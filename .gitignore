@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+web/dist/
+
+# OS files
+.DS_Store
+
+# pi agent data
+.pi/
+.pi-web/
+.pi-subagents/
+
+# Editor data
+.vscode/
+
+# Plugin dependencies (installed per-plugin)
+plugins/*/node_modules/
+
+# 插件运行期数据（书源/书架/进度等，属于用户数据不入库）
+plugins/*/storage/
+
+# Scratch/test temp files
+tests/scratch/
+
+# ccui Electron 桌面版构建产物
+release/
+
+# 独立社区插件清单仓库工作区
+plugin-registry/

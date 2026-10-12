@@ -1,0 +1,9 @@
+{
+	"name": "@ccui/plugin-sdk",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Starter helpers + types for ccui plugins (copy this dir into your plugin, or vendor index.mjs/index.d.ts).",
+	"main": "index.mjs",
+	"types": "index.d.ts"
+}

@@ -1,0 +1,290 @@
+/**
+ * Serializes pi SDK AgentMessage[] into the browser-friendly UiMessage[] shape
+ * defined in protocol.ts. Keeps payloads bounded (tool outputs and text blocks
+ * are truncated with a marker) so snapshots stay cheap to stream.
+ */
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { UiContentBlock, UiImageBlock, UiMessage } from "./protocol.js";
+
+/** AgentMessage is not re-exported from the package root; derive it from AgentSession. */
+export type AgentMessage = AgentSession["messages"][number];
+
+const TEXT_CAP = 200_000;
+const TOOL_OUTPUT_CAP = 100_000;
+const ARGS_CAP = 20_000;
+/**
+ * toolResult 里单张图片进快照的上限（dataUrl 字符数 ≈ 1.5MB 二进制）。
+ * 视口/元素截图随便过；超大整页截图回落成占位文本（模型侧不受影响 —— 图它
+ * 已经看过，只是浏览器这边的缩略图不带）。超限截断 base64 会得到一张坏图，
+ * 所以是整张丢、不是截一半。
+ */
+const TOOL_RESULT_IMAGE_CAP = 2_000_000;
+/** 单条 toolResult 最多带几张图进快照（防图片刷屏把快照撑爆）。 */
+const TOOL_RESULT_IMAGE_MAX = 8;
+/**
+ * toolResult.details 的体积上限。details 是给 UI 用的结构化元数据（如
+ * present_files 的卡片数据、ask_user_question 的答案），快照每 60ms 推一次，
+ * 不能无节制。超过上限时**整个丢掉**（而不是截断 —— 截断后的 JSON 不可解析，
+ * 前端还得写容错）；工具作者应自己封顶（见 present-files-tool.ts 的摘录预算）。
+ */
+const TOOL_DETAILS_CAP = 64_000;
+
+function truncate(s: string, cap: number): { text: string; truncated: boolean } {
+	if (s.length <= cap) return { text: s, truncated: false };
+	return { text: `${s.slice(0, cap)}\n\n… [truncated]`, truncated: true };
+}
+
+type ImageBlockLike = {
+	data?: string;
+	mimeType?: string;
+	source?: {
+		type?: string;
+		data?: string;
+		mediaType?: string;
+		url?: string;
+	};
+};
+
+/**
+ * SDK/工具的图片块 → 前端可直接 <img> 的 UiImageBlock。
+ * Canonical ImageContent shape is { type, data, mimeType }; tolerate the
+ * legacy { source } wrapper too.
+ * cap: dataUrl 超过该字符数回 undefined（调用方按占位文本处理）；默认不限
+ * （用户粘贴图走 image-paste 的缩放管线，尺寸本来就有界）。
+ */
+function imageBlockToUi(b: unknown, cap = Number.POSITIVE_INFINITY): UiImageBlock | undefined {
+	const img = b as unknown as ImageBlockLike;
+	const src = img.source;
+	if (typeof src?.url === "string" && src.url) return { type: "image", dataUrl: src.url };
+	if (typeof img.data === "string" && img.data.length > 0) {
+		const dataUrl = `data:${img.mimeType ?? "image/png"};base64,${img.data}`;
+		if (dataUrl.length > cap) return undefined;
+		return { type: "image", dataUrl, mimeType: img.mimeType };
+	}
+	if (src?.type === "base64" && src.data) {
+		const dataUrl = `data:${src.mediaType ?? "image/png"};base64,${src.data}`;
+		if (dataUrl.length > cap) return undefined;
+		return { type: "image", dataUrl, mimeType: src.mediaType };
+	}
+	return undefined;
+}
+
+function serializeUserContent(content: Extract<AgentMessage, { content: unknown }>["content"]): UiContentBlock[] {
+	if (typeof content === "string") return [{ type: "text", text: content }];
+	return content.map((b) => {
+		if (b.type === "image") {
+			return imageBlockToUi(b) ?? { type: "image", dataUrl: undefined };
+		}
+		return { type: "text", text: String((b as { text?: unknown }).text ?? "") };
+	});
+}
+
+function serializeAssistantContent(content: Extract<AgentMessage, { role: "assistant" }>["content"]): UiContentBlock[] {
+	return content.map((b) => {
+		if (b.type === "text") {
+			const { text, truncated } = truncate(b.text, TEXT_CAP);
+			return { type: "text", text, truncated };
+		}
+		if (b.type === "thinking") {
+			return { type: "thinking", thinking: b.thinking };
+		}
+		if (b.type === "toolCall") {
+			if (b.arguments === undefined) {
+				return { type: "toolCall", id: b.id, name: b.name };
+			}
+			const { text, truncated } = truncate(JSON.stringify(b.arguments), ARGS_CAP);
+			return {
+				type: "toolCall",
+				id: b.id,
+				name: b.name,
+				argumentsText: text,
+				argumentsTruncated: truncated,
+			};
+		}
+		return { type: "unknown", ...(b as unknown as Record<string, unknown>) };
+	});
+}
+
+/**
+ * Hide transient LLM failures while an auto-retry is pending.
+ *
+ * The SDK finalizes the failed assistant message (message_end, then agent_end
+ * with willRetry) BEFORE it slices the message out of state and backs off, so
+ * a snapshot taken in between would paint a red error that vanishes one frame
+ * later. While `retryActive` the trailing stopReason=error assistant messages
+ * are intermediate state: dropped here (retry success → the user never sees
+ * them; exhaustion → auto_retry_end clears the flag and the message renders
+ * red permanently). Non-trailing content is never touched.
+ */
+export function stripTransientRetryErrors(messages: UiMessage[], retryActive: boolean): UiMessage[] {
+	if (!retryActive) return messages;
+	let end = messages.length;
+	while (end > 0) {
+		const m = messages[end - 1];
+		if (m.role === "assistant" && m.stopReason === "error") end -= 1;
+		else break;
+	}
+	return end === messages.length ? messages : messages.slice(0, end);
+}
+
+export function serializeMessage(m: AgentMessage, seq: number): UiMessage | null {
+	switch (m.role) {
+		case "user":
+			return {
+				id: `u-${m.timestamp}-${seq}`,
+				role: "user",
+				content: serializeUserContent(m.content),
+				timestamp: m.timestamp,
+			};
+
+		case "assistant":
+			return {
+				id: `a-${m.timestamp}-${seq}`,
+				role: "assistant",
+				content: serializeAssistantContent(m.content),
+				timestamp: m.timestamp,
+				model: m.model,
+				provider: m.provider,
+				usageCost: typeof m.usage?.cost?.total === "number" ? m.usage.cost.total : undefined,
+				stopReason: m.stopReason,
+				errorMessage: m.errorMessage,
+			};
+
+		case "toolResult": {
+			// 工具结果里的图片（web_shot 截图、read 读到的图……）要下发浏览器：
+			// 卡片里直接显示缩略图、点开放大（见 ToolCallBlock）。以前这里统一丢成
+			// "[image result]"，用户只能看到占位文本。超限/超数的图仍回落占位文本。
+			const textParts: string[] = [];
+			const images: UiImageBlock[] = [];
+			for (const c of m.content) {
+				if (c.type === "text") {
+					textParts.push(c.text);
+					continue;
+				}
+				if (c.type === "image" && images.length < TOOL_RESULT_IMAGE_MAX) {
+					const ui = imageBlockToUi(c, TOOL_RESULT_IMAGE_CAP);
+					if (ui) {
+						images.push(ui);
+						continue;
+					}
+				}
+				textParts.push("[image result]");
+			}
+			const raw = textParts.join("\n");
+			const { text, truncated } = truncate(raw, TOOL_OUTPUT_CAP);
+			const content: UiContentBlock[] =
+				raw || images.length === 0 ? [{ type: "text", text, truncated }, ...images] : [...images];
+			const msg: UiMessage = {
+				id: `t-${m.toolCallId}`,
+				role: "toolResult",
+				content,
+				toolCallId: m.toolCallId,
+				toolName: m.toolName,
+				isError: m.isError,
+				timestamp: m.timestamp,
+			};
+			// 结构化元数据（tool result details）也要下发：present_files 的预览卡片
+			// 就靠它拿 kind/size/excerpt（前端不能靠再打一次 HTTP 才知类型），
+			// ask_user_question/todo_list 同理。体积封顶，超限整丢（见 TOOL_DETAILS_CAP）。
+			if (m.details !== undefined) {
+				try {
+					if (JSON.stringify(m.details).length <= TOOL_DETAILS_CAP) msg.details = m.details;
+				} catch {
+					// 循环引用等序列化不了的值：details 是附加信息，丢掉不影响消息本体。
+				}
+			}
+			return msg;
+		}
+
+		case "bashExecution": {
+			const { text, truncated } = truncate(m.output, TOOL_OUTPUT_CAP);
+			return {
+				id: `b-${m.timestamp}-${seq}`,
+				role: "bashExecution",
+				content: [
+					{
+						type: "bash",
+						command: m.command,
+						output: text,
+						exitCode: m.exitCode,
+						cancelled: m.cancelled,
+						truncated,
+					},
+				],
+				timestamp: m.timestamp,
+			};
+		}
+
+		case "custom": {
+			// Third-party extension messages with display:false are UI-hidden
+			// (they still go into LLM context — the SDK handles that).
+			if ((m as { display?: boolean }).display === false) {
+				return null;
+			}
+			const content = serializeUserContent(m.content);
+			return {
+				id: `c-${m.timestamp}-${seq}`,
+				role: "custom",
+				content,
+				customType: m.customType,
+				details: (m as { details?: unknown }).details,
+				timestamp: m.timestamp,
+			};
+		}
+
+		case "branchSummary": {
+			const { text, truncated } = truncate(m.summary, TEXT_CAP);
+			return {
+				id: `bs-${m.timestamp}-${seq}`,
+				role: "branchSummary",
+				content: [{ type: "text", text, truncated }],
+				timestamp: m.timestamp,
+			};
+		}
+
+		case "compactionSummary": {
+			const { text, truncated } = truncate(m.summary, TEXT_CAP);
+			return {
+				id: `cs-${m.timestamp}-${seq}`,
+				role: "compactionSummary",
+				content: [{ type: "text", text, truncated }],
+				timestamp: m.timestamp,
+				tokensBefore: (m as { tokensBefore?: unknown }).tokensBefore as number | undefined,
+			};
+		}
+
+		case "system": {
+			// SDK 的 system 消息是 prompt sections 的内部差量
+			// (content 空串 + sections 结构化内存)、compaction 的
+			// systemMessage 等——从来不面向用户。不过滤的话
+			// 会掉进 default 分支被序列化成 content: []
+			// 的空气泡、前端顶着 system 标题白显示一条
+			// (对话结束后底部冒出的空 SYSTEM 气泡就是它)。
+			// LLM 上下文不受影响——这里只决定浏览器看到什么。
+			return null;
+		}
+
+		default:
+			return {
+				id: `x-${seq}`,
+				role: String((m as { role?: unknown }).role ?? "unknown"),
+				content: [],
+				timestamp: (m as { timestamp?: number }).timestamp,
+			};
+	}
+}
+
+/**
+ * Serialize the in-progress assistant message (agent.state.streamingMessage).
+ *
+ * Unlike persisted messages, the id must be STABLE across snapshots: the SDK
+ * replaces the partial object on every stream event, so a seq-based id would
+ * remount the React component (and collapse open thinking/tool blocks) every
+ * 60ms. The timestamp is fixed at message creation, so `stream-<ts>` stays
+ * constant for the whole stream.
+ */
+export function serializeStreamingMessage(m: AgentMessage): UiMessage | null {
+	const msg = serializeMessage(m, 0);
+	if (!msg) return null;
+	return { ...msg, id: `stream-${m.timestamp ?? 0}` };
+}
