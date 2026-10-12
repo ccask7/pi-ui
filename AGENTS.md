@@ -239,6 +239,9 @@ npm run pack:extension   # 打浏览器扩展 zip → release/（仅本地用，
 
 **测试规范**：端口隔离（≥8900）；data-dir 隔离（`mkdtempSync`）；精确清理自己进程；不允许 `pkill -f` 杀全局。
 
+**提交习惯**：正常分次提交（一次改动一个 commit，中文提交信息）；不要为了“只要一个提交”去 `--amend`/squash 已有历史，也不要为此 force push。
+（本仓当前只有 `Initial commit` 一个提交，那是历史压缩的一次性结果，不是往后的做法。）
+
 ## 6. 版本与发布（本 fork）
 
 不发布 npm、不建 Release 资产；版本线自己走。
