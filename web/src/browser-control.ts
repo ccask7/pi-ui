@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { DraftAttachment } from "./composer-draft";
+import { isDesktopShell } from "./desktop";
 
 /**
  * page-picker 浏览器扩展由你自己准备（本 fork 不提供下载地址）：
@@ -69,6 +70,15 @@ export function pokeBrowserControl(): void {
 
 /** 问一次状态（扩展不在线时返回可读的失败，不抛）。 */
 export async function queryBrowserControl(): Promise<BrowserControlStatus> {
+	// 桌面壳里没有 Chrome 扩展运行时，page-picker 永远装不上 —— 别走下面的
+	// pageCall（宿主桥在桌面壳里是存在的，会白等 3 秒桥超时），直接给结论。
+	if (isDesktopShell()) {
+		return {
+			available: false,
+			pages: [],
+			error: "桌面版不支持浏览器操作：窗口里没有 Chrome 扩展运行时，请改用系统浏览器打开同一个地址（网页版）",
+		};
+	}
 	const pageCall = host();
 	if (!pageCall) {
 		return {
