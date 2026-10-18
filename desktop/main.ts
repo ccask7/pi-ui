@@ -1,0 +1,250 @@
+/**
+ * pi-ccui desktop shell (Electron, sidecar 模式) —— 移植自上游 pi-web-ui 的 desktop/。
+ *
+ * 设计：不碰 server/ 现有逻辑。主进程用 ELECTRON_RUN_AS_NODE 把
+ * Electron 二进制当纯 Node 用，起一个 `dist/server/index.js` 子进程
+ * （127.0.0.1 + 随机空闲口），等 /api/health 就绪后 BrowserWindow
+ * 直接 load 该地址。前端继续走 appUrl("/ws") + location.host，
+ * protocol.ts 零改动——和浏览器访问远端 server 是同一条路。
+ *
+ * 与上游的差异（fork 决策）：
+ *   - 裁掉了 electron-updater 自动更新（本 fork 已删自更新功能，也没有
+ *     自己的 release 通道；publish 配置若指向上游 repo 会把 fork 覆盖成上游版本）。
+ *   - productName / appId 改为 pi-ccui 系（见 electron-builder.yml）。
+ *
+ * 运行前先 `npm run build`（需要 dist/server + web/dist）。
+ * 开发联调：PI_WEB_DESKTOP_URL=http://localhost:5173 可让窗口指到 vite。
+ */
+import { app, BrowserWindow, shell } from "electron";
+import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import { createServer } from "node:net";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { isAllowedExternalUrl } from "./external-url.js";
+
+const here = dirname(fileURLToPath(import.meta.url));
+/** 开发：dist/desktop → dist/server；打包后：asar 关闭，app 目录即根布局（dist/server + web/dist + themes）。 */
+function resolveServerEntry(): string {
+	if (app.isPackaged) {
+		return join(app.getAppPath(), "dist", "server", "index.js");
+	}
+	return join(here, "..", "server", "index.js");
+}
+
+function resolveWebDir(): string | null {
+	// 打包后静态资源由 server 自己从 web/dist 提供（与 npm 包一致），此处仅 dev 兜底检查。
+	const devWeb = join(here, "..", "..", "web", "dist", "index.html");
+	if (!app.isPackaged && !existsSync(join(here, "..", "server", "index.js"))) {
+		console.error("✖ 找不到 dist/server/index.js，请先跑 `npm run build`");
+		process.exit(1);
+	}
+	return devWeb;
+}
+
+/** 取一个系统分配的空闲 TCP 口（桌面模式不用固定 8787，避免和网页版冲突）。 */
+function pickFreePort(): Promise<number> {
+	return new Promise((resolve, reject) => {
+		const s = createServer();
+		s.once("error", reject);
+		s.listen(0, "127.0.0.1", () => {
+			const addr = s.address();
+			s.close(() => {
+				if (addr && typeof addr === "object") resolve(addr.port);
+				else reject(new Error("pickFreePort: bad address"));
+			});
+		});
+	});
+}
+
+/** 该端口现在能不能绑（能绑 = 空闲）。 */
+function isPortFree(port: number): Promise<boolean> {
+	return new Promise((resolve) => {
+		const s = createServer();
+		s.once("error", () => resolve(false));
+		s.listen(port, "127.0.0.1", () => s.close(() => resolve(true)));
+	});
+}
+
+/**
+ * 端口：默认随机空闲口。`PI_WEB_PORT` 显式指定时优先，但**已被占用就退回随机口**——
+ * 从 ccui 自己的终端里跑 `desktop:dev` 会继承它的 `PI_WEB_PORT=8787`，
+ * 硬用该值只会让 sidecar 一启动就 EADDRINUSE 崩掉（窗口转而连上那个网页版 server）。
+ */
+async function resolvePort(): Promise<number> {
+	const want = Number(process.env.PI_WEB_PORT ?? 0);
+	if (want > 0) {
+		if (await isPortFree(want)) return want;
+		console.warn(`[desktop] PI_WEB_PORT=${want} 已被占用，改用随机空闲口（不影响在跑的那个 server）`);
+	}
+	return pickFreePort();
+}
+
+/** /api/health 轮询：server 就绪后再建窗口，避免白屏。 */
+async function waitForHealth(url: string, timeoutMs = 20_000): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	for (;;) {
+		try {
+			const res = await fetch(`${url}/api/health`);
+			if (res.ok) return;
+		} catch {
+			/* 还没起来 */
+		}
+		if (Date.now() > deadline) throw new Error(`server 未在 ${timeoutMs}ms 内就绪：${url}`);
+		await new Promise((r) => setTimeout(r, 200));
+	}
+}
+
+let serverProc: ChildProcess | null = null;
+let mainWin: BrowserWindow | null = null;
+let serverHealthy = false;
+
+console.log("[desktop] main started, waiting for app ready…");
+
+async function startServerSidecar(): Promise<string> {
+	const override = process.env.PI_WEB_DESKTOP_URL;
+	if (override) return override; // 指向 vite(:5173) 联调，前提是另起 dev:server
+	const entry = resolveServerEntry();
+	resolveWebDir();
+	console.log(`[desktop] server entry: ${entry}`);
+	const port = await resolvePort();
+	const dataDir = process.env.PI_WEB_DATA_DIR ?? join(app.getPath("userData"), "data");
+	const cwd = process.env.PI_WEB_CWD ?? homedir();
+	console.log(`[desktop] spawning server on 127.0.0.1:${port} (data: ${dataDir})`);
+	// ELECTRON_RUN_AS_NODE=1：让 Electron 二进制退化成纯 Node 跑 server，
+	// 无需额外捆一个 node，也不用改 server/index.ts。
+	// --import：可选的「优先用全局 pi SDK」钩子（默认关；见 server/resolve-global-sdk.ts）。
+	// dist 可能是旧构建（没这个文件）—— 只有存在才注入，别让桌面版起不来。
+	// 桌面版通常没有祖先 node_modules，所以它实际上总是回落自带那份。
+	// Windows 坑：--import 的绝对路径必须转成 file:// URL，否则 ESM loader 把
+	// 盘符当协议（ERR_UNSUPPORTED_ESM_URL_SCHEME, protocol 'd:'），server 起不来。
+	const sdkHook = join(dirname(entry), "resolve-global-sdk.js");
+	serverProc = spawn(
+		process.execPath,
+		[
+			...(existsSync(sdkHook) ? ["--import", pathToFileURL(sdkHook).href] : []),
+			entry,
+			"--host",
+			"127.0.0.1",
+			"--port",
+			String(port),
+		],
+		{
+			env: {
+				...process.env,
+				ELECTRON_RUN_AS_NODE: "1",
+				PI_WEB_HOST: "127.0.0.1",
+				PI_WEB_PORT: String(port),
+				PI_WEB_CWD: cwd,
+				PI_WEB_DATA_DIR: dataDir,
+			},
+			stdio: "inherit",
+			windowsHide: true,
+		},
+	);
+	serverProc.on("error", (err) => {
+		console.error(`[desktop] server spawn 失败：${err.message}`);
+		if (!serverHealthy) app.quit();
+	});
+	serverProc.on("exit", (code, signal) => {
+		console.error(`[desktop] server 提前退出（code=${code} signal=${signal}），请看上方 server 日志`);
+		if (!serverHealthy) app.quit();
+	});
+	const url = `http://127.0.0.1:${port}`;
+	await waitForHealth(url);
+	serverHealthy = true;
+	console.log(`[desktop] server 就绪：${url}`);
+	return url;
+}
+
+async function createWindow(url: string): Promise<void> {
+	mainWin = new BrowserWindow({
+		width: 1280,
+		height: 860,
+		autoHideMenuBar: true,
+		webPreferences: {
+			preload: join(here, "preload.js"),
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true,
+		},
+	});
+	console.log(`[desktop] opening window: ${url}`);
+	try {
+		await mainWin.loadURL(url);
+	} catch (err) {
+		console.error(`[desktop] loadURL 失败：${(err as Error).message}`);
+	}
+	// 外链丢给系统浏览器，别在应用窗口里导航走。
+	mainWin.webContents.setWindowOpenHandler(({ url: u }) => {
+		if (!isAllowedExternalUrl(u)) {
+			console.warn(`[desktop] 已拦截非 allowlist 外链（新窗口）：${u}`);
+			return { action: "deny" };
+		}
+		void shell.openExternal(u);
+		return { action: "deny" };
+	});
+	// 同帧导航守卫：setWindowOpenHandler 只拦新窗口请求（window.open /
+	// target="_blank"），而对话正文里的裸 href 与 JS 主动跳转（location.href/assign）
+	// 走的是同帧导航 —— 默认会被允许，直接把应用窗口带走（无地址栏、无后退键，只能重启）。
+	// 应用自身 origin（重载/前端路由）放行，其余一律转系统浏览器。
+	const appOrigin = new URL(url).origin;
+	mainWin.webContents.on("will-navigate", (e, target) => {
+		let origin: string;
+		try {
+			origin = new URL(target).origin;
+		} catch {
+			return; // 非法 URL：交给 Electron 处理
+		}
+		if (origin === appOrigin) return;
+		e.preventDefault();
+		if (!isAllowedExternalUrl(target)) {
+			console.warn(`[desktop] 已拦截非 allowlist 外链（同帧导航）：${target}`);
+			return;
+		}
+		console.log(`[desktop] will-navigate 拦截，已用系统浏览器打开：${target}`);
+		void shell.openExternal(target);
+	});
+	mainWin.on("closed", () => {
+		mainWin = null;
+	});
+}
+
+// 单实例：第二个实例聚焦已有窗口（和网页版多标签页各走独立 clientId 不冲突）。
+if (!app.requestSingleInstanceLock()) {
+	app.quit();
+} else {
+	app.on("second-instance", () => {
+		if (mainWin) {
+			if (mainWin.isMinimized()) mainWin.restore();
+			mainWin.focus();
+		}
+	});
+}
+
+// ⚠️ 绝对不要在 ESM 主进程顶层 `await app.whenReady()`（Electron 44 实测死锁）：
+// Electron 要等入口模块求值完成才发 ready 事件，顶层 await ready = 互相死等——
+// 进程挂在 "waiting for app ready…"，窗口永远不开（改成 .then 回调里 await 即可）。
+void app.whenReady().then(async () => {
+	console.log("[desktop] app ready");
+	try {
+		const url = await startServerSidecar();
+		await createWindow(url);
+	} catch (err) {
+		console.error("✖ 桌面版启动失败：", err);
+		app.quit();
+	}
+});
+
+app.on("window-all-closed", () => {
+	if (process.platform !== "darwin") app.quit();
+});
+app.on("activate", () => {
+	// macOS 点 dock 时窗口已关：server sidecar 还在，本骨架暂不重建窗口，退出重进即可。
+	if (BrowserWindow.getAllWindows().length === 0) app.quit();
+});
+app.on("will-quit", () => {
+	serverProc?.kill();
+	serverProc = null;
+});
