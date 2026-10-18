@@ -13,7 +13,7 @@ Ccui 是 pi 编码智能体（`@earendil-works/pi-coding-agent` SDK）的 Web �
 声音提醒、多语言切换。可 Docker / systemd 等常见方式部署（见 `docs/deployment.md`）。
 
 - 本仓是**本地私有 fork**：基于上游 **pi-web-ui v0.95.0**，源码级改动，不向上游提交、不发布 npm
-- 包名仍为 `ccui`，只在本机通过 `node bin/ccui.mjs` 运行（数据目录 `~/.pi-web`、会话 `~/.pi/agent/sessions` 不变）
+- 包名仍为 `ccui`，本机通过 `node bin/ccui.mjs` 或 Electron 桌面版（`desktop/`，见 §8）运行（数据目录 `~/.pi-web`、会话 `~/.pi/agent/sessions` 不变）
 - 版本：`package.json` 与 `package-lock.json` 两处同步维护，本 fork 从 `0.0.1` 起
 - Node 要求：**>= 22.19.0**（pi SDK 的 dist 使用了 `import … with { type: "json" }` 语法）
 
@@ -23,7 +23,7 @@ Ccui 是 pi 编码智能体（`@earendil-works/pi-coding-agent` SDK）的 Web �
 
 | 已删除                        | 相关痕迹                                                                                  |
 | ----------------------------- | ----------------------------------------------------------------------------------------- |
-| Electron 桌面壳               | `desktop/`、`release/`、electron-builder 配置与桌面 workflow                              |
+| ~~Electron 桌面壳~~（已加回）  | 上游桌面壳已移植回 `desktop/`（裁掉 electron-updater 自动更新，只出 Windows NSIS 包），见 `desktop/README.md` |
 | DSH 第二引擎                  | `server/dsh/`、`docs/dsh-engine.md`、双引擎分支与设置里的 DSH 分页                        |
 | 插件市场与远程安装            | `plugin-catalog/installer`、`bin` 的 `install / uninstall / plugins` 子命令、开机目录同步 |
 | 自更新与更新检查              | 版本检查路由、npm 自升级、前端更新入口                                                    |
@@ -122,6 +122,12 @@ ccui/
 │   │   └── components/         # 见下
 │   └── dist/                   # 构建产物（gitignore；运行时由 dist/server 与 web/dist 提供）
 ├── bin/ccui.mjs           # CLI：前台启动（本 fork 已移除 server */install 等子命令）
+├── desktop/                  # Electron 桌面壳（sidecar 模式，移植自上游；编译到 dist/desktop/）
+│   ├── main.ts               # 主进程：起 server sidecar（127.0.0.1+随机口）→ BrowserWindow load 该地址
+│   ├── preload.ts            # 只暴露 window.piDesktop = { isDesktop, versions }（无 updater）
+│   ├── external-url.ts       # 外链 scheme allowlist（新窗口 + 同帧导航守卫共用）
+│   ├── electron-builder.yml  # 打包配置（Windows NSIS；asar:false；npmRebuild:false；无 publish）
+│   └── README.md             # 桌面版约定与坑（详）
 ├── themes/                     # 内置主题（完整样式表：:root 变量 + 任意选择器/布局覆盖皆可，styles.css 只是共享基线）
 ├── make-light-theme.mjs        # 主题生成器（从 styles.css 的 :root 变量清单生成纯调色板）
 ├── tests/                      # 全部测试脚本（自包含：独立端口 ≥8900 + 临时 data-dir）
@@ -278,6 +284,7 @@ git tag vX.Y.Z && git push origin main --tags   # tag 带 v 前缀，数字与 p
 
 - **CLI 前台**：`node bin/ccui.mjs --port 9000 --cwd /path`
 - **Docker**：`docker compose up -d`
+- **桌面版（Electron）**：`npm run desktop:dev`（开发）/ `npm run desktop:dist`（出 `release/pi-ccui-*-setup.exe`）；约定与坑见 `desktop/README.md`
 
 ## 9. 常见坑
 
