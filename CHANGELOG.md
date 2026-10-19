@@ -10,6 +10,16 @@
 
 ## [Unreleased]
 
+## [0.0.2] — 2026-10-19
+
+### Added
+
+- **Electron 桌面版（exe 启动）** — 移植上游 `desktop/` sidecar 壳：Electron 主进程用 `ELECTRON_RUN_AS_NODE` 把 `dist/server` 当纯 Node 子进程起在 127.0.0.1 随机空闲口，`/api/health` 就绪后 BrowserWindow 直接加载该地址，server / web / protocol 与网页版同一份构建产物零分叉。`npm run desktop:dev` 开发联调、`npm run desktop:dist` 出 NSIS 安装包（`release/pi-ccui-<version>-setup.exe`）。与上游的差异：裁掉 electron-updater 自动更新（本 fork 无 release 通道，`publish` 指向上游会把 fork 覆盖成上游版本）、只出 Windows 包。**启动工作区恢复**（参考 VS Code `window.restoreWindows` 语义）：`PI_WEB_CWD` env > 恢复 `client-state.json` 里最近用过的项目（跳过已删除目录与最近列表墓碑）> 首次启动弹原生目录选择框（取消才回退用户主目录）；UI 里切项目写回同一份文件，下次启动自动恢复。已知限制：未签名，Windows 首启有 SmartScreen 提示；`browser_page` 桌面版不可用（窗口内无 Chrome 扩展运行时，`isDesktopShell()` 短路直接提示改用网页版，不干等桥超时）。
+
+### Fixed
+
+- **Windows 下桌面 sidecar 起不来** — 上游把 `--import <绝对路径>` 直接传给子进程，Windows 盘符被 ESM loader 当协议（`ERR_UNSUPPORTED_ESM_URL_SCHEME`），现改为 `pathToFileURL` 转 `file://` URL。
+
 ## [0.95.0] — 2026-09-24
 
 ### Added
