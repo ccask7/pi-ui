@@ -15,9 +15,9 @@
  * 运行前先 `npm run build`（需要 dist/server + web/dist）。
  * 开发联调：PI_WEB_DESKTOP_URL=http://localhost:5173 可让窗口指到 vite。
  */
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, dialog, shell } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -102,6 +102,83 @@ let serverHealthy = false;
 
 console.log("[desktop] main started, waiting for app ready…");
 
+function resolveDataDir(): string {
+	return process.env.PI_WEB_DATA_DIR ?? join(app.getPath("userData"), "data");
+}
+
+/** 目录仍存在的真实目录才作数（记录里的项目可能已被删/移走）。 */
+function isUsableDir(p: string): boolean {
+	try {
+		return statSync(p).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * 从 <dataDir>/client-state.json 恢复上次项目（VS Code 的 restoreWindows 思路）：
+ * 合并所有 client 的 projects，按 lastUsed 倒序，跳过用户从最近列表移除的
+ * （removedProjects 墓碑）与已不存在的目录，取第一个可用的。
+ * 只读不写——写入仍归 server 管（UI 里 set_cwd 时它更新同一份文件，闭环）。
+ * 文件不存在/损坏一律回退 null，绝不让启动挂在这。
+ */
+function readLastProject(dataDir: string): string | null {
+	try {
+		const raw = readFileSync(join(dataDir, "client-state.json"), "utf8");
+		const all = JSON.parse(raw) as Record<
+			string,
+			{ projects?: { path: string; lastUsed: number }[]; removedProjects?: string[] }
+		>;
+		const removed = new Set<string>();
+		const candidates: { path: string; lastUsed: number }[] = [];
+		for (const state of Object.values(all)) {
+			if (!state || typeof state !== "object") continue;
+			for (const r of state.removedProjects ?? []) removed.add(r);
+			for (const p of state.projects ?? []) {
+				if (typeof p?.path === "string" && typeof p?.lastUsed === "number") candidates.push(p);
+			}
+		}
+		candidates.sort((a, b) => b.lastUsed - a.lastUsed);
+		for (const c of candidates) {
+			if (removed.has(c.path)) continue;
+			if (isUsableDir(c.path)) return c.path;
+			console.warn(`[desktop] 上次项目已不存在，跳过：${c.path}`);
+		}
+	} catch {
+		/* 没有记录/读失败：当首次启动处理 */
+	}
+	return null;
+}
+
+/**
+ * 启动 cwd 的优先级：
+ *   1. PI_WEB_CWD 显式指定（env 覆盖语义不变）；
+ *   2. client-state.json 里最近用过的项目（自动恢复）；
+ *   3. 都没有（首次启动/记录全失效）→ 弹原生目录选择框，取消才回退 home。
+ * defaultPath 必须显式传：Electron 43+ 不传时会强制落 Downloads/Home，
+ * 覆盖系统对话框自己记忆的最近目录（electron#52454）。
+ */
+async function resolveCwd(dataDir: string): Promise<string> {
+	const explicit = process.env.PI_WEB_CWD;
+	if (explicit) return explicit;
+	const last = readLastProject(dataDir);
+	if (last) {
+		console.log(`[desktop] 恢复上次项目：${last}`);
+		return last;
+	}
+	const picked = await dialog.showOpenDialog({
+		title: "选择项目目录（取消则使用用户主目录）",
+		defaultPath: homedir(),
+		properties: ["openDirectory", "createDirectory"],
+	});
+	if (!picked.canceled && picked.filePaths[0]) {
+		console.log(`[desktop] 首次启动选定项目：${picked.filePaths[0]}`);
+		return picked.filePaths[0];
+	}
+	console.log("[desktop] 未选择项目目录，回退用户主目录");
+	return homedir();
+}
+
 async function startServerSidecar(): Promise<string> {
 	const override = process.env.PI_WEB_DESKTOP_URL;
 	if (override) return override; // 指向 vite(:5173) 联调，前提是另起 dev:server
@@ -109,8 +186,8 @@ async function startServerSidecar(): Promise<string> {
 	resolveWebDir();
 	console.log(`[desktop] server entry: ${entry}`);
 	const port = await resolvePort();
-	const dataDir = process.env.PI_WEB_DATA_DIR ?? join(app.getPath("userData"), "data");
-	const cwd = process.env.PI_WEB_CWD ?? homedir();
+	const dataDir = resolveDataDir();
+	const cwd = await resolveCwd(dataDir);
 	console.log(`[desktop] spawning server on 127.0.0.1:${port} (data: ${dataDir})`);
 	// ELECTRON_RUN_AS_NODE=1：让 Electron 二进制退化成纯 Node 跑 server，
 	// 无需额外捆一个 node，也不用改 server/index.ts。

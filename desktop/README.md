@@ -46,7 +46,12 @@ ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder
 - 图标：复用网页版的 `web/public/icons/icon-1024.png`，electron-builder 自己转 `.ico`，
   换图标只改这一处（网页版 PWA 图标同步变）。
 - 数据：`PI_WEB_DATA_DIR` 默认 `<userData>/data`（Windows 上 `%APPDATA%/ccui/data`），
-  和 `~/.pi-web` 隔离；`PI_WEB_CWD` 默认用户主目录，可用同名 env 覆盖。
+  和 `~/.pi-web` 隔离。
+- 启动工作区（cwd）按优先级：`PI_WEB_CWD` 显式指定 → 恢复上次项目（读
+  `<dataDir>/client-state.json` 里所有 client 的 projects，按 lastUsed 取最新、
+  跳过已删除目录与墓碑）→ 都没有就弹原生目录选择框（取消才回退用户主目录）。
+  UI 里切项目会写回同一份 client-state.json，下次启动自动恢复——闭环。
+  选择框必须显式传 `defaultPath`：Electron 43+ 不传会强制落 Downloads/Home（electron#52454）。
 - 单实例锁：`requestSingleInstanceLock()`。
 - 安全：`contextIsolation + sandbox`，renderer 无 node，外链经 scheme allowlist
   （`external-url.ts`）走系统浏览器；同帧导航（`will-navigate`）同样拦截——
