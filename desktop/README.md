@@ -49,7 +49,9 @@ ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder
   和 `~/.pi-web` 隔离。
 - 启动工作区（cwd）按优先级：`PI_WEB_CWD` 显式指定 → 恢复上次项目（读
   `<dataDir>/client-state.json` 里所有 client 的 projects，按 lastUsed 取最新、
-  跳过已删除目录与墓碑）→ 都没有就弹原生目录选择框（取消才回退用户主目录）。
+  跳过已删除目录、墓碑、以及用户主目录——home 只是取消选择框后的临时兜底，
+  不作恢复目标，否则取消一次选择框它就作为「上次项目」被 server 写回，永远 sticky）
+  → 都没有就弹原生目录选择框（取消才回退用户主目录）。
   UI 里切项目会写回同一份 client-state.json，下次启动自动恢复——闭环。
   选择框必须显式传 `defaultPath`：Electron 43+ 不传会强制落 Downloads/Home（electron#52454）。
 - 单实例锁：`requestSingleInstanceLock()`。

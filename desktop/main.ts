@@ -20,7 +20,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isAllowedExternalUrl } from "./external-url.js";
 
@@ -118,7 +118,8 @@ function isUsableDir(p: string): boolean {
 /**
  * 从 <dataDir>/client-state.json 恢复上次项目（VS Code 的 restoreWindows 思路）：
  * 合并所有 client 的 projects，按 lastUsed 倒序，跳过用户从最近列表移除的
- * （removedProjects 墓碑）与已不存在的目录，取第一个可用的。
+ * （removedProjects 墓碑）、已不存在的目录、以及用户主目录——home 只是
+ * 取消选择框后的临时兜底，不算「上次项目」，否则取消一次就永远 sticky。
  * 只读不写——写入仍归 server 管（UI 里 set_cwd 时它更新同一份文件，闭环）。
  * 文件不存在/损坏一律回退 null，绝不让启动挂在这。
  */
@@ -139,7 +140,9 @@ function readLastProject(dataDir: string): string | null {
 			}
 		}
 		candidates.sort((a, b) => b.lastUsed - a.lastUsed);
+		const home = resolve(homedir()).toLowerCase();
 		for (const c of candidates) {
+			if (resolve(c.path).toLowerCase() === home) continue; // 主目录不作恢复目标
 			if (removed.has(c.path)) continue;
 			if (isUsableDir(c.path)) return c.path;
 			console.warn(`[desktop] 上次项目已不存在，跳过：${c.path}`);
