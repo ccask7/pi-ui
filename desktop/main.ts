@@ -228,6 +228,12 @@ async function createWindow(): Promise<void> {
 		width: 1280,
 		height: 860,
 		autoHideMenuBar: true,
+		// WCO（VS Code 同款）：系统只留右上角 min/max/close 覆盖条，标题栏交给网页
+		// （顶栏 CSS app-region: drag，见 styles.css 的 html.desktop-shell 段）。
+		// 初始配色对 welcome.html 的深色底；进主界面后由 syncTitlebarOverlay 跟随主题。
+		// height 49 = ccui 顶栏实测高（控件 28 + 上下 padding 10 + 边框 1）。
+		titleBarStyle: "hidden",
+		titleBarOverlay: { color: "#1a1b1e", symbolColor: "#e4e4e7", height: 49 },
 		webPreferences: {
 			preload: join(here, "preload.cjs"),
 			contextIsolation: true,
@@ -304,6 +310,18 @@ ipcMain.handle("desktop:pick-directory", async () => {
 		properties: ["openDirectory", "createDirectory"],
 	});
 	return r.canceled ? null : (r.filePaths[0] ?? null);
+});
+
+// 主题切换后同步 WCO 按钮条颜色（只收不透明 hex6，overlay 不吃 alpha）。
+let lastOverlay = "";
+ipcMain.handle("desktop:titlebar-overlay", (_e, color: unknown, symbolColor: unknown) => {
+	if (typeof color !== "string" || typeof symbolColor !== "string") return;
+	if (!/^#[0-9a-fA-F]{6}$/.test(color) || !/^#[0-9a-fA-F]{6}$/.test(symbolColor)) return;
+	const key = `${color}/${symbolColor}`;
+	if (key === lastOverlay) return; // 初次会排三次重试，同样的值不必重复设
+	lastOverlay = key;
+	console.log(`[desktop] 标题栏按钮条配色：${color} / ${symbolColor}`);
+	mainWin?.setTitleBarOverlay({ color, symbolColor, height: 49 });
 });
 
 // 返回 null = 成功（窗口已切到真 UI）；返回字符串 = 给用户看的错误。

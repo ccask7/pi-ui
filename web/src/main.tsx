@@ -4,7 +4,8 @@ import { App } from "./App";
 import { LanguageProvider } from "./i18n";
 import "./styles.css";
 import "highlight.js/styles/github-dark.css";
-import { applyTheme, loadTheme } from "./theme";
+import { applyTheme, loadTheme, THEME_CHANGE_EVENT } from "./theme";
+import { isDesktopShell, syncTitlebarOverlay } from "./desktop";
 import { initAuthToken } from "./auth-token";
 import { installScrollbarGutterVar } from "./scrollbar-gutter";
 import { appBase } from "./base-url";
@@ -15,6 +16,16 @@ initAuthToken();
 // Apply the persisted theme before first render so there's no flash of the
 // wrong palette. The full stylesheet swap happens via an injected <link>.
 applyTheme(loadTheme());
+// 桌面壳（Electron WCO）：顶栏兼任标题栏——挂根 class（styles.css 里有对应的
+// 拖拽 / 右侧让位规则），主题切换时同步右上角系统按钮条颜色。浏览器全跳过。
+if (isDesktopShell()) {
+	document.documentElement.classList.add("desktop-shell");
+	window.addEventListener(THEME_CHANGE_EVENT, () => setTimeout(syncTitlebarOverlay, 0));
+	// 初次同步：顶栏渲染与主题 <link> 加载都是异步的，排三次保险（幂等，重复调无副作用）。
+	requestAnimationFrame(syncTitlebarOverlay);
+	setTimeout(syncTitlebarOverlay, 300);
+	setTimeout(syncTitlebarOverlay, 1500);
+}
 // 首帧前实测滚动条宽（scrollbar-gutter 预留 gutter 的宽度）→ 宽屏消息列与
 // 输入列的对齐补偿变量 --msgs-gutter，见 scrollbar-gutter.ts。
 installScrollbarGutterVar();

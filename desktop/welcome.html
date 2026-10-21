@@ -22,6 +22,8 @@
 				color: #e4e4e7;
 				font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
 				user-select: none;
+				/* WCO：整页当标题栏拖，按钮自己不许拖 */
+				-webkit-app-region: drag;
 			}
 			.card {
 				text-align: center;
@@ -53,6 +55,7 @@
 				color: #fff;
 				cursor: pointer;
 				transition: background 0.15s;
+				-webkit-app-region: no-drag;
 			}
 			button:hover:not(:disabled) {
 				background: #818cf8;

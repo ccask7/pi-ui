@@ -14178,3 +14178,21 @@ button.source-default-toggle {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+
+/* ===== 桌面壳（Electron WCO）：顶栏兼任标题栏 =====
+   `html.desktop-shell` 由 main.tsx 在 isDesktopShell() 时挂上，浏览器永远没有这个
+   class，下面规则在网页版完全失效。系统只画右上角 min/max/close 按钮条（overlay），
+   标题栏其余区域是本顶栏：可拖拽移动窗口，双击最大化/还原（app-region: drag 自带）。 */
+html.desktop-shell .topbar {
+	-webkit-app-region: drag;
+	/* 右侧给 overlay 按钮条让位：被占宽度 = 全宽 - 可用宽。
+	   env() 不支持/未启用 WCO 时回退 100%，calc 结果就是原本的 16px。 */
+	padding-right: calc(16px + 100% - env(titlebar-area-width, 100%));
+}
+/* 交互元素一律不许拖（否则点不动）；两栏之间的 .tb-spacer 是空白，仍可拖。 */
+html.desktop-shell .topbar * {
+	-webkit-app-region: no-drag;
+}
+html.desktop-shell .topbar .tb-spacer {
+	-webkit-app-region: drag;
+}

@@ -62,6 +62,20 @@ ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder
   选择框必须显式传 `defaultPath`：Electron 43+ 不传会强制落 Downloads/Home（electron#52454）。
 - 欢迎页资源：tsc 不搬 HTML，`build:desktop` 末尾把 `desktop/*.html` 拷进
   `dist/desktop/`（electron-builder 的 files 只认 dist/desktop）。
+- **标题栏（WCO，VS Code 同款）**：窗口用 `titleBarStyle: "hidden"` +
+  `titleBarOverlay`，系统只留右上角 min/max/close 覆盖条（原生行为——双击最大化、
+  Win11 贴靠悬停、边缘缩放——全保留），其余标题栏区域是网页：
+  - `web/src/main.tsx` 在 `isDesktopShell()` 时给 `<html>` 挂 `desktop-shell`，
+    `styles.css` 末尾的规则让顶栏 `-webkit-app-region: drag`（交互元素 no-drag、
+    `.tb-spacer` 仍可拖）、`padding-right: calc(16px + 100% - env(titlebar-area-width))`
+    给按钮条让位。浏览器没有这个 class，网页版零影响。
+  - overlay 颜色由 `web/src/desktop.ts#syncTitlebarOverlay()` 算：`.topbar` 叠 `body`
+    逐层合成（两者常是半透明，壁纸主题尤甚）→ hex6 + 按亮度选深浅符号色，
+    经 `desktop:titlebar-overlay` IPC 下发（主进程 `setTitleBarOverlay`）。
+    主题切换（`ccui:theme-change`）与初次进主界面时都调，所以**浅色主题下按钮条跟着变浅**。
+  - overlay 高度 49 = 顶栏实测高（控件 28 + 上下 padding 10 + 边框 1），改顶栏高度要同步改。
+  - 坑：颜色解析要兼容 `color(srgb 0.07 0.08 0.11 / 0.6)` 这类回读格式（分量 0~1 浮点，
+    不是 0~255）；overlay 不接受 alpha，必须合成成不透明色。
 - 单实例锁：`requestSingleInstanceLock()`。
 - 安全：`contextIsolation + sandbox`，renderer 无 node，外链经 scheme allowlist
   （`external-url.ts`）走系统浏览器；同帧导航（`will-navigate`）同样拦截——

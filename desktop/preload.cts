@@ -24,4 +24,7 @@ contextBridge.exposeInMainWorld("piDesktop", {
 	pickDirectory: (): Promise<string | null> => ipcRenderer.invoke("desktop:pick-directory"),
 	/** 欢迎页：用选定目录起 server 并把窗口切到主界面；返回 null=成功，字符串=给用户看的错误。 */
 	start: (cwd: string): Promise<string | null> => ipcRenderer.invoke("desktop:start", cwd),
+	/** 主题切换后同步标题栏按钮条（WCO）颜色；只收不透明 hex6。 */
+	setTitleBarOverlay: (color: string, symbolColor: string): Promise<void> =>
+		ipcRenderer.invoke("desktop:titlebar-overlay", color, symbolColor),
 });
