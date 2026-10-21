@@ -229,7 +229,7 @@ async function createWindow(): Promise<void> {
 		height: 860,
 		autoHideMenuBar: true,
 		webPreferences: {
-			preload: join(here, "preload.js"),
+			preload: join(here, "preload.cjs"),
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,

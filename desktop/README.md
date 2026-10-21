@@ -16,6 +16,8 @@ Electron 主进程 (desktop/main.ts)
   （`electron-builder.yml` 不设 `publish`——指向上游 repo 会把 fork 覆盖成上游版本）。
   preload 暴露 `window.piDesktop = { isDesktop, versions, pickDirectory, start }`
   ——后两个是欢迎页（welcome.html）的 IPC 控制面，server 未起之前选目录/启动只能走壳。
+  注意 preload 必须是 CJS（源码为 `preload.cts`）：sandbox 渲染进程不载 ESM preload，
+  静默失败表现为 `window.piDesktop` undefined。
 - 只出 Windows NSIS 包（mac/linux target 已删，需要时参照上游 yml 加回）。
 - 修了一个 Windows 坑：sidecar 的 `--import <sdkHook>` 必须传 `file://` URL
   （`pathToFileURL`），否则盘符被 ESM loader 当协议，server 起不来。

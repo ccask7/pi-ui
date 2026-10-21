@@ -3,8 +3,15 @@
  * 仅有的两个 IPC 是壳层欢迎页（welcome.html）的控制面：server 未起之前，
  * 「选目录 / 启动」只能走壳。（上游此处还有 electron-updater 的更新通道，
  * 本 fork 已随自更新功能一起裁掉，见 desktop/main.ts 头部注释。）
+ *
+ * 文件名必须是 .cts（tsc 产出 preload.cjs，CommonJS）：sandbox:true 的渲染进程
+ * 里 preload 只支持 CJS；仓库 "type": "module" 下的 .js 会被当 ESM，静默加载失败
+ * ——表现为页面里 window.piDesktop 是 undefined（主界面一直靠 UA 兜底判断桌面壳，
+ * 所以这个坑直到欢迎页第一次真正调 IPC 才暴露）。
  */
-import { contextBridge, ipcRenderer } from "electron";
+import electron = require("electron");
+
+const { contextBridge, ipcRenderer } = electron;
 
 contextBridge.exposeInMainWorld("piDesktop", {
 	isDesktop: true as const,
