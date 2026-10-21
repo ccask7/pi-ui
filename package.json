@@ -50,7 +50,7 @@
 		"build:extension": "node plugins/page-picker/extension/build.mjs",
 		"pack:extension": "node plugins/page-picker/extension/pack.mjs",
 		"build:runtrace-vendor": "node scripts/build-runtrace-vendor.mjs",
-		"build:desktop": "tsc -p desktop/tsconfig.json",
+		"build:desktop": "tsc -p desktop/tsconfig.json && node -e \"for (const f of require('fs').readdirSync('desktop')) if (f.endsWith('.html')) require('fs').cpSync('desktop/'+f, 'dist/desktop/'+f)\"",
 		"desktop:dev": "npm run build:desktop && electron dist/desktop/main.js",
 		"desktop:dist": "npm run build && npm run build:desktop && electron-builder -c desktop/electron-builder.yml",
 		"typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit && tsc -p desktop/tsconfig.json --noEmit && tsc -p plugins/page-picker/extension/tsconfig.json --noEmit",

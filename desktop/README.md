@@ -14,7 +14,8 @@ Electron 主进程 (desktop/main.ts)
 
 - **裁掉了 electron-updater 自动更新**：本 fork 已删自更新功能，也没有自己的 release 通道
   （`electron-builder.yml` 不设 `publish`——指向上游 repo 会把 fork 覆盖成上游版本）。
-  preload 只暴露 `window.piDesktop = { isDesktop, versions }`。
+  preload 暴露 `window.piDesktop = { isDesktop, versions, pickDirectory, start }`
+  ——后两个是欢迎页（welcome.html）的 IPC 控制面，server 未起之前选目录/启动只能走壳。
 - 只出 Windows NSIS 包（mac/linux target 已删，需要时参照上游 yml 加回）。
 - 修了一个 Windows 坑：sidecar 的 `--import <sdkHook>` 必须传 `file://` URL
   （`pathToFileURL`），否则盘符被 ESM loader 当协议，server 起不来。
@@ -49,11 +50,16 @@ ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder
   和 `~/.pi-web` 隔离。
 - 启动工作区（cwd）按优先级：`PI_WEB_CWD` 显式指定 → 恢复上次项目（读
   `<dataDir>/client-state.json` 里所有 client 的 projects，按 lastUsed 取最新、
-  跳过已删除目录、墓碑、以及用户主目录——home 只是取消选择框后的临时兜底，
-  不作恢复目标，否则取消一次选择框它就作为「上次项目」被 server 写回，永远 sticky）
-  → 都没有就弹原生目录选择框（取消才回退用户主目录）。
+  跳过已删除目录、墓碑、以及用户主目录——home 不作恢复目标，否则取消一次选择
+  它就作为「上次项目」被 server 写回，永远 sticky）→ 都没有（新用户/记录全失效）
+  就开**欢迎页**：窗口先开、`welcome.html`（壳层 file:// 页面）接管，此时 server
+  还没起；用户点「选择项目目录」→ `desktop:pick-directory` IPC 弹系统框 →
+  `desktop:start` IPC 才 spawn server（cwd=所选目录）→ 窗口切到真 UI。
+  全程无启动期系统对话框、不回退 home；boot 失败清掉半拉 sidecar 可重试。
   UI 里切项目会写回同一份 client-state.json，下次启动自动恢复——闭环。
   选择框必须显式传 `defaultPath`：Electron 43+ 不传会强制落 Downloads/Home（electron#52454）。
+- 欢迎页资源：tsc 不搬 HTML，`build:desktop` 末尾把 `desktop/*.html` 拷进
+  `dist/desktop/`（electron-builder 的 files 只认 dist/desktop）。
 - 单实例锁：`requestSingleInstanceLock()`。
 - 安全：`contextIsolation + sandbox`，renderer 无 node，外链经 scheme allowlist
   （`external-url.ts`）走系统浏览器；同帧导航（`will-navigate`）同样拦截——

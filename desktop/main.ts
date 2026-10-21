@@ -15,7 +15,7 @@
  * 运行前先 `npm run build`（需要 dist/server + web/dist）。
  * 开发联调：PI_WEB_DESKTOP_URL=http://localhost:5173 可让窗口指到 vite。
  */
-import { app, BrowserWindow, dialog, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:net";
@@ -99,6 +99,9 @@ async function waitForHealth(url: string, timeoutMs = 20_000): Promise<void> {
 let serverProc: ChildProcess | null = null;
 let mainWin: BrowserWindow | null = null;
 let serverHealthy = false;
+let intentionalKill = false; // boot 失败时主动杀 sidecar，不让 exit 监听把 app 带走
+/** 应用 origin（loadApp 时确定）；欢迎页阶段为 null。 */
+let appOrigin: string | null = null;
 
 console.log("[desktop] main started, waiting for app ready…");
 
@@ -154,44 +157,26 @@ function readLastProject(dataDir: string): string | null {
 }
 
 /**
- * 启动 cwd 的优先级：
- *   1. PI_WEB_CWD 显式指定（env 覆盖语义不变）；
- *   2. client-state.json 里最近用过的项目（自动恢复）；
- *   3. 都没有（首次启动/记录全失效）→ 弹原生目录选择框，取消才回退 home。
- * defaultPath 必须显式传：Electron 43+ 不传时会强制落 Downloads/Home，
- * 覆盖系统对话框自己记忆的最近目录（electron#52454）。
+ * 启动 cwd 的优先级：PI_WEB_CWD 显式指定 > client-state.json 里最近用过的项目。
+ * 都没有（首次启动/记录全失效）→ 返回 null：由欢迎页（welcome.html）接管，
+ * 用户在应用内选好目录后才起 server——不再弹启动期系统对话框，也不再回退 home
+ * （home 一旦当选就会被 server 写回「最近项目」永远 sticky，且工作区太大不安全）。
  */
-async function resolveCwd(dataDir: string): Promise<string> {
+function resolveStartupCwd(dataDir: string): string | null {
 	const explicit = process.env.PI_WEB_CWD;
 	if (explicit) return explicit;
 	const last = readLastProject(dataDir);
-	if (last) {
-		console.log(`[desktop] 恢复上次项目：${last}`);
-		return last;
-	}
-	const picked = await dialog.showOpenDialog({
-		title: "选择项目目录（取消则使用用户主目录）",
-		defaultPath: homedir(),
-		properties: ["openDirectory", "createDirectory"],
-	});
-	if (!picked.canceled && picked.filePaths[0]) {
-		console.log(`[desktop] 首次启动选定项目：${picked.filePaths[0]}`);
-		return picked.filePaths[0];
-	}
-	console.log("[desktop] 未选择项目目录，回退用户主目录");
-	return homedir();
+	if (last) console.log(`[desktop] 恢复上次项目：${last}`);
+	return last;
 }
 
-async function startServerSidecar(): Promise<string> {
-	const override = process.env.PI_WEB_DESKTOP_URL;
-	if (override) return override; // 指向 vite(:5173) 联调，前提是另起 dev:server
+async function startServerSidecar(cwd: string): Promise<string> {
 	const entry = resolveServerEntry();
 	resolveWebDir();
 	console.log(`[desktop] server entry: ${entry}`);
 	const port = await resolvePort();
 	const dataDir = resolveDataDir();
-	const cwd = await resolveCwd(dataDir);
-	console.log(`[desktop] spawning server on 127.0.0.1:${port} (data: ${dataDir})`);
+	console.log(`[desktop] spawning server on 127.0.0.1:${port} (data: ${dataDir}, cwd: ${cwd})`);
 	// ELECTRON_RUN_AS_NODE=1：让 Electron 二进制退化成纯 Node 跑 server，
 	// 无需额外捆一个 node，也不用改 server/index.ts。
 	// --import：可选的「优先用全局 pi SDK」钩子（默认关；见 server/resolve-global-sdk.ts）。
@@ -225,11 +210,11 @@ async function startServerSidecar(): Promise<string> {
 	);
 	serverProc.on("error", (err) => {
 		console.error(`[desktop] server spawn 失败：${err.message}`);
-		if (!serverHealthy) app.quit();
+		if (!serverHealthy && !intentionalKill) app.quit();
 	});
 	serverProc.on("exit", (code, signal) => {
 		console.error(`[desktop] server 提前退出（code=${code} signal=${signal}），请看上方 server 日志`);
-		if (!serverHealthy) app.quit();
+		if (!serverHealthy && !intentionalKill) app.quit();
 	});
 	const url = `http://127.0.0.1:${port}`;
 	await waitForHealth(url);
@@ -238,7 +223,7 @@ async function startServerSidecar(): Promise<string> {
 	return url;
 }
 
-async function createWindow(url: string): Promise<void> {
+async function createWindow(): Promise<void> {
 	mainWin = new BrowserWindow({
 		width: 1280,
 		height: 860,
@@ -250,12 +235,6 @@ async function createWindow(url: string): Promise<void> {
 			sandbox: true,
 		},
 	});
-	console.log(`[desktop] opening window: ${url}`);
-	try {
-		await mainWin.loadURL(url);
-	} catch (err) {
-		console.error(`[desktop] loadURL 失败：${(err as Error).message}`);
-	}
 	// 外链丢给系统浏览器，别在应用窗口里导航走。
 	mainWin.webContents.setWindowOpenHandler(({ url: u }) => {
 		if (!isAllowedExternalUrl(u)) {
@@ -269,15 +248,15 @@ async function createWindow(url: string): Promise<void> {
 	// target="_blank"），而对话正文里的裸 href 与 JS 主动跳转（location.href/assign）
 	// 走的是同帧导航 —— 默认会被允许，直接把应用窗口带走（无地址栏、无后退键，只能重启）。
 	// 应用自身 origin（重载/前端路由）放行，其余一律转系统浏览器。
-	const appOrigin = new URL(url).origin;
 	mainWin.webContents.on("will-navigate", (e, target) => {
-		let origin: string;
+		let u: URL;
 		try {
-			origin = new URL(target).origin;
+			u = new URL(target);
 		} catch {
 			return; // 非法 URL：交给 Electron 处理
 		}
-		if (origin === appOrigin) return;
+		if (appOrigin && u.origin === appOrigin) return; // 应用自身 origin（重载/前端路由）放行
+		if (u.protocol === "file:") return; // 欢迎页（本地 file://）
 		e.preventDefault();
 		if (!isAllowedExternalUrl(target)) {
 			console.warn(`[desktop] 已拦截非 allowlist 外链（同帧导航）：${target}`);
@@ -290,6 +269,54 @@ async function createWindow(url: string): Promise<void> {
 		mainWin = null;
 	});
 }
+
+/** 把窗口切到真 UI（确定 appOrigin，供导航守卫放行应用内跳转）。 */
+async function loadApp(url: string): Promise<void> {
+	if (!mainWin) throw new Error("窗口已关闭");
+	appOrigin = new URL(url).origin;
+	console.log(`[desktop] opening window: ${url}`);
+	await mainWin.loadURL(url);
+}
+
+/** 起 server 并把窗口切到真 UI；失败时清掉半拉的 sidecar，让欢迎页可以重试。 */
+async function boot(cwd: string): Promise<void> {
+	try {
+		const url = await startServerSidecar(cwd);
+		await loadApp(url);
+	} catch (err) {
+		if (!serverHealthy && serverProc) {
+			intentionalKill = true;
+			serverProc.kill();
+			serverProc = null;
+		}
+		throw err;
+	}
+}
+
+// 欢迎页 IPC（窗口先行模式下 server 还没起，这是壳层唯一的控制面）。
+// defaultPath 必须显式传：Electron 43+ 不传会强制落 Downloads/Home，
+// 覆盖系统对话框自己记忆的最近目录（electron#52454）。
+ipcMain.handle("desktop:pick-directory", async () => {
+	if (!mainWin) return null;
+	const r = await dialog.showOpenDialog(mainWin, {
+		title: "选择项目目录",
+		defaultPath: homedir(),
+		properties: ["openDirectory", "createDirectory"],
+	});
+	return r.canceled ? null : (r.filePaths[0] ?? null);
+});
+
+// 返回 null = 成功（窗口已切到真 UI）；返回字符串 = 给用户看的错误。
+ipcMain.handle("desktop:start", async (_e, cwd: unknown) => {
+	if (typeof cwd !== "string" || !isUsableDir(cwd)) return "目录无效或不存在";
+	if (serverProc) return "server 已在运行";
+	try {
+		await boot(cwd);
+		return null;
+	} catch (err) {
+		return (err as Error).message;
+	}
+});
 
 // 单实例：第二个实例聚焦已有窗口（和网页版多标签页各走独立 clientId 不冲突）。
 if (!app.requestSingleInstanceLock()) {
@@ -309,8 +336,21 @@ if (!app.requestSingleInstanceLock()) {
 void app.whenReady().then(async () => {
 	console.log("[desktop] app ready");
 	try {
-		const url = await startServerSidecar();
-		await createWindow(url);
+		await createWindow();
+		// dev 联调：指向已跑起来的 vite(:5173)，前提是另起 dev:server
+		const override = process.env.PI_WEB_DESKTOP_URL;
+		if (override) {
+			await loadApp(override);
+			return;
+		}
+		const cwd = resolveStartupCwd(resolveDataDir());
+		if (cwd) {
+			await boot(cwd);
+			return;
+		}
+		// 新用户/无历史项目：不急着起 server，欢迎页里选好目录再起
+		console.log("[desktop] 无历史项目，显示欢迎页（server 待选择项目目录后启动）");
+		await mainWin!.loadFile(join(here, "welcome.html"));
 	} catch (err) {
 		console.error("✖ 桌面版启动失败：", err);
 		app.quit();
