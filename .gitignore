@@ -30,3 +30,5 @@ release/
 
 # 独立社区插件清单仓库工作区
 plugin-registry/
+# 临时脚本/截图（CDP 验证用）
+.tmp-*
