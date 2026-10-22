@@ -10,6 +10,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **面板透明度** — 设置 → 对话 里新增「不透明度」滑杆（0–100%，默认 100 = 实色）：控制顶栏/底栏/侧栏/卡片/消息区/输入框这些底板的透图率（即 `--wallpaper-panel-alpha`，配背景图才看得出差别）。纯前端 localStorage（`ccui:panel-opacity`），单独设置、不跟随主题；桌面壳下改完会同步重算标题栏按钮条配色。
+
+### Changed
+
+- **内置主题裁剪为 4 套** — 只保留 VS Code 黑（`vs-code-dark`）、VS Code 白（`vs-code-light`）、暗青（`dark-teal`）与默认深色（内嵌 styles.css）；其余 23 个主题文件（含「半透明」「全透明」两个旧主题——透明度现在由上面的滑杆调节）已删除。用户主题（`<数据目录>/themes`）不受影响，仍可自由投放。`make-light-theme.mjs` 同步裁成只生成 VS Code 黑/白。
+
 ## [0.0.2] — 2026-10-19
 
 ### Added

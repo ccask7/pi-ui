@@ -6,6 +6,7 @@ import "./styles.css";
 import "highlight.js/styles/github-dark.css";
 import { applyTheme, loadTheme, THEME_CHANGE_EVENT } from "./theme";
 import { isDesktopShell, syncTitlebarOverlay } from "./desktop";
+import { PANEL_OPACITY_CHANGE_EVENT, applyPanelOpacity } from "./panel-opacity";
 import { initAuthToken } from "./auth-token";
 import { installScrollbarGutterVar } from "./scrollbar-gutter";
 import { appBase } from "./base-url";
@@ -16,11 +17,16 @@ initAuthToken();
 // Apply the persisted theme before first render so there's no flash of the
 // wrong palette. The full stylesheet swap happens via an injected <link>.
 applyTheme(loadTheme());
+// 面板透明度（styles.css 的 --wallpaper-panel-alpha）也要在首帧前到位，
+// 否则开了背景图会先闪一帧实色底板。
+applyPanelOpacity();
 // 桌面壳（Electron WCO）：顶栏兼任标题栏——挂根 class（styles.css 里有对应的
 // 拖拽 / 右侧让位规则），主题切换时同步右上角系统按钮条颜色。浏览器全跳过。
 if (isDesktopShell()) {
 	document.documentElement.classList.add("desktop-shell");
 	window.addEventListener(THEME_CHANGE_EVENT, () => setTimeout(syncTitlebarOverlay, 0));
+	// 面板透明度变化会改变顶栏背景色（透图率），按钮条跟着重算。
+	window.addEventListener(PANEL_OPACITY_CHANGE_EVENT, () => setTimeout(syncTitlebarOverlay, 0));
 	// 初次同步：顶栏渲染与主题 <link> 加载都是异步的，排三次保险（幂等，重复调无副作用）。
 	requestAnimationFrame(syncTitlebarOverlay);
 	setTimeout(syncTitlebarOverlay, 300);
