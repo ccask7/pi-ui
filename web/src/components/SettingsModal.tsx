@@ -13,6 +13,7 @@ import {
 	FiFolder,
 	FiGitBranch,
 	FiHelpCircle,
+	FiImage,
 	FiKey,
 	FiMessageSquare,
 	FiPackage,
@@ -335,6 +336,7 @@ type SettingsTab =
 	| "approval-rules"
 	| "question"
 	| "display"
+	| "appearance"
 	| "quick"
 	| "markers"
 	| "skills"
@@ -658,6 +660,7 @@ export function SettingsModal({ chat, terminal, initialSection, onSwitchToTermin
 			count: (settings.approvalRules ?? []).length || undefined,
 		},
 		{ id: "display", icon: <FiMessageSquare />, label: t("settingsMessageDisplay") },
+		{ id: "appearance", icon: <FiImage />, label: t("settingsAppearance") },
 		{ id: "quick", icon: <FiSend />, label: t("quickPhrases"), count: settings.quickPhrases.length },
 		{ id: "skills", icon: <FiCpu />, label: t("settingsSkills"), count: settings.skills.length },
 		{ id: "extensions", icon: <FiPackage />, label: t("settingsExtensions"), count: settings.extensions.length },
@@ -2013,7 +2016,16 @@ export function SettingsModal({ chat, terminal, initialSection, onSwitchToTermin
 									enabled={projectTitle}
 									onToggle={() => saveTitleSettings({ projectName: !projectTitle })}
 								/>
-								<hr className="set-sep" />
+							</div>
+						)}
+
+						{/* ---- 界面设置（外观）：聊天背景图 + 面板透明度 ------------------- */}
+						{tab === "appearance" && (
+							<div className="set-section">
+								<div className="set-section-title">
+									<FiImage className="set-section-icon" />
+									{t("settingsAppearance")}
+								</div>
 								<div className="set-row">
 									<div className="set-row-info">
 										<div className="set-row-name">

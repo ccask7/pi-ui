@@ -954,6 +954,7 @@
 		"toolDescSubagentWaitAll": "Wartet auf mehrere Subagenten auf einmal und sammelt Ergebnisse — kein Polling.",
 		"toolDescSubagentTemplates": "Listet verfügbare Subagent-Vorlagen (deaktivierte sind verborgen) zur Auswahl für spawn.",
 		"settingsMessageDisplay": "Unterhaltung",
+		"settingsAppearance": "Darstellung",
 		"thinkingWrap": "Denken vollständig anzeigen",
 		"thinkingWrapDesc": "Aktiviert: Denkinhalte werden stets vollständig ausgeklappt und umbrochen dargestellt (der laufende Schlussfolgerungsprozess ist auch beim Streaming live sichtbar); Deaktiviert: Auf eine einzeilige Zusammenfassung eingeklappt, beim Streaming wird live jeweils der neueste Text in einer Zeile angezeigt",
 		"toolsWrap": "Werkzeuge vollständig anzeigen",

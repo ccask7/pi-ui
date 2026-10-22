@@ -954,6 +954,7 @@
 		"toolDescSubagentWaitAll": "複数のサブエージェントを一括待機し結果を収集。ポーリング不要。",
 		"toolDescSubagentTemplates": "利用可能なサブエージェントテンプレートを一覧表示（無効は非表示）。spawn 選択用。",
 		"settingsMessageDisplay": "会話",
+		"settingsAppearance": "外観",
 		"thinkingWrap": "思考をすべて表示します",
 		"thinkingWrapDesc": "オン：思考内容を常にすべて展開し、自動で折り返して表示します（ストリーミング中の推論過程もリアルタイムで見られます）。オフ：一行の要約に折りたたみ、ストリーミング中は一行で最新のテキストをリアルタイム表示します",
 		"toolsWrap": "ツールをすべて表示します",

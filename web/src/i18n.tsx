@@ -1083,6 +1083,7 @@ export const zh = {
 	toolDescSubagentWaitAll: "一次等多个子代理全部完成并汇总结果，不用轮询。",
 	toolDescSubagentTemplates: "列出可用的子代理模板（停用的不出现），供 spawn 选用。",
 	settingsMessageDisplay: "对话",
+	settingsAppearance: "界面设置",
 	thinkingWrap: "完整显示思考",
 	thinkingWrapDesc:
 		"开启：思考内容始终完整展开并自动换行（流式推理过程也实时可见）；关闭：折叠成一行摘要，流式中一行实时显示最新文本",
@@ -2555,6 +2556,7 @@ const en: Record<keyof typeof zh, string> = {
 	toolDescSubagentWaitAll: "Wait for multiple subagents at once and collect results — no polling.",
 	toolDescSubagentTemplates: "List available subagent templates (disabled ones hidden) for spawn to use.",
 	settingsMessageDisplay: "Conversation",
+	settingsAppearance: "Appearance",
 	thinkingWrap: "Show full thinking",
 	thinkingWrapDesc:
 		"On: thinking always expands fully and wraps (live reasoning visible while streaming); Off: collapses to a one-line summary with the latest text shown live while streaming",

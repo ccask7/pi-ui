@@ -954,6 +954,7 @@
 		"toolDescSubagentWaitAll": "Attende più subagenti in una volta e raccoglie i risultati, senza polling.",
 		"toolDescSubagentTemplates": "Elenca i modelli di subagente disponibili (nascosti i disattivati) da usare con spawn.",
 		"settingsMessageDisplay": "Conversazione",
+		"settingsAppearance": "Aspetto",
 		"thinkingWrap": "Mostra pensiero completo",
 		"thinkingWrapDesc": "On: il pensiero è sempre espanso completamente e va a capo (ragionamento in tempo reale visibile durante lo streaming); Off: compresso in un riepilogo di una riga con l'ultimo testo mostrato in tempo reale durante lo streaming",
 		"toolsWrap": "Mostra strumenti completi",

@@ -11125,7 +11125,9 @@ button.source-default-toggle {
 }
 .wallpaper-slider > span:first-child {
 	flex: none;
-	width: 38px;
+	/* 容下 4 字标签（如「不透明度」），不换行也不与滑杆重叠 */
+	width: 60px;
+	white-space: nowrap;
 }
 /* 壁纸滑杆：细轨道 + accent 圆钮（原生粗条与卡片语言不搭） */
 .settings-modal .wallpaper-slider input[type="range"] {
