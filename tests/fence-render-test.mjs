@@ -196,7 +196,7 @@ async function main() {
 	}
 
 	const initialSvgId = await page.locator(".mermaid-block svg").getAttribute("id");
-	await applyTheme("cyberpunk");
+	await applyTheme("dark-teal");
 	await page.waitForFunction((id) => document.querySelector(".mermaid-block svg")?.id !== id, initialSvgId);
 	const beforeThemeSwitch = await page.evaluate(() => {
 		const svg = document.querySelector(".mermaid-block svg");
@@ -217,7 +217,7 @@ async function main() {
 		};
 	});
 	await sleep(200);
-	await applyTheme("dazzle");
+	await applyTheme("vs-code-dark");
 	await page.waitForFunction((id) => document.querySelector(".mermaid-block svg")?.id !== id, beforeThemeSwitch.id);
 	const afterThemeSwitch = await page.evaluate(() => {
 		clearInterval(window.__mermaidPresenceTimer);
@@ -257,7 +257,7 @@ async function main() {
 		beforeThemeSwitch.scrollTop > 0 && beforeThemeSwitch.scrollTop === afterThemeSwitch.scrollTop,
 	);
 
-	await applyTheme("white");
+	await applyTheme("vs-code-light");
 	await page.waitForFunction((id) => document.querySelector(".mermaid-block svg")?.id !== id, afterThemeSwitch.id);
 	const lightTheme = await page.evaluate(() => {
 		const block = document.querySelector(".mermaid-block");
@@ -384,7 +384,7 @@ async function main() {
 		await new Promise((resolve, reject) => {
 			link.onload = resolve;
 			link.onerror = reject;
-			link.href = `/themes/white.css?initial-race=${Date.now()}`;
+			link.href = `/themes/vs-code-light.css?initial-race=${Date.now()}`;
 			document.head.appendChild(link);
 		});
 		window.dispatchEvent(new CustomEvent("ccui:theme-change"));

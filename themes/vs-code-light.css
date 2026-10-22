@@ -1,0 +1,188 @@
+/* theme-name: VS Code 白 */
+/* theme-name-en: VS Code Light */
+/* theme-group: classic */
+:root {
+	color-scheme: light;
+	--bg: #ffffff;
+	--bg-elev: #f8f8f8;
+	--bg-elev2: #f2f2f2;
+	--border: #e5e5e5;
+	--border-soft: #ececec;
+	--text: #3b3b3b;
+	--text-dim: #616161;
+	--text-faint: #767676;
+	--accent: #005fb8;
+	--accent-soft: rgba(0, 95, 184, 0.12);
+	--green: #2ea043;
+	--green-soft: rgba(46, 160, 67, 0.12);
+	--red: #cd3131;
+	--red-soft: rgba(205, 49, 49, 0.1);
+	--amber: #bf8803;
+	--blue: #0451a5;
+	--blue-soft: rgba(4, 81, 165, 0.12);
+	--term-bg: #ffffff;
+	--term-fg: #3b3b3b;
+	--term-cursor: #005fb8;
+	--term-cursor-accent: #ffffff;
+	--term-selection: rgba(173, 214, 255, 0.6);
+	--term-black: #000000;
+	--term-red: #cd3131;
+	--term-green: #00bc00;
+	--term-yellow: #949800;
+	--term-blue: #0451a5;
+	--term-magenta: #bc05bc;
+	--term-cyan: #0598bc;
+	--term-white: #555555;
+	--term-bright-black: #666666;
+	--term-bright-red: #cd3131;
+	--term-bright-green: #14ce14;
+	--term-bright-yellow: #b5ba00;
+	--term-bright-blue: #0451a5;
+	--term-bright-magenta: #bc05bc;
+	--term-bright-cyan: #0598bc;
+	--term-bright-white: #a5a5a5;
+	--mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+	--mermaid-font-size: 12px;
+	--tooltip-bg: #f8f8f8;
+	--code-bg: #f8f8f8;
+	--code-text: #3b3b3b;
+	--code-border: var(--border-soft);
+	--code-pad: 8px 10px;
+	--card-body-pad: 4px 14px 12px;
+	--err-text: #cd3131;
+	--red-text: #cd3131;
+	--amber-text: #bf8803;
+	--info-blue: #005fb8;
+	--link: #005fb8;
+	--link-hover: #0258a8;
+	--link-soft: #005fb8;
+	--md-strong: #1f1f1f;
+	--skill-blue: #005fb8;
+	--plugin-purple: #af00db;
+	--auth-green: #2ea043;
+	--scroll-thumb: #c9c9c9;
+	--scroll-thumb-hover: #a8a8a8;
+	--notice-err-bg: #fbeaea;
+	--notice-warn-bg: #faf3df;
+	--notice-info-bg: #e9f1fb;
+	--notice-err-border: #cd3131;
+	--notice-warn-border: #bf8803;
+	--notice-info-border: #005fb8;
+	--send-blue: #005fb8;
+	--send-blue-hover: #0258a8;
+	--stop-red: #cd3131;
+	--stop-red-hover: #b02626;
+	--brand-grad-a: #0078d4;
+	--brand-grad-b: #005fb8;
+	--on-amber: #1f1f1f;
+	--search-active-fg: #1f1f1f;
+	--switch-knob: #ffffff;
+	--bg-elev3: rgba(0, 0, 0, 0.02);
+	--sunken-bg: rgba(0, 0, 0, 0.03);
+	--glow-015: rgba(0, 0, 0, 0.02);
+	--glow-025: rgba(0, 0, 0, 0.02);
+	--glow-03: rgba(0, 0, 0, 0.02);
+	--glow-04: rgba(0, 0, 0, 0.03);
+	--glow-05: rgba(0, 0, 0, 0.03);
+	--glow-12: rgba(0, 0, 0, 0.08);
+	--glow-18: rgba(0, 0, 0, 0.12);
+	--glow-22: rgba(0, 0, 0, 0.15);
+	--glow-38: rgba(0, 0, 0, 0.25);
+	--control-fg: #3b3b3b;
+	--control-bg: #f8f8f8;
+	--control-border: #e5e5e5;
+	--bg-image: none;
+	--bg-image-dim: 0.78;
+	--bg-image-blur: 0px;
+	--wallpaper-panel-alpha: 100%;
+	--topbar-bg: #f8f8f8;
+	--statusbar-bg: #f8f8f8;
+	--panel-bg: #f8f8f8;
+	--card-bg: #f8f8f8;
+	--chip-bg: #f2f2f2;
+	--msgs-bg: #ffffff;
+	--inputbox-bg: #f3f3f3;
+	--menu-bg: #ffffff;
+}
+
+/* ---- syntax highlighting (VS Code Light+) ---- */
+.hljs {
+	color: #3b3b3b;
+	background: #f8f8f8;
+}
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-variable.language_ {
+	color: #0000ff;
+}
+.hljs-title,
+.hljs-title.function_ {
+	color: #795e26;
+}
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-built_in,
+.hljs-symbol,
+.hljs-type {
+	color: #267f99;
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-id {
+	color: #001080;
+}
+.hljs-literal {
+	color: #0000ff;
+}
+.hljs-number {
+	color: #098658;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-meta .hljs-string {
+	color: #a31515;
+}
+.hljs-comment,
+.hljs-code,
+.hljs-formula,
+.hljs-quote {
+	color: #008000;
+}
+.hljs-name,
+.hljs-selector-tag,
+.hljs-selector-class,
+.hljs-section {
+	color: #800000;
+}
+.hljs-meta {
+	color: #0451a5;
+}
+.hljs-bullet {
+	color: #0451a5;
+}
+.hljs-subst,
+.hljs-operator,
+.hljs-punctuation {
+	color: #000000;
+}
+.hljs-emphasis {
+	color: #800080;
+	font-style: italic;
+}
+.hljs-strong {
+	color: #000080;
+	font-weight: 700;
+}
+.hljs-addition {
+	color: #098658;
+	background: #e7f5ea;
+}
+.hljs-deletion {
+	color: #a31515;
+	background: #fbe9e9;
+}

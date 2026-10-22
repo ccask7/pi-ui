@@ -2,7 +2,7 @@
  * Theme switching smoke test (pure `:root` palette override).
  *
  * Scenarios:
- *   1. /api/themes lists the builtin palette themes (white/md-preview/…)
+ *   1. /api/themes lists the builtin palette themes (vs-code-*/dark-teal)
  *   2. choosing a theme injects a <link> and applies its palette
  *   3. the choice persists across reload
  *   4. switching back to default removes the injected link
@@ -97,33 +97,33 @@ try {
 	const ids = themes.themes.map((t) => t.id).sort();
 	check(
 		"/api/themes lists builtin + user themes",
-		ids.includes("white") &&
-			ids.includes("md-preview") &&
-			ids.includes("cyberpunk") &&
-			ids.includes("dazzle") &&
-			!ids.includes("light") && // legacy full-copy theme removed
+		ids.includes("vs-code-dark") &&
+			ids.includes("vs-code-light") &&
+			ids.includes("dark-teal") &&
+			!ids.includes("white") && // 裁剪后已删除
+			!ids.includes("md-preview") &&
 			ids.includes("user-test"),
 		`got ${ids.join(", ")}`,
 	);
-	const whiteInfo = themes.themes.find((t) => t.id === "white");
-	const mdPrevInfo = themes.themes.find((t) => t.id === "md-preview");
+	const vsdInfo = themes.themes.find((t) => t.id === "vs-code-dark");
+	const tealInfo = themes.themes.find((t) => t.id === "dark-teal");
 	check(
 		"theme-name header gives display names",
-		whiteInfo?.name === "白色" && mdPrevInfo?.name === "紫晕",
-		`white=${whiteInfo?.name} md-preview=${mdPrevInfo?.name}`,
+		vsdInfo?.name === "VS Code 黑" && tealInfo?.name === "暗青",
+		`vs-code-dark=${vsdInfo?.name} dark-teal=${tealInfo?.name}`,
 	);
-	check("white is builtin", whiteInfo?.builtin === true);
+	check("vs-code-dark is builtin", vsdInfo?.builtin === true);
 	const userInfo = themes.themes.find((t) => t.id === "user-test");
 	check("user-test is not builtin", userInfo?.builtin === false);
 
-	// 2. Choosing white injects a <link> and applies the palette.
+	// 2. Choosing dark-teal injects a <link> and applies the palette.
 	await openThemeMenu(page);
-	await page.locator(".dd-item", { hasText: "白色" }).first().click();
+	await page.locator(".dd-item", { hasText: "暗青" }).first().click();
 	await page.waitForTimeout(1500);
 	const hasLink = await page.evaluate(() => document.getElementById("theme-stylesheet")?.getAttribute("href"));
-	check("theme <link> injected for white", hasLink === "/themes/white.css", `href=${hasLink}`);
+	check("theme <link> injected for dark-teal", hasLink === "/themes/dark-teal.css", `href=${hasLink}`);
 	const bg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--bg").trim());
-	check("white palette applied", bg === "#ffffff", `--bg=${bg}`);
+	check("dark-teal palette applied", bg === "#0a0a0a", `--bg=${bg}`);
 
 	// 3. Persists across reload.
 	await page.reload({ waitUntil: "domcontentloaded" });
@@ -135,7 +135,7 @@ try {
 	});
 	check(
 		"theme persists after reload",
-		afterReload.href === "/themes/white.css" && afterReload.bg === "#ffffff",
+		afterReload.href === "/themes/dark-teal.css" && afterReload.bg === "#0a0a0a",
 		`href=${afterReload.href} bg=${afterReload.bg}`,
 	);
 

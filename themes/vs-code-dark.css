@@ -1,84 +1,84 @@
-/* theme-name: VS Code 暗色 */
+/* theme-name: VS Code 黑 */
 /* theme-name-en: VS Code Dark */
 /* theme-group: classic */
 :root {
 	color-scheme: dark;
-	--bg: #1e1e1e;
-	--bg-elev: #252526;
-	--bg-elev2: #2d2d2d;
-	--border: #3c3c3c;
-	--border-soft: #333333;
-	--text: #d4d4d4;
+	--bg: #1f1f1f;
+	--bg-elev: #181818;
+	--bg-elev2: #2b2b2b;
+	--border: #2b2b2b;
+	--border-soft: #232323;
+	--text: #cccccc;
 	--text-dim: #9d9d9d;
-	--text-faint: #6a6a6a;
-	--accent: #297aa0;
-	--accent-soft: rgba(41, 122, 160, 0.16);
-	--green: #4ec9b0;
-	--green-soft: rgba(78, 201, 176, 0.12);
-	--red: #f48771;
-	--red-soft: rgba(244, 135, 113, 0.12);
-	--amber: #dcdcaa;
+	--text-faint: #7a7a7a;
+	--accent: #0078d4;
+	--accent-soft: rgba(0, 120, 212, 0.18);
+	--green: #2ea043;
+	--green-soft: rgba(46, 160, 67, 0.15);
+	--red: #f85149;
+	--red-soft: rgba(248, 81, 73, 0.15);
+	--amber: #cca700;
 	--blue: #569cd6;
-	--blue-soft: rgba(86, 156, 214, 0.12);
-	--term-bg: #1e1e1e;
-	--term-fg: #d4d4d4;
-	--term-cursor: #297aa0;
-	--term-cursor-accent: #1e1e1e;
-	--term-selection: rgba(41, 122, 160, 0.3);
-	--term-black: #2d2d2d;
-	--term-red: #f44747;
-	--term-green: #6a9955;
-	--term-yellow: #d7ba7d;
-	--term-blue: #569cd6;
-	--term-magenta: #c586c0;
-	--term-cyan: #4ec9b0;
+	--blue-soft: rgba(86, 156, 214, 0.14);
+	--term-bg: #1f1f1f;
+	--term-fg: #cccccc;
+	--term-cursor: #aeafad;
+	--term-cursor-accent: #1f1f1f;
+	--term-selection: rgba(38, 79, 120, 0.6);
+	--term-black: #000000;
+	--term-red: #cd3131;
+	--term-green: #0dbc79;
+	--term-yellow: #e5e510;
+	--term-blue: #2472c8;
+	--term-magenta: #bc3fbc;
+	--term-cyan: #11a8cd;
 	--term-white: #e5e5e5;
-	--term-bright-black: #6a6a6a;
-	--term-bright-red: #f44747;
-	--term-bright-green: #6a9955;
-	--term-bright-yellow: #d7ba7d;
-	--term-bright-blue: #569cd6;
-	--term-bright-magenta: #c586c0;
-	--term-bright-cyan: #4ec9b0;
-	--term-bright-white: #ffffff;
+	--term-bright-black: #666666;
+	--term-bright-red: #f14c4c;
+	--term-bright-green: #23d18b;
+	--term-bright-yellow: #f5f543;
+	--term-bright-blue: #3b8eea;
+	--term-bright-magenta: #d670d6;
+	--term-bright-cyan: #29b8db;
+	--term-bright-white: #e5e5e5;
 	--mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
 	--mermaid-font-size: 12px;
-	--tooltip-bg: #252526;
-	--code-bg: #1e1e1e;
-	--code-text: #d4d4d4;
+	--tooltip-bg: #202020;
+	--code-bg: #2b2b2b;
+	--code-text: #d0d0d0;
 	--code-border: var(--border-soft);
 	--code-pad: 8px 10px;
 	--card-body-pad: 4px 14px 12px;
-	--err-text: #f48771;
-	--red-text: #f99b92;
-	--amber-text: #e8d49a;
-	--info-blue: #569cd6;
-	--link: #3794ff;
-	--link-hover: #4da3ff;
-	--link-soft: #4da3ff;
-	--md-strong: #e5e5e5;
+	--err-text: #f85149;
+	--red-text: #f85149;
+	--amber-text: #cca700;
+	--info-blue: #4daafc;
+	--link: #4daafc;
+	--link-hover: #6cb6ff;
+	--link-soft: #4daafc;
+	--md-strong: #ffffff;
 	--skill-blue: #569cd6;
 	--plugin-purple: #c586c0;
-	--auth-green: #4ec9b0;
-	--scroll-thumb: #3f3f3f;
-	--scroll-thumb-hover: #555555;
-	--notice-err-bg: #412126;
-	--notice-warn-bg: #39351f;
-	--notice-info-bg: #1d2a3a;
-	--notice-err-border: #f44747;
+	--auth-green: #2ea043;
+	--scroll-thumb: #4a4a4a;
+	--scroll-thumb-hover: #6b6b6b;
+	--notice-err-bg: #3a1e20;
+	--notice-warn-bg: #37301a;
+	--notice-info-bg: #16293f;
+	--notice-err-border: #f85149;
 	--notice-warn-border: #cca700;
-	--notice-info-border: #4d9ec9;
-	--send-blue: #297aa0;
-	--send-blue-hover: #3493c4;
-	--stop-red: #f44747;
-	--stop-red-hover: #e13b3b;
-	--brand-grad-a: #297aa0;
-	--brand-grad-b: #569cd6;
-	--on-amber: #1a1a1a;
-	--search-active-fg: #1e1e1e;
+	--notice-info-border: #0078d4;
+	--send-blue: #0078d4;
+	--send-blue-hover: #026ec1;
+	--stop-red: #f85149;
+	--stop-red-hover: #e03c34;
+	--brand-grad-a: #0078d4;
+	--brand-grad-b: #4daafc;
+	--on-amber: #1f1f1f;
+	--search-active-fg: #1f1f1f;
 	--switch-knob: #ffffff;
 	--bg-elev3: rgba(255, 255, 255, 0.06);
-	--sunken-bg: rgba(0, 0, 0, 0.2);
+	--sunken-bg: rgba(0, 0, 0, 0.15);
 	--glow-015: rgba(255, 255, 255, 0.015);
 	--glow-025: rgba(255, 255, 255, 0.025);
 	--glow-03: rgba(255, 255, 255, 0.03);
@@ -88,59 +88,101 @@
 	--glow-18: rgba(255, 255, 255, 0.18);
 	--glow-22: rgba(255, 255, 255, 0.22);
 	--glow-38: rgba(255, 255, 255, 0.38);
-	--control-fg: #9d9d9d;
-	--control-bg: #252526;
+	--control-fg: #cccccc;
+	--control-bg: #2b2b2b;
 	--control-border: #3c3c3c;
 	--bg-image: none;
 	--bg-image-dim: 0.78;
 	--bg-image-blur: 0px;
 	--wallpaper-panel-alpha: 100%;
-	--topbar-bg: #252526;
-	--statusbar-bg: #252526;
-	--panel-bg: #252526;
-	--card-bg: #252526;
-	--chip-bg: #2d2d2d;
-	--msgs-bg: #1e1e1e;
-	--inputbox-bg: #252526;
-	--menu-bg: var(--bg-elev2);
+	--topbar-bg: #181818;
+	--statusbar-bg: #181818;
+	--panel-bg: #181818;
+	--card-bg: #202020;
+	--chip-bg: #2b2b2b;
+	--msgs-bg: #1f1f1f;
+	--inputbox-bg: #313131;
+	--menu-bg: #1f1f1f;
 }
 
 /* ---- syntax highlighting (VS Code Dark+) ---- */
 .hljs {
-	color: #d4d4d4;
-	background: #1e1e1e;
+	color: #cccccc;
+	background: #2b2b2b;
 }
 .hljs-doctag,
 .hljs-keyword,
-.hljs-meta .hljs-keyword {
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-variable.language_ {
 	color: #569cd6;
 }
 .hljs-title,
-.hljs-title.class_,
 .hljs-title.function_ {
 	color: #dcdcaa;
 }
-.hljs-literal,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-built_in,
+.hljs-symbol,
+.hljs-type {
+	color: #4ec9b0;
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+	color: #9cdcfe;
+}
+.hljs-literal {
+	color: #569cd6;
+}
 .hljs-number {
 	color: #b5cea8;
 }
 .hljs-string,
-.hljs-regexp {
+.hljs-regexp,
+.hljs-meta .hljs-string {
 	color: #ce9178;
 }
-.hljs-built_in,
-.hljs-type {
-	color: #4ec9b0;
-}
 .hljs-comment,
-.hljs-code {
+.hljs-code,
+.hljs-formula,
+.hljs-quote {
 	color: #6a9955;
 }
-.hljs-attr,
-.hljs-attribute {
-	color: #9cdcfe;
-}
-.hljs-tag,
-.hljs-name {
+.hljs-name,
+.hljs-selector-tag,
+.hljs-section {
 	color: #569cd6;
+}
+.hljs-meta {
+	color: #569cd6;
+}
+.hljs-bullet {
+	color: #6796e6;
+}
+.hljs-subst,
+.hljs-operator,
+.hljs-punctuation {
+	color: #d4d4d4;
+}
+.hljs-emphasis {
+	color: #c586c0;
+	font-style: italic;
+}
+.hljs-strong {
+	color: #569cd6;
+	font-weight: 700;
+}
+.hljs-addition {
+	color: #b5cea8;
+	background: rgba(46, 160, 67, 0.15);
+}
+.hljs-deletion {
+	color: #ce9178;
+	background: rgba(248, 81, 73, 0.15);
 }
