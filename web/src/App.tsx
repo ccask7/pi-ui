@@ -10,6 +10,7 @@ import {
 	type PointerEvent as ReactPointerEvent,
 } from "react";
 import { TopBar } from "./components/TopBar";
+import { ChatTabBar } from "./components/ChatTabBar.js";
 import { LeftPanel } from "./components/LeftPanel";
 import { RightPanel } from "./components/RightPanel";
 import { MessageList } from "./components/MessageList";
@@ -1447,7 +1448,6 @@ export function App() {
 								active={!isMobile || drawer === "left"}
 								sessionFile={chat.state?.sessionFile ?? null}
 								conversations={chat.conversations}
-								elsewhere={chat.elsewhere}
 								sessions={chat.sessions}
 								projects={chat.projects}
 								pathCompletions={chat.pathCompletions}
@@ -1457,11 +1457,17 @@ export function App() {
 								uiContextSession={uiSlots["contextmenu.session"]}
 								uiLeftSessions={uiLeftSessions}
 								onUiAction={onUiAction}
-								presetNames={presetNames}
 							/>
 						</div>
 						{!isMobile && <ResizeHandle side="left" width={leftWidth} onResize={resizeLeft} />}
 						<main className={wide ? "main wide-chat" : "main"}>
+							{/* 标签栏：运行的对话（原左栏分区）——只占对话区顶部，不横跨左右面板。 */}
+							<ChatTabBar
+								conversations={chat.conversations}
+								elsewhere={chat.elsewhere}
+								activeConversationId={chat.activeConversationId}
+								panelSend={panelSend}
+							/>
 							{/* 对话头部条（chat.header 槽位）：纯插件新增位，无条目时不渲染。 */}
 							{uiChatHeader.length > 0 && (
 								<div className="chat-header" role="toolbar">

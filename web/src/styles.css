@@ -14198,3 +14198,172 @@ html.desktop-shell .topbar * {
 html.desktop-shell .topbar .tb-spacer {
 	-webkit-app-region: drag;
 }
+
+/* ===== 顶部标签栏（VS Code 式）：替代左栏「运行的对话」分区 =====
+   多个并行对话/子代理在顶栏下方横排切换，标签横行可滚动，不挤占左栏高度。 */
+.chat-tabs {
+	display: flex;
+	align-items: stretch;
+	flex: none;
+	height: 32px;
+	/* 只在对话区顶部：底色透明，直接叠 .main 的玻璃底（--msgs-bg），
+	   壁纸/半透明主题下与消息区同色，不会多出一条更亮的带子。 */
+	background: transparent;
+	border-bottom: 1px solid var(--border-soft);
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: thin;
+}
+.chat-tab {
+	display: flex;
+	align-items: center;
+	flex: none;
+	max-width: 240px;
+	border-right: 1px solid var(--border-soft);
+	color: var(--text-dim);
+	background: transparent;
+}
+.chat-tab:hover {
+	background: color-mix(in srgb, var(--bg-elev2) 45%, transparent);
+}
+.chat-tab.active {
+	color: var(--text);
+	background: var(--chip-bg);
+	/* 顶部 2px 强调线 = 当前标签（VS Code 的 active tab 语言） */
+	box-shadow: inset 0 2px 0 var(--accent);
+}
+.chat-tab.armed {
+	background: color-mix(in srgb, var(--red) 16%, transparent);
+}
+.chat-tab.elsewhere {
+	opacity: 0.75;
+	font-style: italic;
+}
+.chat-tab-main {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	padding: 0 4px 0 10px;
+	height: 100%;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+.chat-tab-main:disabled {
+	cursor: default;
+}
+.chat-tab-indent {
+	opacity: 0.5;
+	font-size: 11px;
+}
+.chat-tab-title {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-size: 12.5px;
+}
+.chat-tab-flag {
+	flex: none;
+	padding: 0 4px;
+	border-radius: 3px;
+	background: var(--chip-bg);
+	color: var(--text-dim);
+	font-size: 10.5px;
+	font-style: normal;
+}
+.chat-tab-badge {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	line-height: 14px;
+	text-align: center;
+	border-radius: 50%;
+	background: var(--amber);
+	color: #1a1a1a;
+	font-size: 10px;
+	font-weight: 700;
+}
+.chat-tab-badge.clickable {
+	cursor: pointer;
+}
+.chat-tab-dot {
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--text-faint);
+}
+.chat-tab-dot.error {
+	background: var(--red);
+}
+.chat-tab-dot.streaming {
+	background: var(--green);
+	animation: chat-tab-pulse 1.2s ease-in-out infinite;
+}
+@keyframes chat-tab-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.25;
+	}
+}
+.chat-tab-act {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 20px;
+	height: 20px;
+	margin-right: 4px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-faint);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.1s;
+}
+.chat-tab:hover .chat-tab-act,
+.chat-tab.active .chat-tab-act,
+.chat-tab.armed .chat-tab-act {
+	opacity: 1;
+}
+.chat-tab-act:hover {
+	background: var(--accent-soft);
+	color: var(--text);
+}
+.chat-tab-act.close:hover {
+	background: color-mix(in srgb, var(--red) 22%, transparent);
+	color: var(--red);
+}
+.chat-tab-rename {
+	width: 140px;
+	padding: 1px 4px;
+	border: 1px solid var(--accent);
+	border-radius: 3px;
+	background: var(--bg);
+	color: var(--text);
+	font: inherit;
+	font-size: 12.5px;
+}
+.chat-tab-new {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 30px;
+	border: 0;
+	background: transparent;
+	color: var(--text-faint);
+	cursor: pointer;
+}
+.chat-tab-new:hover {
+	background: var(--chip-bg);
+	color: var(--text);
+}

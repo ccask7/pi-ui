@@ -8,16 +8,13 @@ import {
 	FiFolder,
 	FiFolderPlus,
 	FiMessageSquare,
-	FiMoreVertical,
 	FiPlus,
 	FiTrash2,
-	FiX,
 } from "react-icons/fi";
-import type { ConversationSummary, ElsewhereRunning, ProjectSummary, SessionSummary } from "../types";
+import type { ConversationSummary, ProjectSummary, SessionSummary } from "../types";
 import { useT } from "../i18n";
 import { useAppField } from "../app-globals";
 import { applySashDrag, parseWeights } from "../panel-sash";
-import { groupConversations } from "../conv-groups";
 import { ProjectPicker } from "./ProjectPicker.js";
 // 宿主 UI 扩展点（issue #146）：会话行的右键菜单走「slot 条目」这一条通道。
 import { LP_SECTION_ENTRY_IDS, type UiSlotEntry } from "../ui-slots";
@@ -32,8 +29,6 @@ import { composeToComposer, focusComposer } from "../composer-bridge";
 interface LeftPanelProps {
 	sessionFile: string | null;
 	conversations: ConversationSummary[];
-	/** issue #145：其他客户端正在跑的对话（只读，不可点）。 */
-	elsewhere: ElsewhereRunning[];
 	sessions: SessionSummary[];
 	projects: ProjectSummary[];
 	activeConversationId: string;
@@ -76,7 +71,6 @@ interface LeftPanelProps {
 	/** 点击一条会话行内嵌条目：交回 App 分发给贡献它的插件（与顶栏 onUiAction 同通道）。 */
 	onUiAction?: (item: UiSlotEntry, value?: string) => void;
 	/** DSH Agent 预设名录（id → 显示名；左栏会话徽标用，缺省显示 id）。 */
-	presetNames?: Record<string, string>;
 	/** 路径补全（用于项目管理面板的目录浏览与补全）。 */
 	pathCompletions?: { name: string; path: string; type: "dir" | "file" }[];
 }
@@ -111,7 +105,6 @@ function isEditableTarget(el: EventTarget | null): boolean {
 }
 
 const LS_COLLAPSE_PROJECTS = "ccui:lp-collapse-projects";
-const LS_COLLAPSE_CONVS = "ccui:lp-collapse-convs";
 const LS_COLLAPSE_SESSIONS = "ccui:lp-collapse-sessions";
 
 function useCollapsed(key: string, defaultCollapsed = false): [boolean, () => void] {
@@ -156,7 +149,6 @@ function loadLpWeights(): LpWeights {
 export const LeftPanel = memo(function LeftPanel({
 	sessionFile,
 	conversations,
-	elsewhere,
 	sessions,
 	projects,
 	activeConversationId,
@@ -168,7 +160,6 @@ export const LeftPanel = memo(function LeftPanel({
 	uiContextSession,
 	uiLeftSessions,
 	onUiAction,
-	presetNames,
 }: LeftPanelProps) {
 	const t = useT();
 	const currentFile = sessionFile;
@@ -181,11 +172,9 @@ export const LeftPanel = memo(function LeftPanel({
 	const currentCwd = cwd;
 	const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 	const [confirmDel, setConfirmDel] = useState<string | null>(null);
-	const [confirmTakeover, setConfirmTakeover] = useState<string | null>(null);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 	const [collapseProjects, toggleProjects] = useCollapsed(LS_COLLAPSE_PROJECTS, false);
-	const [collapseConvs, toggleConvs] = useCollapsed(LS_COLLAPSE_CONVS, false);
 	const [collapseSessions, toggleSessions] = useCollapsed(LS_COLLAPSE_SESSIONS, false);
 	/** 会话右键菜单（`contextmenu.session` 槽位）：见下面的 showSessionMenu / openSessionMenu /
 	 *  dispatchHostSessionEntry。宿主自己的两条（关闭已结束子代理 / 强行关闭对话）也在这个槽位里，
@@ -214,48 +203,6 @@ export const LeftPanel = memo(function LeftPanel({
 		},
 		[activeConversationId],
 	);
-
-	/** scope 内全部子代理后代数量（不限状态：运行中/已结束/保留中都算）——
-	 *  强行全关按钮的计数口径；口径与 finishedSubagentCount 的 inScope 一致。 */
-	const countScopeSubagents = useCallback((list: ConversationSummary[], scopeId?: string): number => {
-		if (!scopeId) return list.filter((c) => c.isSubagent).length;
-		const byId = new Map(list.map((c) => [c.id, c]));
-		const inScope = (c: ConversationSummary): boolean => {
-			if (c.id === scopeId) return byId.get(scopeId)?.isSubagent ?? false;
-			let cur: ConversationSummary | undefined = c;
-			const seen = new Set<string>();
-			while (cur?.parentId) {
-				if (cur.parentId === scopeId) return true;
-				if (seen.has(cur.parentId)) return false;
-				seen.add(cur.parentId);
-				cur = byId.get(cur.parentId);
-				if (!cur) return false;
-			}
-			return false;
-		};
-		return list.filter((c) => c.isSubagent && inScope(c)).length;
-	}, []);
-
-	/** scope 下运行中（streaming）的子代理后代数量——混合情况
-	 *  （有运行、也有已结束）同样提示连带关闭，但只关不运行的：
-	 *  运行中的不受影响、父对话暂留。口径与 finishedSubagentCount 的 inScope 一致。 */
-	const countRunningSubagentDescendants = useCallback((list: ConversationSummary[], scopeId?: string): number => {
-		if (!scopeId) return 0;
-		const byId = new Map(list.map((c) => [c.id, c]));
-		const inScope = (c: ConversationSummary): boolean => {
-			let cur: ConversationSummary | undefined = c;
-			const seen = new Set<string>();
-			while (cur?.parentId) {
-				if (cur.parentId === scopeId) return true;
-				if (seen.has(cur.parentId)) return false;
-				seen.add(cur.parentId);
-				cur = byId.get(cur.parentId);
-				if (!cur) return false;
-			}
-			return false;
-		};
-		return list.filter((c) => c.isSubagent && c.isStreaming && inScope(c)).length;
-	}, []);
 
 	/** issue #145 行类型：运行的对话 = 本客户端 + 其他标签页/设备（elsewhere 只读行，标“另一处”）。 */
 	/** 上次打开会话菜单的坐标 + 目标：强行关闭的两段确认要在**原地**把菜单换成确认文案
@@ -539,7 +486,6 @@ export const LeftPanel = memo(function LeftPanel({
 		[sessionMenuAvailable, showSessionMenu],
 	);
 
-	type RowConv = ConversationSummary & { elsewhere?: boolean; owner?: string; convId?: string; hasQuestion?: boolean };
 	const panelRef = useRef<HTMLElement>(null);
 	const [weights, setWeights] = useState<LpWeights>(() => loadLpWeights());
 	useEffect(() => {
@@ -548,22 +494,6 @@ export const LeftPanel = memo(function LeftPanel({
 		} catch {}
 	}, [weights]);
 
-	/** issue #145：运行的对话 = 本客户端会话 + 其他标签页/设备的运行（后者只读行）。 */
-	const runningAll: RowConv[] = [
-		...conversations,
-		...elsewhere.map((w, i) => ({
-			id: `elsewhere:${w.cwd}:${w.title}:${i}`,
-			title: w.title,
-			cwd: w.cwd,
-			messageCount: 0,
-			isStreaming: w.isStreaming,
-			isSubagent: false as const,
-			elsewhere: true as const,
-			// 过户目标定位（无则沿用旧行为：只读行，无过户入口）。
-			...(w.owner && w.convId ? { owner: w.owner, convId: w.convId } : {}),
-			...(w.hasQuestion ? { hasQuestion: true as const } : {}),
-		})),
-	];
 	const createSashHandler = useCallback(
 		(aboveKey: keyof LpWeights, belowKey: keyof LpWeights) => (e: React.PointerEvent<HTMLDivElement>) => {
 			e.preventDefault();
@@ -574,7 +504,6 @@ export const LeftPanel = memo(function LeftPanel({
 			if (!panel) return;
 			const visibleMeta = [
 				{ key: "projects" as const, visible: projects.length > 0, collapsed: collapseProjects },
-				{ key: "convs" as const, visible: runningAll.length > 0, collapsed: collapseConvs },
 				{ key: "sessions" as const, visible: true, collapsed: collapseSessions },
 			].filter((s) => s.visible);
 			const collapsedCount = visibleMeta.filter((s) => s.collapsed).length;
@@ -603,7 +532,7 @@ export const LeftPanel = memo(function LeftPanel({
 			window.addEventListener("pointermove", onMove);
 			window.addEventListener("pointerup", onUp);
 		},
-		[weights, projects.length, runningAll.length, collapseProjects, collapseConvs, collapseSessions],
+		[weights, projects.length, collapseProjects, collapseSessions],
 	);
 
 	useEffect(() => {
@@ -669,7 +598,6 @@ export const LeftPanel = memo(function LeftPanel({
 	// 归一化权重：单展开时强制 flex=1 填满；多展开时按权重比例均值归一，避免 0.539 这类小数导致容器留空
 	const visibleMetaForFlex = [
 		{ key: "projects" as const, visible: projects.length > 0, collapsed: collapseProjects },
-		{ key: "convs" as const, visible: runningAll.length > 0, collapsed: collapseConvs },
 		{ key: "sessions" as const, visible: true, collapsed: collapseSessions },
 	].filter((s) => s.visible);
 	const expandedForFlex = visibleMetaForFlex.filter((s) => !s.collapsed);
@@ -741,340 +669,11 @@ export const LeftPanel = memo(function LeftPanel({
 					</div>
 				)}
 			</div>
-			{/* sash: projects ↔ next */}
-			{projects.length > 0 && !collapseProjects && (runningAll.length > 0 ? !collapseConvs : !collapseSessions) && (
+			{/* sash: projects ↔ 历史对话（「运行的对话」已挪到顶栏标签栏） */}
+			{projects.length > 0 && !collapseProjects && !collapseSessions && (
 				<div
 					className="lp-sash"
-					onPointerDown={createSashHandler("projects", runningAll.length > 0 ? "convs" : "sessions")}
-					onDoubleClick={() => setWeights({ ...DEFAULT_LP_WEIGHTS })}
-					title={t("dragToResize")}
-				/>
-			)}
-
-			{/* Running conversations — collapsible, flex share. Hidden when empty to keep old layout expectations. */}
-			{runningAll.length > 0 && (
-				<div
-					className={`lp-section lp-section-convs panel-convs ${collapseConvs ? "collapsed" : ""}`}
-					style={!collapseConvs ? { flex: `${effFlex("convs")} 1 0px` } : undefined}
-					onContextMenu={(e) => openSessionMenu(e, { id: "", kind: "section", label: t("runningConversations") })}
-				>
-					{sectionHeader(t("runningConversations"), collapseConvs, toggleConvs, runningAll.length)}
-					{!collapseConvs && (
-						<div className="lp-section-body convs-scroll">
-							{groupConversations(runningAll, cwd, activeConversationId).map((g) => (
-								<div key={g.cwd} className="panel-conv-group">
-									{!g.isCurrent && (
-										<div className="panel-conv-group-title" title={g.cwd}>
-											{projectName(g.cwd)}
-										</div>
-									)}
-									{(() => {
-										const byId = new Map(g.convs.map((x) => [x.id, x]));
-										const kids = new Map<string, ConversationSummary[]>();
-										const roots: ConversationSummary[] = [];
-										for (const x of g.convs) {
-											if (x.parentId && byId.has(x.parentId)) {
-												const arr = kids.get(x.parentId) ?? [];
-												arr.push(x);
-												kids.set(x.parentId, arr);
-											} else roots.push(x);
-										}
-										const rows: { c: ConversationSummary; depth: number }[] = [];
-										const seen = new Set<string>();
-										const append = (c: ConversationSummary, depth: number) => {
-											if (seen.has(c.id)) return;
-											seen.add(c.id);
-											rows.push({ c, depth });
-											for (const child of kids.get(c.id) ?? []) append(child, depth + 1);
-										};
-										for (const root of roots) append(root, 0);
-										for (const orphan of g.convs) append(orphan, 0);
-										return rows.map(({ c, depth }) => {
-											if ((c as RowConv).elsewhere) {
-												const elseOwner = (c as RowConv).owner;
-												const elseConvId = (c as RowConv).convId;
-												// issue #290：可过户（有 owner + convId）时本行可点击，两段确认。
-												const canTakeover = Boolean(elseOwner && elseConvId);
-												const confirming = confirmTakeover === c.id;
-												return (
-													<div
-														className="lp-row"
-														key={c.id}
-														onMouseLeave={() => setConfirmTakeover((k) => (k === c.id ? null : k))}
-														// 「另一处」行右键：过户到本页（含等答复的问卷）。
-														onContextMenu={(e) =>
-															openSessionMenu(e, {
-																id: elseConvId ?? c.id,
-																kind: "elsewhere",
-																label: c.title,
-																...(elseOwner ? { owner: elseOwner } : {}),
-															})
-														}
-													>
-														{/* 「另一处」行本体：可过户时当按钮用（第一次点 = 确认，第二次点 = 过户）。
-    不可过户（旧条目无 owner/convId）时保持只读，无 onClick。 */}
-														<button
-															type="button"
-															className={`session-item elsewhere-item${canTakeover ? "" : " elsewhere-static"}${confirming ? " confirm" : ""}`}
-															title={confirming ? t("takeoverConfirm") : `${t("elsewhereTip")}\n${c.cwd}`}
-															tabIndex={canTakeover ? 0 : -1}
-															onClick={
-																canTakeover
-																	? () => {
-																			if (!confirming) {
-																				setConfirmTakeover(c.id);
-																				return;
-																			}
-																			setConfirmTakeover(null);
-																			panelSend({
-																				type: "take_over_conversation",
-																				owner: elseOwner as string,
-																				id: elseConvId as string,
-																			});
-																		}
-																	: undefined
-															}
-														>
-															<FiMessageSquare className="session-icon" />
-															<span className="session-info">
-																<span className="session-title">
-																	<span className="elsewhere-badge">{t("elsewhereBadge")}</span>
-																	{c.hasQuestion && elseOwner && elseConvId && (
-																		<span
-																			className="question-badge clickable"
-																			title={t("takeoverHasQuestion")}
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				// 点 `?` 直接把问卷拉到本页作答（不搬迁对话）。
-																				panelSend({
-																					type: "peek_elsewhere_question",
-																					owner: elseOwner,
-																					id: elseConvId,
-																				});
-																			}}
-																		>
-																			?
-																		</span>
-																	)}
-																	{confirming ? t("takeoverConfirm") : c.title}
-																</span>
-																<span className="session-sub">{projectName(c.cwd)}</span>
-															</span>
-															{c.isStreaming && <span className="conv-streaming" title={t("streaming")} />}
-														</button>
-														{/* 触屏没有右键（contextmenu 不可靠）：给「另一处」行一个可见的操作钮，点开与右键同一个会话菜单
-															（过户 / 抢答问卷 / 复制 id）；槽位暂无可显示条目时不渲染（同右键路径的让路口径）。 */}
-														{sessionMenuAvailable && (
-															<button
-																type="button"
-																className="lp-del lp-elsewhere-act"
-																title={t("elsewhereActions")}
-																onClick={(e) => {
-																	e.stopPropagation();
-																	forceArmedRef.current = null;
-																	// 坐标按按钮矩形锚定（触屏 click 的 clientX/Y 不可靠），clampMenuPosition 会自行钳进视口。
-																	const r = e.currentTarget.getBoundingClientRect();
-																	showSessionMenu(r.left, r.bottom + 4, {
-																		id: elseConvId ?? c.id,
-																		kind: "elsewhere",
-																		label: c.title,
-																		...(elseOwner ? { owner: elseOwner } : {}),
-																	});
-																}}
-															>
-																<FiMoreVertical />
-															</button>
-														)}
-													</div>
-												);
-											}
-											const active = activeConversationId === c.id;
-											return (
-												<div
-													className={`lp-row${depth > 0 ? " lp-sub" : ""}`}
-													key={c.id}
-													style={depth > 0 ? { marginLeft: depth * 18 } : undefined}
-													onMouseLeave={() => setConfirmDel((k) => (k === `conv:${c.id}` ? null : k))}
-													onContextMenu={(e) => openSessionMenu(e, { id: c.id, kind: "running", label: c.title })}
-												>
-													<button
-														type="button"
-														className={`session-item ${active ? "active" : ""}`}
-														title={`${c.title}${g.isCurrent ? "" : ` — ${g.cwd}`}`}
-														onClick={() => {
-															if (!active) panelSend({ type: "switch_conversation", id: c.id });
-														}}
-													>
-														<FiMessageSquare className="session-icon" />
-														<span className="session-info">
-															{renaming === `conv:${c.id}` ? (
-																<input
-																	autoFocus
-																	className="session-rename-input"
-																	value={renameDraft}
-																	placeholder={t("renameSessionPlaceholder")}
-																	onClick={(e) => e.stopPropagation()}
-																	onChange={(e) => setRenameDraft(e.target.value)}
-																	onKeyDown={(e) => {
-																		e.stopPropagation();
-																		if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-																			const name = renameDraft.trim();
-																			if (name) panelSend({ type: "rename_conversation", id: c.id, name });
-																			setRenaming(null);
-																		} else if (e.key === "Escape") {
-																			setRenaming(null);
-																		}
-																	}}
-																	onBlur={() => setRenaming(null)}
-																/>
-															) : (
-																<span className="session-title">
-																	{c.isSubagent && <span className="subagent-badge">{t("subagentBadge")}</span>}
-																	{c.isEphemeral && <span className="ephemeral-badge">{t("ephemeralBadge")}</span>}
-																	{c.forkFrom && (
-																		<span
-																			className="preset-badge fork-badge"
-																			title={`${t("forkBadgeTip")}: ${c.forkFrom.title ?? c.forkFrom.conversationId}`}
-																		>
-																			🌿 {t("forkBadge")}
-																		</span>
-																	)}
-																	{c.agentPreset && (
-																		<span className="preset-badge" title={c.agentPreset}>
-																			{presetNames?.[c.agentPreset] ?? c.agentPreset}
-																		</span>
-																	)}
-																	{c.title}
-																	{c.error && (
-																		<span
-																			className="conv-error-badge"
-																			title={t("convErrorBadge", { error: c.error })}
-																		/>
-																	)}
-																	{c.hasQuestion && (
-																		<span className="question-badge" title={t("waitingQuestionBadge")}>
-																			?
-																		</span>
-																	)}
-																</span>
-															)}
-															{renaming === `conv:${c.id}` ? null : (
-																<span className="session-sub">
-																	{active ? t("current") : t("messageCount", { n: c.messageCount })}
-																</span>
-															)}
-														</span>
-														{c.isStreaming && <span className="conv-streaming" title={t("streaming")} />}
-													</button>
-													<button
-														type="button"
-														className="lp-del lp-rename"
-														title={t("renameSession")}
-														onClick={(e) => {
-															e.stopPropagation();
-															setConfirmDel(null);
-															setRenameDraft(c.title);
-															setRenaming(`conv:${c.id}`);
-														}}
-													>
-														<FiEdit2 />
-													</button>
-													{(() => {
-														const key = `conv:${c.id}`;
-														const armed = confirmDel === key;
-														const nFinished = finishedSubagentCount(conversations, c.id);
-														const nRunning = countRunningSubagentDescendants(conversations, c.id);
-														const nAll = countScopeSubagents(conversations, c.id);
-														// 无子代理 + 空闲：两段确认直接移出（active 也可，后端自动让出）。
-														if (nAll === 0 && !c.isStreaming) {
-															return delButton(
-																key,
-																t("dismissConversation"),
-																t("dismissConversationConfirm"),
-																() => panelSend({ type: "dismiss_conversation", id: c.id }),
-																<FiX />,
-															);
-														}
-														// 无子代理 + 运行中：两段确认强行关闭（中止本轮）。
-														if (nAll === 0) {
-															return delButton(
-																key,
-																t("dismissConversation"),
-																t("dismissStreamingConfirm"),
-																() => panelSend({ type: "dismiss_conversation", id: c.id, force: true }),
-																<FiX />,
-															);
-														}
-														// 有子代理后代：点 X 展开两个选项（只关已结束 / 强行全关）。
-														if (!armed) {
-															return (
-																<button
-																	type="button"
-																	className="lp-del"
-																	title={t("dismissConversation")}
-																	onClick={(e) => {
-																		e.stopPropagation();
-																		setConfirmDel(key);
-																	}}
-																>
-																	<FiX />
-																</button>
-															);
-														}
-														return (
-															<span className="lp-del-group">
-																{nFinished > 0 && (
-																	<button
-																		type="button"
-																		className="lp-del-opt"
-																		title={t("dismissFinishedSubagentsScoped", { n: nFinished })}
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			setConfirmDel(null);
-																			panelSend({ type: "dismiss_finished_subagents", parentId: c.id });
-																		}}
-																	>
-																		{t("dismissFinishedOnly", { n: nFinished })}
-																	</button>
-																)}
-																<button
-																	type="button"
-																	className="lp-del-opt danger"
-																	title={t("forceDismissTitle", { n: nAll, m: nRunning })}
-																	onClick={(e) => {
-																		e.stopPropagation();
-																		setConfirmDel(null);
-																		panelSend({ type: "dismiss_conversation", id: c.id, force: true });
-																	}}
-																>
-																	{t("dismissForceAll", { n: nAll })}
-																</button>
-															</span>
-														);
-													})()}
-													{renderLeftSessions()}
-													{c.isStreaming && (
-														<span
-															className="lp-row-stalled"
-															title={t("streaming")}
-															style={{ position: "absolute", right: 28, top: "50%", transform: "translateY(-50%)" }}
-														/>
-													)}
-												</div>
-											);
-										});
-									})()}
-								</div>
-							))}
-						</div>
-					)}
-				</div>
-			)}
-			{/* sash: convs ↔ sessions */}
-			{runningAll.length > 0 && !collapseConvs && !collapseSessions && (
-				<div
-					className="lp-sash"
-					onPointerDown={createSashHandler("convs", "sessions")}
+					onPointerDown={createSashHandler("projects", "sessions")}
 					onDoubleClick={() => setWeights({ ...DEFAULT_LP_WEIGHTS })}
 					title={t("dragToResize")}
 				/>
