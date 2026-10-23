@@ -235,8 +235,8 @@ describe("TopBar 是单一扁直流（无按种类包裹的容器、无贴边例
 		};
 		const { container } = mount(
 			"chat",
-			[hostEntry("host:new-chat"), hostEntry("host:chat"), pluginAction, pluginView],
-			[hostEntry("host:sound")],
+			[hostEntry("host:search"), hostEntry("host:chat"), pluginAction, pluginView],
+			[hostEntry("host:update")],
 		);
 		const ctrls = [
 			...container.querySelectorAll(".topbar-flow button, .topbar-flow a[href]"),
@@ -537,7 +537,7 @@ describe("TopBar 实测宽度溢出（放不下的自动进「⋯」）", () => 
 			hostEntry("host:chat"),
 			hostEntry("host:terminal"),
 			hostEntry("host:git"),
-			hostEntry("host:new-chat"),
+			hostEntry("host:search"),
 		];
 		const { container } = mount("chat", rows);
 		expect(flowItems(container).length).toBe(3);

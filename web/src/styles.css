@@ -14375,3 +14375,17 @@ html.desktop-shell .topbar .tb-spacer {
 	background: var(--chip-bg);
 	color: var(--text);
 }
+
+/* 设置 → 通用：语言行（当前语言用强调色底 + 勾选标记，其余给「切换」按钮） */
+.set-row.active {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+.set-locale-current {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	color: var(--accent);
+}

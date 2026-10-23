@@ -112,7 +112,8 @@ describe("BUILTIN_UI_ITEMS（宿主默认）", () => {
 
 	it("覆盖宿主既有入口（顶栏/底栏/右键菜单），且没有把 settings.pages 列成内置", () => {
 		const bySlot = (slot: UiSlotId) => BUILTIN_UI_ITEMS.filter((i) => i.slot === slot).map((i) => i.id);
-		// 顶栏：视图三连 + 搜索/浏览器/后台任务/设置/声音/语言/主题/更新
+		// 顶栏：视图三连 + 搜索/浏览器/后台任务/设置/更新
+		// （声音/语言已进 设置 → 通用，主题进 设置 → 界面设置，插件菜单与「新对话」已删）
 		expect(bySlot("topbar.primary")).toEqual(
 			expect.arrayContaining([
 				"host:chat",
@@ -122,11 +123,12 @@ describe("BUILTIN_UI_ITEMS（宿主默认）", () => {
 				"host:browser",
 				"host:tasks",
 				"host:settings",
-				"host:sound",
-				"host:language",
 				"host:update",
 			]),
 		);
+		for (const gone of ["host:sound", "host:language", "host:theme", "host:plugins", "host:new-chat"]) {
+			expect(bySlot("topbar.primary")).not.toContain(gone);
+		}
 		// 底栏：上下文/成本/缓存/消息数/主机指标/工作目录
 		expect(bySlot("bottombar")).toEqual(
 			expect.arrayContaining([
@@ -156,16 +158,11 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:chat",
 			"host:terminal",
 			"host:git",
-			"host:plugins",
 			"host:search",
 			"host:browser",
 			"host:tasks",
 			"host:settings",
-			"host:sound",
-			"host:language",
-			"host:theme",
 			"host:update",
-			"host:new-chat",
 			"host:new-ephemeral-chat",
 			"host:files",
 			// order 200：尾部条目 = 实测溢出的第一顺位被收起者（见 BUILTIN_UI_ITEMS 注释）
@@ -208,17 +205,11 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 	/** 缺省收起 = 低频 / 有替代入口的条目落进顶栏「⋯」（App.tsx 把 hidden 的 primary 条目
 	 *  塞进 uiOverflow → 菜单里能点，菜单型条目在菜单里是整块组件，功能不少）。
 	 *  这条断言是「顶栏默认长什么样」的唯一入口 —— 想改默认口径就改这里与 BUILTIN_UI_ITEMS。 */
-	it("缺省收进「⋯」的 6 条 + 常驻的 13 条", () => {
+	it("缺省收进「⋯」的 2 条 + 常驻的 10 条", () => {
 		const slots = build([]);
 		const top = slots["topbar.primary"];
-		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual([
-			"host:browser",
-			"host:sound",
-			"host:language",
-			"host:theme",
-			"host:update",
-		]);
-		// 常驻 = 「切视图（chat/terminal/git） / 起新活（new-chat/new-ephemeral-chat） /
+		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual(["host:browser", "host:update"]);
+		// 常驻 = 「切视图（chat/terminal/git） / 起新活（new-ephemeral-chat） /
 		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目、搜索、面板开关
 		expect(top.filter((e) => !e.hidden).map((e) => e.id)).toEqual([
 			"host:history",
@@ -227,11 +218,9 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:chat",
 			"host:terminal",
 			"host:git",
-			"host:plugins",
 			"host:search",
 			"host:tasks",
 			"host:settings",
-			"host:new-chat",
 			"host:new-ephemeral-chat",
 			"host:files",
 		]);
@@ -521,7 +510,8 @@ describe("顶栏插件视图区段", () => {
 		);
 		const ids = slots["topbar.primary"].filter((entry) => !entry.hidden).map((entry) => entry.id);
 		expect(ids.indexOf("host:git")).toBeLessThan(ids.indexOf("run-trace:__view"));
-		expect(ids.indexOf("run-trace:__view")).toBeLessThan(ids.indexOf("host:plugins"));
+		// 插件视图区段插在视图三连之后（原「插件」菜单条目已删，锚点只剩 git/terminal/chat）
+		expect(ids.indexOf("run-trace:__view")).toBeLessThan(ids.indexOf("host:search"));
 		expect(ids.indexOf("run-trace:__view")).toBeLessThan(ids.indexOf("editor:__view"));
 	});
 });

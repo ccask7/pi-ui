@@ -27,8 +27,11 @@ import {
 	FiTrash2,
 	FiUpload,
 	FiUsers,
+	FiVolume2,
 	FiX,
 	FiZap,
+	FiSun,
+	FiGlobe,
 } from "react-icons/fi";
 import { CopyButton } from "./copy-button";
 import { PluginIcon } from "../plugin-icon";
@@ -52,6 +55,11 @@ import type {
 	UiSubagentTemplate,
 } from "../types";
 import { SchedulerPanel } from "./SchedulerPanel";
+import { SoundSettingsPanel } from "./SoundSettings";
+import { NotifyToggle } from "./NotifyToggle";
+import { LanguageSettings } from "./LanguageSettings";
+import type { SoundKind, SoundSettings } from "../sounds";
+import type { ThemeInfo } from "../theme";
 import {
 	clearPromptHistory,
 	loadPromptHistory,
@@ -103,6 +111,15 @@ import {
  * 它的行固定在上面的 markers 分区（单测 settings-tool-rows 把这个例外锁死）。
  */
 const OTHER_AGENT_TOOLS = AGENT_TOOL_CATALOG.filter((e) => e.group === "other" && e.name !== MARKERS_LIST_TOOL_NAME);
+
+/** 主题下拉的选项文案：名称（zh 用 name，其它语言优先 nameEn）+ 浅/深标注。
+ *  与原顶栏「主题」下拉同一口径；themeLight/themeDark 已进 zh/en + 8 个语言包。 */
+function themeOptionLabel(th: ThemeInfo, locale: string, t: (key: "themeLight" | "themeDark") => string): string {
+	const base = locale === "zh" ? th.name : (th.nameEn ?? th.name);
+	const scheme = th.scheme === "light" ? t("themeLight") : th.scheme === "dark" ? t("themeDark") : "";
+	if (!scheme) return base;
+	return locale === "zh" ? `${base}（${scheme}）` : `${base} (${scheme})`;
+}
 
 /** Minimal terminal-tab bridge (same shape SCMPanel uses). */
 interface SettingsTerminalBridge {
@@ -160,6 +177,17 @@ interface SettingsModalProps {
 		schedulerTasks: SchedulerTaskView[];
 	};
 	terminal: SettingsTerminalBridge;
+	/** 声音提示（通用页：总开关/音量/试听）——状态与播放都在 App 里。 */
+	sound: SoundSettings;
+	onSoundChange: (settings: SoundSettings) => void;
+	onSoundPreview: (kind: SoundKind) => void;
+	/** 主题（界面设置页）：列表 + 当前选择 + 切换。 */
+	themes: ThemeInfo[];
+	theme: string | null;
+	onThemeChange: (id: string | null) => void;
+	reloadThemes: () => void;
+	/** 打开插件视图（设置 → 插件页里的「打开」，顶栏插件菜单已删）。 */
+	onOpenPluginView: (id: string) => void;
 	/** Switch the top-level view to the terminal (uninstall runs there). */
 	onSwitchToTerminal: () => void;
 	onClose: () => void;
@@ -329,6 +357,7 @@ function PluginLogView({ pluginId }: { pluginId: string }) {
  *  —— 条目全局 id 本身是 `<pluginId>:<itemId>`，所以整串是 `plugin-page:<pluginId>:<itemId>`；
  *  一个插件可以贡献多页，故不用 `plugin-page:<pluginId>`（会撞车）。 */
 type SettingsTab =
+	| "general"
 	| "prompt"
 	| "prompt-history"
 	| "scheduler"
@@ -349,7 +378,21 @@ type SettingsTab =
 	| "subagent-templates"
 	| `plugin-page:${string}`;
 
-export function SettingsModal({ chat, terminal, initialSection, onSwitchToTerminal, onClose }: SettingsModalProps) {
+export function SettingsModal({
+	chat,
+	terminal,
+	initialSection,
+	sound,
+	onSoundChange,
+	onSoundPreview,
+	themes,
+	theme,
+	onThemeChange,
+	reloadThemes,
+	onOpenPluginView,
+	onSwitchToTerminal,
+	onClose,
+}: SettingsModalProps) {
 	const t = useT();
 	const { locale } = useI18n();
 	// {{token}} 元数据文案键是动态的（promptTok_<token>[,_desc]），用 tt 跳过字面量类型。
@@ -577,6 +620,9 @@ export function SettingsModal({ chat, terminal, initialSection, onSwitchToTermin
 		if (!plugin) continue;
 		pluginPages.push({ entry, plugin });
 	}
+	/** 可打开的插件整页视图（原顶栏「插件」菜单的入口）。带 error 的置灰，与顶栏灰 tab 同口径。 */
+	const pluginViewList = chat.plugins.filter((p) => p.view !== false);
+
 	/** 导航 id ↔ 插件页的换算只写这一处（tab 状态、回落 effect、渲染块共用）。 */
 	const pluginPageTabId = (entryId: string): SettingsTab => `plugin-page:${entryId}`;
 
@@ -632,6 +678,7 @@ export function SettingsModal({ chat, terminal, initialSection, onSwitchToTermin
 		/** 悬浮提示（插件条目的 `hint`）。 */
 		hint?: string;
 	}[] = [
+		{ id: "general", icon: <FiSettings />, label: t("settingsGeneral") },
 		{ id: "prompt", icon: <FiFileText />, label: t("settingsSystemPrompt") },
 		{
 			id: "prompt-history",
@@ -1066,6 +1113,27 @@ export function SettingsModal({ chat, terminal, initialSection, onSwitchToTermin
 						))}
 					</nav>
 					<div className="modal-body" ref={bodyRef}>
+						{/* ---- 通用（声音 / 语言）--------------------------------------- */}
+						{tab === "general" && (
+							<>
+								<div className="set-section">
+									<div className="set-section-title">
+										<FiVolume2 className="set-section-icon" />
+										{t("sound")}
+									</div>
+									<SoundSettingsPanel settings={sound} onChange={onSoundChange} onPreview={onSoundPreview} />
+									<NotifyToggle />
+								</div>
+								<div className="set-section">
+									<div className="set-section-title">
+										<FiGlobe className="set-section-icon" />
+										{t("language")}
+									</div>
+									<LanguageSettings />
+								</div>
+							</>
+						)}
+
 						{/* ---- system prompt -------------------------------------------- */}
 						{tab === "prompt" && (
 							<div className="set-section">
@@ -2020,6 +2088,36 @@ export function SettingsModal({ chat, terminal, initialSection, onSwitchToTermin
 						)}
 
 						{/* ---- 界面设置（外观）：聊天背景图 + 面板透明度 ------------------- */}
+						{/* ---- 主题（从顶栏「主题」下拉搬来）---------------------------- */}
+						{tab === "appearance" && (
+							<div className="set-section">
+								<div className="set-section-title">
+									<FiSun className="set-section-icon" />
+									{t("theme")}
+									<HintTip text={t("themeHint")} />
+								</div>
+								<FieldRow label={t("theme")}>
+									<select
+										className="set-select"
+										value={theme ?? ""}
+										onFocus={() => {
+											// 挂载那次拉取撞上服务端重启会扑空：列表还空就补拉一次
+											if (themes.length === 0) reloadThemes();
+										}}
+										onChange={(e) => onThemeChange(e.target.value || null)}
+									>
+										<option value="">{t("themeDefault")}</option>
+										{themes.map((th) => (
+											<option key={th.id} value={th.id}>
+												{themeOptionLabel(th, locale, t)}
+											</option>
+										))}
+									</select>
+								</FieldRow>
+								<div className="set-note">{t("themeRememberHint")}</div>
+							</div>
+						)}
+
 						{tab === "appearance" && (
 							<div className="set-section">
 								<div className="set-section-title">
@@ -2547,6 +2645,43 @@ export function SettingsModal({ chat, terminal, initialSection, onSwitchToTermin
 						)}
 						{/* 插件目录授权（issue #146）：插件访问工作区外目录要经用户确认，
 						    这里列出已授权目录并支持逐条撤销（插件自己也能 requestAccess）。 */}
+						{/* ---- 插件视图（原顶栏「插件」菜单的入口，菜单已删）------------- */}
+						{tab === "plugins" && (
+							<div className="set-section">
+								<div className="set-section-title">
+									<FiBox className="set-section-icon" />
+									{t("pluginViewsTitle")}
+									<span className="set-count">{pluginViewList.length}</span>
+								</div>
+								<div className="set-note">{t("pluginViewsHint")}</div>
+								{pluginViewList.length === 0 ? (
+									<p className="set-empty">{t("pluginViewsEmpty")}</p>
+								) : (
+									<div className="set-list">
+										{pluginViewList.map((p) => (
+											<div key={p.id} className="set-row">
+												<div className="set-row-info">
+													<div className="set-row-name">{p.name}</div>
+													<div className="set-row-desc">
+														{p.id}
+														{p.error ? ` · ${p.error}` : ""}
+													</div>
+												</div>
+												<button
+													type="button"
+													className="btn"
+													disabled={Boolean(p.error)}
+													onClick={() => onOpenPluginView(p.id)}
+												>
+													{t("pluginViewOpen")}
+												</button>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+						)}
+
 						{tab === "plugins" && (
 							<div className="set-section">
 								<div className="set-section-title">

@@ -223,8 +223,7 @@ export function FooterBar({ chat, bottombarItems, onUiAction }: FooterBarProps) 
 					: t("contextUsage");
 			return (
 				<span className="status-item status-ctx" title={ctxTitle}>
-					{/* 窄屏（≤420px）只留进度条 + 数字，标签由 CSS 收起 */}
-					<span className="ctx-label">{t("context")}</span>
+					{/* 只留进度条 + 数字：标签文字已去掉（宽度紧张，进度条+数值本身够读） */}
 					<span className={`ctx-bar ${ctxBarClass}`}>
 						{ctxPercent !== null && (
 							<span className="ctx-bar-fill" style={{ width: `${Math.min(ctxPercent, 100)}%` }} />

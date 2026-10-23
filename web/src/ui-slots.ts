@@ -279,16 +279,6 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		align: "end",
 	},
 	{
-		id: "host:new-chat",
-		slot: "topbar.primary",
-		labelKey: "newChat",
-		icon: "plus",
-		kind: "action",
-		order: 96,
-		group: "primary",
-		align: "end",
-	},
-	{
 		id: "host:new-ephemeral-chat",
 		slot: "topbar.primary",
 		labelKey: "newChatEphemeral",
@@ -333,20 +323,6 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		group: "views",
 		align: "end",
 	},
-	// 插件面板（Chrome 扩展图标那个位置）：一个 🧩 入口列出全部已装插件，每行带「钉到顶栏」
-	// 开关。插件视图 tab 默认不钉（合成条目 hidden，见 withPluginViewItems），钉住的才回到
-	// 这里当 tab（order 23，紧跟本条目之前）。图标用 emoji 而不是词表名：词表名会被布局页
-	// 原样当文字画出来（见 ui-slots 末尾的图标词表注释）。
-	{
-		id: "host:plugins",
-		slot: "topbar.primary",
-		labelKey: "pluginMenuTitle",
-		icon: "🧩",
-		kind: "action",
-		order: 24,
-		group: "views",
-		align: "end",
-	},
 	// 工具组：全局搜索 / 浏览器操作 / 后台任务（后台任务的角标数由运行时给 badge）。
 	{
 		id: "host:search",
@@ -380,7 +356,8 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		group: "tools",
 		align: "end",
 	},
-	// 系统组：设置 → 声音/通知 → 语言 → 主题 → 版本（更新）→ GitHub。
+	// 系统组：设置 → 版本（更新）→ GitHub。声音/语言（设置 → 通用页）与主题（设置 →
+	// 界面设置）已从顶栏搬进设置面板，不再占顶栏位置。
 	//
 	// 缺省收起口径（hidden: true）：低频 / 有替代入口的条目缺省落进顶栏「⋯」溢出菜单。
 	// 这不是「消失」—— App.tsx 的 uiOverflow 会把 hidden 的 topbar.primary 条目当成常驻溢出项
@@ -398,42 +375,6 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		kind: "action",
 		order: 60,
 		group: "system",
-		align: "end",
-	},
-	{
-		id: "host:sound",
-		slot: "topbar.primary",
-		labelKey: "sound",
-		icon: "sound",
-		kind: "action",
-		order: 70,
-		group: "system",
-		// 低频（设一次就不动），且菜单里是完整的声音/通知面板
-		hidden: true,
-		align: "end",
-	},
-	{
-		id: "host:language",
-		slot: "topbar.primary",
-		labelKey: "language",
-		icon: "globe",
-		kind: "action",
-		order: 80,
-		group: "system",
-		// 设一次语言就不再动的条目；菜单里是完整的下拉（含「获取更多语言」）
-		hidden: true,
-		align: "end",
-	},
-	{
-		id: "host:theme",
-		slot: "topbar.primary",
-		labelKey: "theme",
-		icon: "sun",
-		kind: "action",
-		order: 82,
-		group: "system",
-		// 同上：低频；菜单里是完整的主题下拉
-		hidden: true,
 		align: "end",
 	},
 	{
@@ -1575,9 +1516,7 @@ function placeTopbarPluginViews(entries: WorkingEntry[]): WorkingEntry[] {
 		["host:git", "host:terminal", "host:chat"]
 			.map((id) => rest.findIndex((entry) => entry.id === id))
 			.find((index) => index >= 0) ?? -1;
-	const panel = rest.findIndex((entry) => entry.id === "host:plugins");
 	let insertAt = anchor + 1;
-	if (panel >= insertAt) insertAt = panel;
 	insertAt = Math.max(0, Math.min(insertAt, rest.length));
 	return [...rest.slice(0, insertAt), ...views, ...rest.slice(insertAt)];
 }

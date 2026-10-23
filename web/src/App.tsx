@@ -78,7 +78,7 @@ import type { Notice } from "./use-chat";
 import { fileToProcessedImage, isRasterImage, type ProcessedImage } from "./image-paste";
 import { randomUuid } from "./uuid";
 import { recordModelUsage } from "./model-usage";
-import { loadSoundSettings, playSound, saveSoundSettings, type SoundKind, type SoundSettings } from "./sounds";
+import { loadSoundSettings, playSound, saveSoundSettings, type SoundSettings } from "./sounds";
 import { useWideChat } from "./chat-width-settings";
 import { registerFilePreviewHost } from "./file-preview-bridge";
 import { projectNameFromCwd, useProjectTitle } from "./title-settings";
@@ -375,12 +375,6 @@ export function App() {
 	const uiChatHeader = useMemo(() => uiSlots["chat.header"].filter((e) => !e.hidden), [uiSlots]);
 	const uiChatEmpty = useMemo(() => uiSlots["chat.empty"].filter((e) => !e.hidden), [uiSlots]);
 	const uiFilePreviewToolbar = useMemo(() => uiSlots["file.preview.toolbar"].filter((e) => !e.hidden), [uiSlots]);
-	// DSH 预设名录 id→显示名（左栏徽标；agentPresets 对象不变时引用稳定，不破坏 LeftPanel memo）。
-	const presetNames = useMemo(
-		() => Object.fromEntries((chat.agentPresets?.presets ?? []).map((p) => [p.id, p.name ?? p.id])),
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[chat.agentPresets],
-	);
 	const uiNoticeActions = useMemo(() => uiSlots["notice.actions"].filter((e) => !e.hidden), [uiSlots]);
 	/** 点一个插件顶栏条目：缺省 action（或 "view"）由宿主切成插件视图；其余交给插件
 	 *  （按需加载它的客户端 bundle；没人接管就提示一句，不让按钮看起来"点了没用"）。
@@ -1332,19 +1326,8 @@ export function App() {
 					setSettingsInitialSection(undefined);
 					setSettingsOpen(true);
 				}}
-				onManagePlugins={() => {
-					setSettingsInitialSection("plugins");
-					setSettingsOpen(true);
-				}}
 				onOpenBgTasks={() => setBgTasksOpen(true)}
 				onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
-				sound={sound}
-				onSoundChange={setSound}
-				onSoundPreview={(kind: SoundKind) => playSound(kind, sound)}
-				themes={themes}
-				theme={theme}
-				onThemeChange={switchTheme}
-				reloadThemes={reloadThemes}
 			/>
 			{chat.protocolMismatch && <div className="protocol-banner">⚠ {t("protocolMismatch")}</div>}
 			<div className="notices">
@@ -2045,6 +2028,17 @@ export function App() {
 					chat={chat}
 					terminal={terminal}
 					initialSection={settingsInitialSection}
+					sound={sound}
+					onSoundChange={setSound}
+					onSoundPreview={(kind) => playSound(kind, sound)}
+					themes={themes}
+					theme={theme}
+					onThemeChange={switchTheme}
+					reloadThemes={reloadThemes}
+					onOpenPluginView={(id) => {
+						setSettingsOpen(false);
+						setView(`plugin:${id}`);
+					}}
 					onSwitchToTerminal={() => setView("terminal")}
 					onClose={() => setSettingsOpen(false)}
 				/>

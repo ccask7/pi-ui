@@ -85,9 +85,7 @@ async function resolvePort(): Promise<number> {
 		console.warn(`[desktop] PI_WEB_PORT=${want} 已被占用，改用首选/随机空闲口（不影响在跑的那个 server）`);
 	}
 	if (await isPortFree(PREFERRED_PORT)) return PREFERRED_PORT;
-	console.warn(
-		`[desktop] 首选端口 ${PREFERRED_PORT} 被占用，本次改用随机空闲口 —— 界面记忆（主题/面板等）会重置一次`,
-	);
+	console.warn(`[desktop] 首选端口 ${PREFERRED_PORT} 被占用，本次改用随机空闲口 —— 界面记忆（主题/面板等）会重置一次`);
 	return pickFreePort();
 }
 
