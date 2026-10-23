@@ -74,9 +74,9 @@ ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder
     经 `desktop:titlebar-overlay` IPC 下发（主进程 `setTitleBarOverlay`）。
     主题切换（`ccui:theme-change`）与初次进主界面时都调，所以**浅色主题下按钮条跟着变浅**。
   - overlay 高度不再是写死值：`syncTitlebarOverlay()` 用 `getBoundingClientRect()` 实测
-    `.topbar` 高（当前 37 = 控件 26 + 上下 padding 5 + 边框 1）一并下发，主进程校验
+    `.topbar` 高（当前 35 = 控件 26 + 上下 padding 4 + 边框 1，对齐 VS Code 的 35px）一并下发，主进程校验
     20~120px 后 `setTitleBarOverlay`。所以改顶栏 padding / `--topbar-ctl-h` 时**不用**再动
-    `main.ts`（只有 welcome.html 阶段的默认高度还留着 37，仅作初值）。
+    `main.ts`（只有 welcome.html 阶段的默认高度还留着 35，仅作初值）。
   - 坑：颜色解析要兼容 `color(srgb 0.07 0.08 0.11 / 0.6)` 这类回读格式（分量 0~1 浮点，
     不是 0~255）；overlay 不接受 alpha，必须合成成不透明色。
 - 单实例锁：`requestSingleInstanceLock()`。

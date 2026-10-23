@@ -232,9 +232,9 @@ async function createWindow(): Promise<void> {
 		// （顶栏 CSS app-region: drag，见 styles.css 的 html.desktop-shell 段）。
 		// 初始配色对 welcome.html 的深色底；进主界面后由 syncTitlebarOverlay 跟随主题。
 		// 高度先给个默认值（welcome.html 阶段顶栏还没渲染），进主界面后
-		// syncTitlebarOverlay 会把实测的顶栏高度传进来（当前 37 = 控件 26 + 上下 5 + 边框 1）。
+		// syncTitlebarOverlay 会把实测的顶栏高度传进来（当前 35 = 控件 26 + 上下 4 + 边框 1）。
 		titleBarStyle: "hidden",
-		titleBarOverlay: { color: "#1a1b1e", symbolColor: "#e4e4e7", height: 37 },
+		titleBarOverlay: { color: "#1a1b1e", symbolColor: "#e4e4e7", height: 35 },
 		webPreferences: {
 			preload: join(here, "preload.cjs"),
 			contextIsolation: true,
