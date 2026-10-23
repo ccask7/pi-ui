@@ -160,8 +160,12 @@ function readPanelWidth(side: PanelSide): number {
 	return Number.isFinite(v) && v >= PANEL_MIN && v <= PANEL_MAX ? v : PANEL_DEFAULT;
 }
 const panelCollapsedKey = (side: PanelSide) => `ccui:${side}-panel-collapsed`;
+/** 折叠状态：没存过时右栏（文件列表）缺省收起 —— 多数时候用不到，先给对话区让位；
+ *  左栏缺省展开。用户点过折叠按钮后按存下来的值走。 */
 function readPanelCollapsed(side: PanelSide): boolean {
-	return localStorage.getItem(panelCollapsedKey(side)) === "1";
+	const saved = localStorage.getItem(panelCollapsedKey(side));
+	if (saved === null) return side === "right";
+	return saved === "1";
 }
 
 /** 面板与主区之间的拖拽分隔条：拖动改宽度，双击复位。 */

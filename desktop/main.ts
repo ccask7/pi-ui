@@ -67,17 +67,27 @@ function isPortFree(port: number): Promise<boolean> {
 	});
 }
 
+/** 首选端口：**必须固定**。窗口 origin 是 http://127.0.0.1:<port>，而 localStorage
+ * 按 origin 隔离 —— 每次随机端口意味着主题、面板宽度、面板折叠、不透明度、各种
+ * 「记住上次选择」全部在新进程里失踪。端口被占（另一个 ccui 在跑 / 用户自己占了）
+ * 才退回随机口，那种情况下界面记忆会重置一次。 */
+const PREFERRED_PORT = 34567;
+
 /**
- * 端口：默认随机空闲口。`PI_WEB_PORT` 显式指定时优先，但**已被占用就退回随机口**——
- * 从 ccui 自己的终端里跑 `desktop:dev` 会继承它的 `PI_WEB_PORT=8787`，
- * 硬用该值只会让 sidecar 一启动就 EADDRINUSE 崩掉（窗口转而连上那个网页版 server）。
+ * 端口：优先 `PI_WEB_PORT`（显式指定），其次固定首选口，最后才随机。
+ * `PI_WEB_PORT` 被占用不能硬绑 —— 从 ccui 自己的终端跑 `desktop:dev` 会继承
+ * 网页版的 8787，硬用只会让 sidecar 一启动就 EADDRINUSE 崩掉。
  */
 async function resolvePort(): Promise<number> {
 	const want = Number(process.env.PI_WEB_PORT ?? 0);
 	if (want > 0) {
 		if (await isPortFree(want)) return want;
-		console.warn(`[desktop] PI_WEB_PORT=${want} 已被占用，改用随机空闲口（不影响在跑的那个 server）`);
+		console.warn(`[desktop] PI_WEB_PORT=${want} 已被占用，改用首选/随机空闲口（不影响在跑的那个 server）`);
 	}
+	if (await isPortFree(PREFERRED_PORT)) return PREFERRED_PORT;
+	console.warn(
+		`[desktop] 首选端口 ${PREFERRED_PORT} 被占用，本次改用随机空闲口 —— 界面记忆（主题/面板等）会重置一次`,
+	);
 	return pickFreePort();
 }
 
