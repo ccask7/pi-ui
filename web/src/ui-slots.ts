@@ -335,18 +335,6 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		align: "end",
 	},
 	{
-		id: "host:browser",
-		slot: "topbar.primary",
-		labelKey: "browserControl",
-		icon: "browser",
-		kind: "action",
-		order: 41,
-		group: "tools",
-		align: "end",
-		// 缺省收进「⋯」：只有装了 page-picker 扩展、真要用模型看页面的人才需要它
-		hidden: true,
-	},
-	{
 		id: "host:tasks",
 		slot: "topbar.primary",
 		labelKey: "bgTasks",
@@ -376,18 +364,6 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		order: 60,
 		group: "system",
 		align: "end",
-	},
-	{
-		id: "host:update",
-		slot: "topbar.primary",
-		labelKey: "update",
-		icon: "download",
-		kind: "action",
-		order: 90,
-		group: "system",
-		align: "end",
-		// 展示型（版本号 + 更新红点）：缺省收进「⋯」，菜单里仍是完整下拉（红点也一起过去）
-		hidden: true,
 	},
 	// GitHub 外链：缺省收起 + 排在**尾部**（order 取最大）。两件事配合起来才对：
 	//   · hidden: true  —— 缺省落在「⋯」里；

@@ -359,13 +359,9 @@ export function App() {
 		for (const d of diagnostics) console.warn(`[ui-slot] ${d.pluginId ? `[${d.pluginId}] ` : ""}${d.message}`);
 		return slots;
 	}, [chat.plugins, chat.settings?.disabledPlugins, chat.settings?.uiLayout, locale, t]);
-	// 顶栏：主栏 = 非 hidden 的 topbar.primary；溢出 = hidden 的 primary + topbar.overflow。
-	// 这样插件把宿主条目 hide 掉之后，它仍在溢出菜单/布局页里找得回来（锁不死用户）。
+	// 顶栏：只画非 hidden 的 topbar.primary（「⋯」溢出菜单已删，顶栏改横向滚动；
+	// 被用户隐藏的条目仍在 设置 → 界面布局 里勾回来）。
 	const uiPrimary = useMemo(() => uiSlots["topbar.primary"].filter((e) => !e.hidden), [uiSlots]);
-	const uiOverflow = useMemo(
-		() => [...uiSlots["topbar.primary"].filter((e) => e.hidden), ...uiSlots["topbar.overflow"]],
-		[uiSlots],
-	);
 	// 面板槽位（收尾接线）：非 hidden 条目直传面板，空数组时面板返回 null，DOM 与旧版一致。
 	const uiLeftSessions = useMemo(() => uiSlots["leftpanel.sessions"].filter((e) => !e.hidden), [uiSlots]);
 	const uiTerminalToolbar = useMemo(() => uiSlots["terminal.toolbar"].filter((e) => !e.hidden), [uiSlots]);
@@ -1308,7 +1304,6 @@ export function App() {
 				view={view}
 				plugins={enabledPlugins}
 				uiPrimary={uiPrimary}
-				uiOverflow={uiOverflow}
 				uiContextTopbar={uiSlots["contextmenu.topbar"]}
 				onUiAction={onUiAction}
 				onViewChange={(v: ViewName) => {

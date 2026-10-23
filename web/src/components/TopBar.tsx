@@ -1,7 +1,5 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import {
-	FiDownload,
 	FiFolder,
 	FiFolderPlus,
 	FiGitBranch,
@@ -13,17 +11,14 @@ import {
 	FiTerminal,
 } from "react-icons/fi";
 import type { ChatState } from "../use-chat";
-import { BrowserControl } from "./BrowserControl";
-import { BROWSER_PAGE_TOOL_NAME } from "../../../server/tool-manager.js";
 import { PluginIcon } from "../plugin-icon";
 import { useI18n } from "../i18n";
-import { isPluginViewItem, REQUIRED_TOPBAR_ITEM_IDS, type UiSlotEntry } from "../ui-slots";
-import { fitTopbar, MOBILE_ASIDE_TOPBAR_IDS, sortOverflowMenuItems } from "../topbar-fit";
+import type { UiSlotEntry } from "../ui-slots";
+import { MOBILE_ASIDE_TOPBAR_IDS } from "../topbar-fit";
 import { openContextMenu } from "../context-menu-state";
-import { appSend, useAppField, useAppGlobals } from "../app-globals";
+import { appSend, useAppField } from "../app-globals";
 import { ProjectPicker } from "./ProjectPicker";
 import { focusComposer } from "../composer-bridge";
-import { useFloatingPanel } from "../use-floating-panel";
 
 /**
  * 顶栏「⋯」溢出菜单（issue #162）：portal 到 document.body + `position: fixed`。
@@ -37,41 +32,6 @@ import { useFloatingPanel } from "../use-floating-panel";
  * 行为：点外面 / Esc 关闭（与 Dropdown/ContextMenu 一致）；窗口缩放或滚动时重算锚点
  * （移动端横滑顶栏时菜单跟着走，而不是飘在原地）。
  */
-function TopbarOverflowMenu({
-	anchorRef,
-	open,
-	onClose,
-	children,
-}: {
-	anchorRef: React.RefObject<HTMLButtonElement | null>;
-	open: boolean;
-	onClose: () => void;
-	children: ReactNode;
-}) {
-	const {
-		panelRef: menuRef,
-		style,
-		measure,
-	} = useFloatingPanel({
-		open,
-		anchor: anchorRef,
-		onClose,
-	});
-
-	// 打开后、内容变化后：绘制前实测一次（layout effect，用户看不到中间态）。
-	useLayoutEffect(() => {
-		if (open) measure();
-	}, [open, children, measure]);
-
-	if (!open) return null;
-	return createPortal(
-		<div ref={menuRef} className="plugin-topbar-menu portal" role="menu" style={style}>
-			{children}
-		</div>,
-		document.body,
-	);
-}
-
 /**
  * 手机端断点（与 styles.css 的 mobile ≤768px 同口径）：matchMedia 监听，跨断点实时切换。
  * jsdom / SSR（无 matchMedia）回落 false —— 宁可全画，也不清空顶栏。
@@ -115,8 +75,6 @@ interface TopBarProps {
 	}[];
 	/** 顶栏主栏条目（内置 + 插件的最终结果，已按用户偏好/插件 arrange 排好；由 App 计算）。 */
 	uiPrimary?: UiSlotEntry[];
-	/** 溢出菜单条目：被隐藏/被移到 overflow 的条目（用户仍能从这里找回）。 */
-	uiOverflow?: UiSlotEntry[];
 	/** 点击一个条目：view 由宿主切视图，其余（action/select）交给贡献它的插件
 	 *  （select 切选项时第二个参数带选中的 value）。 */
 	onUiAction?: (item: UiSlotEntry, value?: string) => void;
@@ -137,7 +95,6 @@ export function TopBar({
 	view,
 	plugins,
 	uiPrimary,
-	uiOverflow,
 	uiContextTopbar,
 	onUiAction,
 	onViewChange,
@@ -147,27 +104,17 @@ export function TopBar({
 	onOpenGlobalSearch,
 }: TopBarProps) {
 	const { t } = useI18n();
-	// 「⋯」溢出菜单的开关（宿主自己的菜单，插件不碰 DOM；顺序与设置面板里看到的一致）。
-	const [topbarMenuOpen, setTopbarMenuOpen] = useState(false);
 	/* 「打开项目」按钮（host:open-project）的项目选择器：与左栏 📁+ 同一个组件、同一套行为
 	   （浏览磁盘目录 / 选当前目录 / ＋新建项目后切过去）。cwd 与额外工作区根走全局 store
 	   （整棵树都要的值，不再从 App 传参）。 */
 	const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 	const cwd = useAppField("cwd");
 	const workspaceRoots = useAppField("workspaceRoots");
-	// 溢出菜单触发按钮：portal 菜单按它的视口矩形锚定（issue #162）。
-	const moreBtnRef = useRef<HTMLButtonElement>(null);
 	/* PI_WEB_TABS: an instance can be set up to offer only some tabs — the
 	   server refuses the messages of the others anyway (server/tabs.ts), so
 	   drawing them would only offer an action that comes back refused. No list
 	   means every tab, which is the default. */
 	const tabOn = (tab: string) => !chat.tabs || tab === "chat" || chat.tabs.includes(tab);
-	/** 常驻溢出菜单的条目：「布局页里被隐藏的宿主条目 ＋ topbar.overflow 声明项」。
-	 *  品牌（host:brand）没有动作，进菜单会变成死按钮 —— 直接过滤（布局页仍可勾回来）。
-	 *  另外还有「本断点放不下」的条目，那是实测出来的（见下面的 fitTopbar），不在这里。 */
-	const pinnedOverflowItems = [...(uiOverflow ?? [])].filter(
-		(it) => !(it.source === "host" && it.id === "host:brand") && !isPluginViewItem(it),
-	);
 	/**
 	 * 顶栏统一渲染（方案 A：**完全扁平**，桌面与手机同一份 slot 数据）——
 	 * 所有条目都是 `.topbar-flow` 的直接子节点，**没有任何按种类包裹的容器**
@@ -187,10 +134,8 @@ export function TopBar({
 		"host:terminal",
 		"host:git",
 		"host:search",
-		"host:browser",
 		"host:tasks",
 		"host:settings",
-		"host:update",
 		"host:new-ephemeral-chat",
 		"host:files",
 	];
@@ -219,50 +164,6 @@ export function TopBar({
 				}) as UiSlotEntry,
 		);
 	// 视图门禁 / 白名单门禁在统一的条目流里过滤（见下面的 flowItems）。
-	/**
-	 * 溢出菜单里的**宿主内置动作**：点下去得真干活。
-	 *
-	 * 主路径是原样渲染（菜单里直接画 hostNodes 的 chip/tab，点它就是点顶栏本身，
-	 * 不需要分派）。这里只服务两条后备：hostNodes 返回 null 的条目
-	 * （门禁/条件不满足，如终端视图里的 ☰，扁平行保证找得回来）与 select 行。
-	 * 宿主自己的入口实现全在 TopBar 里（与 T1 的教训一致：`host:*` 的实现留在拥有
-	 * 它的组件内），所以这里按 id 映射到本地处理器；返回 false = 不认识
-	 * 这个 id（比如插件条目、或 kind="view" 的条目）→ 交回 onUiAction。
-	 */
-	const dispatchHostOverflow = (entry: UiSlotEntry): boolean => {
-		if (entry.source !== "host") return false;
-		switch (entry.id) {
-			case "host:history":
-				onOpenPanel("left");
-				return true;
-			case "host:files":
-				onOpenPanel("right");
-				return true;
-			case "host:new-ephemeral-chat":
-				onViewChange("chat");
-				appSend({ type: "new_chat", ephemeral: true });
-				focusComposer();
-				return true;
-			case "host:open-project":
-				setProjectPickerOpen(true);
-				return true;
-			case "host:search":
-				onOpenGlobalSearch();
-				return true;
-			case "host:tasks":
-				onOpenBgTasks();
-				return true;
-			case "host:settings":
-				onOpenSettings();
-				return true;
-			default:
-				// 视图条目（chat/terminal/git/插件视图）与插件动作交给 App 的 onUiAction
-				//（视图由它自己 setView，动作转给贡献插件）；菜单型宿主条目不会走到这里
-				//（它们整块搬进菜单，见 OVERFLOW_AS_NODE_IDS）。
-				return false;
-		}
-	};
-
 	/** 右键一个顶栏条目 → 打开 contextmenu.topbar 槽位（插件可往里贡献菜单项）。 */
 	const openItemMenu = (e: React.MouseEvent, id: string, label: string) => {
 		e.preventDefault();
@@ -274,10 +175,8 @@ export function TopBar({
 			entries: uiContextTopbar ?? [],
 		});
 	};
-	// 受管标记与自身版本号：走全局（web/src/app-globals.ts），整个连接内不变。
-	const { appVersion } = useAppGlobals();
 
-	/** 手机端断点（见 useIsMobileTopbar）：旁置/实测按断点切（mobileAsideItems/fitInput）。 */
+	/** 手机端断点（见 useIsMobileTopbar）：旁置项（📁）按断点挂到整条最右。 */
 	const isMobile = useIsMobileTopbar();
 	/**
 	 * 顶栏宿主内置条目的节点工厂（与 FooterBar 的 hostNodes 同模式）：`renderZoneFlow`
@@ -325,7 +224,7 @@ export function TopBar({
 			view === "chat" && tabOn("files") ? (
 				// 桌面与手机同一节点（带文字）：文字显隐统一走顶栏文字总开关
 				// （.topbar.no-labels），不再有手机端独立的纯图标分支；手机端钉在
-				// ⋯ 右边最右（见 mobileAsideItems），放不下由实测溢出接管。
+				// 整条最右（见 mobileAsideItems），不参与横向滚动。
 				<button
 					type="button"
 					className="panel-toggle has-label"
@@ -401,9 +300,6 @@ export function TopBar({
 				<span className="chip-sub">{t("searchGlobal")}</span>
 			</button>
 		),
-		"host:browser": !(chat.settings?.disabledAgentTools?.includes(BROWSER_PAGE_TOOL_NAME) ?? false) ? (
-			<BrowserControl />
-		) : null,
 		"host:tasks": (
 			<button type="button" className="chip bg-task-chip" data-tip={t("bgTasksTip")} onClick={onOpenBgTasks}>
 				<FiLayers />
@@ -417,21 +313,11 @@ export function TopBar({
 				<span className="chip-sub">{t("settings")}</span>
 			</button>
 		),
-		"host:update": (
-			<span className="chip" data-tip={`ccui v${appVersion ?? "…"}`}>
-				<FiDownload />
-				<span className="chip-sub">v{appVersion ?? "…"}</span>
-			</span>
-		),
 	};
 
 	/** 桌面工具 chips 的可见性历史口径（不扩大）：只有 search / tasks / settings 这几个成员
 	 *  的显隐还受 PI_WEB_TABS 白名单管（服务端会拒绝对应的消息，画出来只会给一个点了没反应用的按钮）。 */
 	const TABS_GATED_IDS = new Set(["host:search", "host:tasks", "host:settings"]);
-	/** 溢出菜单里**整块搬进来**的宿主条目（菜单型：下拉/外链/自带面板）。
-	 *  其余宿主条目（history / files / new-chat / search / tasks / settings）在菜单里是一条扁平
-	 *  菜单项，由 dispatchHostOverflow 分派到本地处理器 —— 扁平的更像菜单，整块的才需要搬组件。 */
-	const OVERFLOW_AS_NODE_IDS = new Set(["host:update", "host:browser"]);
 	/** TABS 白名单门禁（历史口径，不扩大）：search/tasks/settings 的显隐还受白名单管，
 	 *  其余宿主入口只看 slot（各节点工厂内部自行判断，见 hostNodes）。 */
 	const isTabGatedOff = (id: string) => TABS_GATED_IDS.has(id) && !tabOn(id.slice("host:".length));
@@ -515,87 +401,14 @@ export function TopBar({
 	}
 	/** 条目自己的对齐段（脏值回落 start，与合并引擎同口径）。 */
 	const zoneOf = (it: { entry: UiSlotEntry | null }): "start" | "center" | "end" => it.entry?.align ?? "start";
-	/** 本断点放不下的条目（实测宽度算出来的，见 web/src/topbar-fit.ts）：退进「⋯」菜单。 */
-	const [droppedIds, setDroppedIds] = useState<ReadonlySet<string>>(() => new Set<string>());
-	const flowRef = useRef<HTMLDivElement>(null);
-	/** 条目宽度缓存（id → 实测 px）。被丢进溢出的条目已不在 DOM 里、量不到宽度 —— 用上一次的
-	 *  实测值，窗口变宽时它们才能按真实宽度回来（否则会「一旦被丢就再也回不来」）。 */
-	const widthCacheRef = useRef(new Map<string, number>());
-	/** 桌面与手机同一套实测溢出：放不下的条目（droppedIds）退进「⋯」，放得下全留
-	 *  （手机端不再按名单强制折叠 —— 搜索/插件 tab 等能放下就直接显示）。 */
-	const keptItems = flowItems.filter((it) => !droppedIds.has(it.id));
-	/** 手机端固定位（MOBILE_ASIDE_TOPBAR_IDS）：移出主直流、渲染在 ⋯ 右边最右，
-	 *  不参与实测溢出。桌面端为空，直流保持单一扁平（slot 顺序直排，不动）。 */
-	const mobileAsideItems = isMobile ? keptItems.filter((it) => MOBILE_ASIDE_TOPBAR_IDS.has(it.id)) : [];
-	/** 主直流里实际渲染的条目（手机端 = kept 去掉固定位）。 */
-	const flowKeptItems = isMobile ? keptItems.filter((it) => !MOBILE_ASIDE_TOPBAR_IDS.has(it.id)) : keptItems;
-	/** 实测与溢出的视觉顺序（左段→中段→右段，段内仍是 slot 顺序）：渲染层按这个顺序落位，
-	 *  fitTopbar 必须吃同样顺序才能做到「从视觉最右边开始收」。直接喂 slot 顺序会在
-	 *  align 混排时把视觉左边的条目先丢掉 —— 窄屏下排第 2 的都可能进 ⋯。手机端固定位
-	 *  （📁 挂在直流外面，不占直流宽度）同样不参与实测。 */
-	const fitBase = isMobile ? flowItems.filter((it) => !MOBILE_ASIDE_TOPBAR_IDS.has(it.id)) : flowItems;
-	const visualAll = [
-		...fitBase.filter((it) => zoneOf(it) === "start"),
-		...fitBase.filter((it) => zoneOf(it) === "center"),
-		...fitBase.filter((it) => zoneOf(it) === "end"),
-	];
-	/** 直流子节点（已滤掉 spacer）就是按这个顺序排的，宽度缓存必须按它一一对应 ——
-	 *  按 slot 顺序对应会在混排时把别人的宽度记到自己名下。 */
-	const keptVisual = visualAll.filter((it) => !droppedIds.has(it.id));
-	const measure = () => {
-		const flow = flowRef.current;
-		// jsdom / 未挂载（没有 ResizeObserver）：不丢任何条目 —— 宁可全画，也不清空顶栏。
-		if (!flow || typeof ResizeObserver === "undefined") return;
-		const kids = Array.from(flow.children).filter((el) => !el.classList.contains("tb-spacer"));
-		// 每个条目恰好渲染一个元素（宿主条目都是单根元素）；数量对不上就不猜了 —— 全保留。
-		// 手机端固定位（📁）挂在直流外面：只比对直流内的条目数（keptVisual）。
-		if (kids.length === keptVisual.length) {
-			keptVisual.forEach((it, i) => widthCacheRef.current.set(it.id, (kids[i] as HTMLElement).offsetWidth));
-		}
-		const gap = Number.parseFloat(getComputedStyle(flow).columnGap) || 0;
-		// 「⋯」按钮是流容器的**兄弟**节点：flex 已经把它占的宽度从 clientWidth 里扣掉了，
-		// 所以这里不用为它预留（reserve = 0）。没有 slot 元数据的条目（回退模式）不参与溢出
-		// （宽度传 0 = 不可丢），否则菜单里会出现画不出来的幽灵项。
-		// 极窄屏下放不下的视觉尾部条目退进溢出，而不是把顶栏撑成两行。
-		const fitInput = visualAll;
-		const next = fitTopbar(
-			fitInput.map((it) => ({ id: it.id, width: it.entry ? (widthCacheRef.current.get(it.id) ?? 0) : 0 })),
-			flow.clientWidth,
-			gap,
-			0,
-			REQUIRED_TOPBAR_ITEM_IDS,
-		);
-		setDroppedIds((prev) => (prev.size === next.size && [...next].every((id) => prev.has(id)) ? prev : next));
-	};
-	// 条目集合 / 文案 / 视图 / 语言 / 断点变了就重算一次（绘制前实测，用户看不到中间态）；窗口尺寸变化由
-	// 下面的 ResizeObserver 兜。**不**随快照流每次渲染都量（那会变成 60ms 一次的强制重排）。
-	const measureKey = `${keptItems.map((it) => `${it.id}:${it.entry?.label ?? ""}`).join("|")}|${view}|${(
-		chat.tabs ?? []
-	).join(",")}|${isMobile ? "m" : "d"}`;
-	useLayoutEffect(measure, [measureKey]); // eslint-disable-line react-hooks/exhaustive-deps
-	useEffect(() => {
-		const flow = flowRef.current;
-		if (!flow || typeof ResizeObserver === "undefined") return;
-		const ro = new ResizeObserver(() => measure());
-		ro.observe(flow);
-		return () => ro.disconnect();
-	}, [measureKey]); // eslint-disable-line react-hooks/exhaustive-deps
-	/** 三段落位（段内仍是 slot 顺序 → 布局页 ↑↓ 的效果与界面一致；手机端固定位不在直流里）。 */
-	const segStart = flowKeptItems.filter((it) => zoneOf(it) === "start");
-	const segCenter = flowKeptItems.filter((it) => zoneOf(it) === "center");
-	const segEnd = flowKeptItems.filter((it) => zoneOf(it) === "end");
-	/** 溢出菜单 = 被隐藏/常驻条目 ＋ 本断点放不下的条目（同一个「⋯」，手机上也只有一个入口）。
-	 *  顺序与顶栏视觉一致（左→中→右，段内按 slot 顺序），见 sortOverflowMenuItems。 */
-	const droppedEntries = flowItems.filter((it) => droppedIds.has(it.id) && it.entry).map((it) => it.entry!);
-	const slotRank = new Map<string, number>();
-	[...(uiPrimary ?? []), ...(uiOverflow ?? [])].forEach((e, i) => {
-		if (!slotRank.has(e.id)) slotRank.set(e.id, i);
-	});
-	const overflowMenuItems = sortOverflowMenuItems(
-		[...pinnedOverflowItems, ...droppedEntries],
-		(id) => slotRank.get(id) ?? 999999,
-	);
-
+	/** 手机端固定位（MOBILE_ASIDE_TOPBAR_IDS：📁 文件列表开关）挂在直流外面、钉在整条最右，
+	 *  不参与横向滚动；桌面端为空，直流保持单一扁平（slot 顺序直排）。 */
+	const mobileAsideItems = isMobile ? flowItems.filter((it) => MOBILE_ASIDE_TOPBAR_IDS.has(it.id)) : [];
+	const flowShown = isMobile ? flowItems.filter((it) => !MOBILE_ASIDE_TOPBAR_IDS.has(it.id)) : flowItems;
+	/** 三段落位（段内仍是 slot 顺序 → 布局页 ↑↓ 的效果与界面一致）。 */
+	const segStart = flowShown.filter((it) => zoneOf(it) === "start");
+	const segCenter = flowShown.filter((it) => zoneOf(it) === "center");
+	const segEnd = flowShown.filter((it) => zoneOf(it) === "end");
 	// 顶栏按钮文字总开关（设置 → 界面布局 → 顶栏，默认开）：关掉后顶栏只剩图标
 	// （数字角标保留；溢出菜单里仍带文字；实现见 styles.css 的 .topbar.no-labels）。
 	const hideTopbarText = chat.settings?.uiLayout?.topbarText === false;
@@ -603,7 +416,7 @@ export function TopBar({
 		<header className={`topbar${hideTopbarText ? " no-labels" : ""}`} data-pi-anchor="topbar">
 			{/* 单一扁直流：所有条目同级（没有按种类包裹的容器，也没有两端贴边的例外）。
 			    两个 spacer 把条目分成 start / center / end 三段 —— 就是布局页里的「对齐方向」。 */}
-			<div className="topbar-flow" ref={flowRef} role="toolbar" aria-label={t("viewSwitch")}>
+			<div className="topbar-flow" role="toolbar" aria-label={t("viewSwitch")}>
 				{segStart.map((it) => (
 					<Fragment key={it.id}>{it.node}</Fragment>
 				))}
@@ -616,99 +429,7 @@ export function TopBar({
 					<Fragment key={it.id}>{it.node}</Fragment>
 				))}
 			</div>
-			{overflowMenuItems.length > 0 && (
-				<div className="plugin-topbar-more">
-					<button
-						ref={moreBtnRef}
-						type="button"
-						className="plugin-topbar-item"
-						aria-haspopup="menu"
-						aria-expanded={topbarMenuOpen}
-						data-tip={t("pluginTopbarMore")}
-						onClick={() => setTopbarMenuOpen((v) => !v)}
-					>
-						⋯
-					</button>
-					{/* issue #162：菜单 portal 到 body（fixed），不再挂在会被祖先 overflow 裁剪的容器里。 */}
-					<TopbarOverflowMenu anchorRef={moreBtnRef} open={topbarMenuOpen} onClose={() => setTopbarMenuOpen(false)}>
-						{overflowMenuItems.map((it) => {
-							// 被隐藏的**宿主菜单型**条目（声音/语言/主题/版本/GitHub/浏览器操作）：
-							// 它们不是一次性动作，扁平按钮点了没意义 —— 把整块组件搬进溢出菜单，
-							// 这样「隐藏」只是换了个位置，功能一点不少（与内建条目的实现留在组件内一致）。
-							const asNode = it.source === "host" && OVERFLOW_AS_NODE_IDS.has(it.id) ? hostNodes[it.id] : undefined;
-							if (asNode !== undefined) {
-								return <Fragment key={it.id}>{asNode}</Fragment>;
-							}
-							// 折叠按钮保持折叠前样式（只统一宽度顶满菜单，不重绘成扁平行）：
-							// 宿主走 hostNodes（与顶栏同一套 chip/tab/panel-toggle），插件走通用渲染。
-							// 包一层关菜单（点后关 ⋯，与扁平行一致）。节点为 null（门禁/条件不满足，
-							// 如终端视图里的 ☰）才回落扁平行，保证条目找得回来。
-							if (it.source === "host") {
-								const node = hostNodes[it.id];
-								if (node) {
-									return (
-										<div key={it.id} className="plugin-topbar-menu-keep" onClick={() => setTopbarMenuOpen(false)}>
-											{node}
-										</div>
-									);
-								}
-							} else {
-								const node = renderPluginEntry(it);
-								if (node) {
-									return (
-										<div key={it.id} className="plugin-topbar-menu-keep" onClick={() => setTopbarMenuOpen(false)}>
-											{node}
-										</div>
-									);
-								}
-							}
-							// kind="select" 在溢出菜单里同样落成下拉（label + select 一行）。
-							if (it.kind === "select" && it.options?.length) {
-								return (
-									<label key={it.id} className="plugin-topbar-overflow-select" title={it.hint ?? it.label}>
-										<span>
-											{it.icon && !/[a-z]/i.test(it.icon) ? `${it.icon} ` : ""}
-											{it.label}
-										</span>
-										<select
-											aria-label={it.label}
-											value={it.options.some((o) => o.value === it.value) ? (it.value as string) : it.options[0]!.value}
-											onChange={(e) => {
-												setTopbarMenuOpen(false);
-												if (!dispatchHostOverflow(it)) onUiAction?.(it, e.target.value);
-											}}
-										>
-											{it.options.map((o) => (
-												<option key={o.value} value={o.value}>
-													{o.label}
-												</option>
-											))}
-										</select>
-									</label>
-								);
-							}
-							return (
-								<button
-									key={it.id}
-									type="button"
-									role="menuitem"
-									title={it.hint ?? it.label}
-									onClick={() => {
-										setTopbarMenuOpen(false);
-										// 宿主内置动作在本地分派（见 dispatchHostOverflow），其余交回 onUiAction。
-										if (!dispatchHostOverflow(it)) onUiAction?.(it);
-									}}
-								>
-									{it.icon && !/[a-z]/i.test(it.icon) ? `${it.icon} ` : ""}
-									{it.label}
-								</button>
-							);
-						})}
-					</TopbarOverflowMenu>
-				</div>
-			)}
-
-			{/* 手机端固定位：📁 纯图标钉在 ⋯ 右边（整条顶栏最右），直流/溢出都不含它。 */}
+			{/* 手机端固定位：📁 纯图标钉在整条顶栏最右，不在可横向滚动的直流里。 */}
 			{mobileAsideItems.map((it) => (
 				<Fragment key={it.id}>{it.node}</Fragment>
 			))}

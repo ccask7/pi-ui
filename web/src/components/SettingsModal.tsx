@@ -26,6 +26,7 @@ import {
 	FiTool,
 	FiTrash2,
 	FiUpload,
+	FiMonitor,
 	FiUsers,
 	FiVolume2,
 	FiX,
@@ -58,6 +59,7 @@ import { SchedulerPanel } from "./SchedulerPanel";
 import { SoundSettingsPanel } from "./SoundSettings";
 import { NotifyToggle } from "./NotifyToggle";
 import { LanguageSettings } from "./LanguageSettings";
+import { BrowserControlSettings } from "./BrowserControl";
 import type { SoundKind, SoundSettings } from "../sounds";
 import type { ThemeInfo } from "../theme";
 import {
@@ -84,7 +86,7 @@ import {
 	type UiDiagnostic,
 	type UiSlotEntry,
 } from "../ui-slots";
-import { appSend } from "../app-globals";
+import { appSend, useAppGlobals } from "../app-globals";
 import { countPluginPhases, pluginPhase, type PluginPhase } from "../plugin-phase";
 import {
 	PLUGIN_LOG_LEVELS,
@@ -395,6 +397,8 @@ export function SettingsModal({
 }: SettingsModalProps) {
 	const t = useT();
 	const { locale } = useI18n();
+	// 设置 → 通用 页底部显示版本号（原顶栏「版本」芯片，随溢出菜单一起删掉）。
+	const { appVersion } = useAppGlobals();
 	// {{token}} 元数据文案键是动态的（promptTok_<token>[,_desc]），用 tt 跳过字面量类型。
 	const tt = (k: string) => t(k as Parameters<typeof t>[0]);
 	const settings = chat.settings;
@@ -1131,6 +1135,7 @@ export function SettingsModal({
 									</div>
 									<LanguageSettings />
 								</div>
+								<div className="set-note settings-version-note">ccui v{appVersion ?? "…"}</div>
 							</>
 						)}
 
@@ -2645,6 +2650,17 @@ export function SettingsModal({
 						)}
 						{/* 插件目录授权（issue #146）：插件访问工作区外目录要经用户确认，
 						    这里列出已授权目录并支持逐条撤销（插件自己也能 requestAccess）。 */}
+						{/* ---- 浏览器操作（page-picker / browser_page 工具，原顶栏芯片 + 弹窗）--- */}
+						{tab === "plugins" && (
+							<div className="set-section">
+								<div className="set-section-title">
+									<FiMonitor className="set-section-icon" />
+									{t("browserControl")}
+								</div>
+								<BrowserControlSettings />
+							</div>
+						)}
+
 						{/* ---- 插件视图（原顶栏「插件」菜单的入口，菜单已删）------------- */}
 						{tab === "plugins" && (
 							<div className="set-section">

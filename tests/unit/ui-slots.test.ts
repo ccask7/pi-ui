@@ -112,21 +112,28 @@ describe("BUILTIN_UI_ITEMS（宿主默认）", () => {
 
 	it("覆盖宿主既有入口（顶栏/底栏/右键菜单），且没有把 settings.pages 列成内置", () => {
 		const bySlot = (slot: UiSlotId) => BUILTIN_UI_ITEMS.filter((i) => i.slot === slot).map((i) => i.id);
-		// 顶栏：视图三连 + 搜索/浏览器/后台任务/设置/更新
-		// （声音/语言已进 设置 → 通用，主题进 设置 → 界面设置，插件菜单与「新对话」已删）
+		// 顶栏：视图三连 + 搜索/后台任务/设置
+		// （声音/语言 → 设置→通用，主题 → 界面设置，浏览器操作 → 插件页，版本号 → 通用页底部；
+		//   插件菜单、「新对话」与「⋯」溢出菜单已删）
 		expect(bySlot("topbar.primary")).toEqual(
 			expect.arrayContaining([
 				"host:chat",
 				"host:terminal",
 				"host:git",
 				"host:search",
-				"host:browser",
 				"host:tasks",
 				"host:settings",
-				"host:update",
 			]),
 		);
-		for (const gone of ["host:sound", "host:language", "host:theme", "host:plugins", "host:new-chat"]) {
+		for (const gone of [
+			"host:sound",
+			"host:language",
+			"host:theme",
+			"host:plugins",
+			"host:new-chat",
+			"host:browser",
+			"host:update",
+		]) {
 			expect(bySlot("topbar.primary")).not.toContain(gone);
 		}
 		// 底栏：上下文/成本/缓存/消息数/主机指标/工作目录
@@ -159,10 +166,8 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:terminal",
 			"host:git",
 			"host:search",
-			"host:browser",
 			"host:tasks",
 			"host:settings",
-			"host:update",
 			"host:new-ephemeral-chat",
 			"host:files",
 			// order 200：尾部条目 = 实测溢出的第一顺位被收起者（见 BUILTIN_UI_ITEMS 注释）
@@ -202,13 +207,12 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 		expect(slots["modal.dialog"]).toEqual([]);
 	});
 
-	/** 缺省收起 = 低频 / 有替代入口的条目落进顶栏「⋯」（App.tsx 把 hidden 的 primary 条目
-	 *  塞进 uiOverflow → 菜单里能点，菜单型条目在菜单里是整块组件，功能不少）。
-	 *  这条断言是「顶栏默认长什么样」的唯一入口 —— 想改默认口径就改这里与 BUILTIN_UI_ITEMS。 */
-	it("缺省收进「⋯」的 2 条 + 常驻的 10 条", () => {
+	/** 这条断言是「顶栏默认长什么样」的唯一入口 —— 想改默认口径就改这里与 BUILTIN_UI_ITEMS。
+	 *  「⋯」溢出菜单删除后不再有「缺省收进菜单」的条目：默认全常驻，放不下就横向滚动。 */
+	it("默认没有隐藏条目，常驻 10 条", () => {
 		const slots = build([]);
 		const top = slots["topbar.primary"];
-		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual(["host:browser", "host:update"]);
+		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual([]);
 		// 常驻 = 「切视图（chat/terminal/git） / 起新活（new-ephemeral-chat） /
 		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目、搜索、面板开关
 		expect(top.filter((e) => !e.hidden).map((e) => e.id)).toEqual([
@@ -542,16 +546,16 @@ describe("buildUiSlots / 第 4 层：用户偏好（最高）", () => {
 	});
 
 	it("order 列表：列出的按列表顺序排在最前，未列出的保持原顺序", () => {
-		const slots = build([], { layout: { order: ["host:update", "host:chat"] } });
-		expect(ids(slots["topbar.primary"]).slice(0, 2)).toEqual(["host:update", "host:chat"]);
-		// 其余仍按权重排：update/chat 置顶之后是 history(0) → brand(1) → open-project(3) …
+		const slots = build([], { layout: { order: ["host:files", "host:chat"] } });
+		expect(ids(slots["topbar.primary"]).slice(0, 2)).toEqual(["host:files", "host:chat"]);
+		// 其余仍按权重排：files/chat 置顶之后是 history(0) → brand(1) → open-project(3) …
 		expect(ids(slots["topbar.primary"]).slice(2, 5)).toEqual(["host:history", "host:brand", "host:open-project"]);
 		expect(slots["topbar.primary"].find((e) => e.id === "host:chat")?.userOverrides).toEqual(["order"]);
 	});
 
 	it("order 列表里的历史 id（条目已不存在）被忽略", () => {
-		const slots = build([], { layout: { order: ["ghost:gone", "host:update"] } });
-		expect(ids(slots["topbar.primary"])[0]).toBe("host:update");
+		const slots = build([], { layout: { order: ["ghost:gone", "host:files"] } });
+		expect(ids(slots["topbar.primary"])[0]).toBe("host:files");
 		expect(slots["topbar.primary"]).toHaveLength(BUILTIN_UI_ITEMS.filter((i) => i.slot === "topbar.primary").length);
 	});
 

@@ -324,103 +324,12 @@ async function main() {
 	const [ctxA, msgA] = after.split(":").map(Number);
 	check("布局页 ↑ 调序后界面真的换位置", ctxA >= 0 && msgA >= 0 && msgA < ctxA, `${before} → ${after}`);
 
-	// ---- 5b. 顶栏：调序真的换位置 + 隐藏的菜单型条目落到溢出菜单里且能用 -------
-	// 注意动作纪律：**设置面板开着时不要点顶栏**（modal-backdrop 盖住整页，鼠标事件全落到它身上，
-	// 不是按钮坏了）。每次改完布局先关面板、断言界面、再开面板改下一处。
-	/** 桌面工具组里两个 chip 的先后（DOM 顺序，按可见文案定位）。 */
-	const desktopOrder = async (a, b) =>
-		await page.evaluate(
-			([ta, tb]) => {
-				const nodes = Array.from(document.querySelectorAll(".topbar-flow .chip"));
-				const idx = (t) => nodes.findIndex((n) => (n.textContent ?? "").includes(t));
-				return `${idx(ta)}:${idx(tb)}`;
-			},
-			[a, b],
-		);
-	const themeRow = layoutRow(page, /顶栏|Top bar/, /主题|Theme/);
-	check("布局页列出了顶栏的「主题」条目", await until(async () => (await themeRow.count()) > 0, 30, 250));
-	const soundRow = layoutRow(page, /顶栏|Top bar/, /声音|Sound/);
-	check("布局页列出了顶栏的「声音」条目", await until(async () => (await soundRow.count()) > 0, 30, 250));
-	// 声音/语言/主题/更新/GitHub/浏览器这六个内置条目在 BUILTIN_UI_ITEMS 里就是 `hidden: true`
-	// （#146 的刻意设计：低频，且菜单里是完整面板）——默认落在「⋯」溢出菜单里，
-	// 所以布局页里它们的勾选框**本来就是未勾的**。本段要验「调序 / 隐藏 / 溢出菜单里仍可用」，
-	// 所以先把这两个**显示出来**再测（不然「取消勾选」实际是把它从隐藏变显示）。
-	for (const row of [themeRow, soundRow]) {
-		const box = row.locator('input[type="checkbox"]').first();
-		if (!(await box.isChecked())) await tap(page, box);
-	}
-	check(
-		"勾上后「主题」「声音」出现在主栏（这两个默认是隐藏的）",
-		await until(async () => (await page.locator(".topbar-flow .chip", { hasText: /主题|Theme/ }).count()) > 0, 30, 250),
-	);
-	// 默认顺序：…声音(70) → 主题(82)。按两次 ↑ 把主题挪到声音前面。
-	await tap(page, themeRow.locator("button", { hasText: "↑" }).first());
-	await tap(page, themeRow.locator("button", { hasText: "↑" }).first());
-	check("关掉设置面板", await closeLayoutPage(page));
-	const orderAfter = await desktopOrder("主题", "声音");
-	const [themeIdx, soundIdx] = orderAfter.split(":").map(Number);
-	check(
-		"顶栏 ↑ 调序后界面真的换位置（主题排到声音前面）",
-		themeIdx >= 0 && soundIdx >= 0 && themeIdx < soundIdx,
-		orderAfter,
-	);
-
-	// 隐藏「声音」：chip 从桌面组消失 → 它整块搬到「⋯」溢出菜单里，点了要能开面板
-	check("再打开布局页", await openLayoutPage(page));
-	check("布局页仍列出「声音」", await until(async () => (await soundRow.count()) > 0, 30, 250));
-	await tap(page, soundRow.locator('input[type="checkbox"]').first());
-	check("关掉设置面板（才能点顶栏）", await closeLayoutPage(page));
-	check(
-		"隐藏后顶栏的声音 chip 消失",
-		await until(
-			async () => (await page.locator(".topbar-flow .chip", { hasText: /声音|Sound/ }).count()) === 0,
-			30,
-			250,
-		),
-	);
-	const moreBtn = page.locator(".plugin-topbar-more > button").first();
-	check("顶栏「⋯」按钮出现（有隐藏条目）", (await moreBtn.count()) > 0);
-	await tap(page, moreBtn);
-	const soundInMenu = await until(
-		async () => (await page.locator(".plugin-topbar-menu .chip", { hasText: /声音|Sound/ }).count()) > 0,
-		20,
-		200,
-	);
-	check("隐藏的声音整块出现在「⋯」溢出菜单里（不是死按钮）", soundInMenu);
-	// issue #162 回归：菜单必须真的可见可点（portal 之前它在 DOM 里但被祖先 overflow 裁掉）。
-	const menuHit = await page.evaluate(() => {
-		const menu = document.querySelector(".plugin-topbar-menu");
-		if (!menu) return "no-menu";
-		const r = menu.getBoundingClientRect();
-		if (r.width === 0 || r.height === 0) return "zero-size";
-		if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth)
-			return "outside-viewport";
-		const el = document.elementFromPoint(r.x + Math.min(r.width - 5, 12), r.y + Math.min(r.height - 5, 12));
-		return menu.contains(el) ? "ok" : `clipped-by:${el ? (el.className ?? el.tagName) : "null"}`;
-	});
-	check("溢出菜单真的可见可点（不被祖先 overflow 裁剪）", menuHit === "ok", String(menuHit));
-	if (soundInMenu) {
-		await tap(page, page.locator(".plugin-topbar-menu .chip", { hasText: /声音|Sound/ }).first());
-		check(
-			"点它真能展开声音设置面板（搬过去也还能用）",
-			await until(async () => (await page.locator(".plugin-topbar-menu .dd-menu").count()) > 0, 20, 200),
-		);
-		await page.keyboard.press("Escape");
-		// issue #162：溢出菜单现在是 portal + 点外面/Esc 关闭 —— Esc 会把内层声音面板与溢出菜单一起收起。
-		check(
-			"Esc 后溢出菜单收起",
-			await until(async () => (await page.locator(".plugin-topbar-menu").count()) === 0, 20, 200),
-		);
-	}
-	// 放回去（把布局改回默认，别影响后面的断言）。若菜单还开着，再点一次 ⋯ 收起。
-	if ((await page.locator(".plugin-topbar-menu").count()) > 0) await moreBtn.evaluate((el) => el.click());
-	check("再打开布局页（恢复声音）", await openLayoutPage(page));
-	await tap(page, soundRow.locator('input[type="checkbox"]').first());
-	check("关掉设置面板", await closeLayoutPage(page));
-	check(
-		"勾回去后声音 chip 回到顶栏",
-		await until(async () => (await page.locator(".topbar-flow .chip", { hasText: /声音|Sound/ }).count()) > 0, 30, 250),
-	);
+	// ---- 5b. 顶栏（精简后）：只剩常驻条目，「⋯」溢出菜单已删除 ---------------
+	// 声音/语言/主题/版本号/浏览器操作都搬进设置，插件菜单与「新对话」也已删除 ——
+	// 所以这里不再测「隐藏的菜单型条目落进溢出菜单」，改成锁新的不变量：
+	// 顶栏直流里有条目、且里面没有「⋯」按钮；空间不够时靠横向滚动。
+	check("顶栏直流有条目", (await page.locator(".topbar-flow > *").count()) > 0);
+	check("顶栏没有「⋯」溢出菜单按钮", (await page.locator(".plugin-topbar-more").count()) === 0);
 
 	// ---- 5c. 底栏 cwd 选择器也能把目录加成工作区根（第二条入口） -------------
 	// 根选择器长在「文件」tab 里（SlotTabs 只挂当前选中项）：先把右栏切回文件 tab，

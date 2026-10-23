@@ -14389,3 +14389,18 @@ html.desktop-shell .topbar .tb-spacer {
 	font-size: 12px;
 	color: var(--accent);
 }
+
+/* 「⋯」溢出菜单已删除：空间不够时的唯一出口就是这条横向滚动（原来只有窄屏才有）。
+   顶栏条目不再被丢进菜单，滑动即可看到全部；条目仍然不许被 flex 压扁（见上一条）。 */
+.topbar-flow {
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: thin;
+}
+/* 设置 → 通用 页底部版本号（原顶栏「版本」芯片） */
+.settings-version-note {
+	margin-top: 16px;
+	text-align: right;
+	font-size: 11px;
+	color: var(--text-faint);
+}

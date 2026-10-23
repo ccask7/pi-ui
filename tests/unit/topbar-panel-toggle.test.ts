@@ -233,15 +233,14 @@ describe("TopBar 是单一扁直流（无按种类包裹的容器、无贴边例
 			kind: "view",
 			view: "plugin:demo",
 		};
-		const { container } = mount(
-			"chat",
-			[hostEntry("host:search"), hostEntry("host:chat"), pluginAction, pluginView],
-			[hostEntry("host:update")],
-		);
-		const ctrls = [
-			...container.querySelectorAll(".topbar-flow button, .topbar-flow a[href]"),
-			...document.querySelectorAll(".plugin-topbar-more > button"),
-		];
+		const { container } = mount("chat", [
+			hostEntry("host:search"),
+			hostEntry("host:chat"),
+			hostEntry("host:terminal"),
+			pluginAction,
+			pluginView,
+		]);
+		const ctrls = [...container.querySelectorAll(".topbar-flow button, .topbar-flow a[href]")];
 		expect(ctrls.length).toBeGreaterThan(4);
 		for (const el of ctrls) {
 			const tip = el.getAttribute("data-tip");
@@ -306,39 +305,6 @@ describe("TopBar 面板抽屉按钮的视图门禁", () => {
 		expect(opened).toEqual([]);
 	});
 
-	it("隐藏的内置入口出现在溢出菜单里，点它仍能打开对应面板", () => {
-		const { container, opened } = mount(
-			"chat",
-			[hostEntry("host:chat")],
-			[hostEntry("host:files"), hostEntry("host:history")],
-		);
-		const more = container.querySelector<HTMLButtonElement>(".plugin-topbar-more > button");
-		expect(more).toBeTruthy();
-		act(() => more!.click());
-		// issue #162：菜单 portal 到 document.body（fixed），不在 container 里 —— 查全局。
-		// 且不再挂在会被任何祖先 overflow 裁剪的容器下。
-		const menu = document.querySelector(".plugin-topbar-menu");
-		expect(menu?.parentElement).toBe(document.body);
-		expect(menu?.classList.contains("portal")).toBe(true);
-		// 折叠按钮保持原样式：菜单里画的仍是 panel-toggle（不是扁平菜单行）。
-		const items = Array.from(
-			document.querySelectorAll<HTMLButtonElement>(
-				".plugin-topbar-menu .plugin-topbar-menu-keep > button.panel-toggle",
-			),
-		);
-		expect(items.length).toBe(2);
-		act(() => items[0]!.click());
-		expect(opened).toEqual(["right"]);
-		// 菜单点完即关；再开一次点另一条 → 打开左栏
-		act(() => more!.click());
-		const items2 = Array.from(
-			document.querySelectorAll<HTMLButtonElement>(
-				".plugin-topbar-menu .plugin-topbar-menu-keep > button.panel-toggle",
-			),
-		);
-		act(() => items2[1]!.click());
-		expect(opened).toEqual(["right", "left"]);
-	});
 });
 
 describe("TopBar「打开项目」入口（host:open-project）", () => {
@@ -396,20 +362,6 @@ describe("TopBar「打开项目」入口（host:open-project）", () => {
 		expect(document.querySelector(".project-picker")).toBeNull();
 	});
 
-	it("被布局页隐藏后仍能从「⋯」溢出菜单打开（隐藏 ≠ 失去入口）", () => {
-		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
-		setAppSend(() => true);
-		const { container } = mount("chat", [hostEntry("host:chat")], [hostEntry("host:open-project", true)]);
-		expect(container.querySelector("button.open-project")).toBeNull();
-		act(() => container.querySelector<HTMLButtonElement>(".plugin-topbar-more > button")!.click());
-		// 折叠后仍是原来的 chip（不是扁平菜单行），点它照样打开选择器。
-		const item = document.querySelector<HTMLButtonElement>(
-			".plugin-topbar-menu .plugin-topbar-menu-keep > button.open-project",
-		);
-		expect(item).toBeTruthy();
-		act(() => item!.click());
-		expect(document.querySelector(".project-picker")).toBeTruthy();
-	});
 });
 
 describe("TopBar 连接状态", () => {
@@ -493,60 +445,5 @@ describe("TopBar 槽位渲染（顺序即 slot 顺序，插件条目与宿主条
 		expect(broken?.textContent).toContain("Mail");
 		// 报错原因走 data-tip 即时气泡（顶栏直流内不用原生 title，见上）
 		expect(broken?.getAttribute("data-tip")).toContain("boom");
-	});
-});
-
-describe("TopBar 实测宽度溢出（放不下的自动进「⋯」）", () => {
-	// jsdom 没有布局：把 offsetWidth / clientWidth 与 ResizeObserver 都打桩，
-	// 只为验证**接线**（实测 → fitTopbar → 从尾部退进菜单），几何正确性由
-	// tests/unit/topbar-fit.test.ts 的纯函数单测负责。
-	const realOffset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
-	const realClient = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-	const realRO = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
-
-	const stubLayout = (itemWidth: number, flowWidth: number) => {
-		Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
-			configurable: true,
-			get() {
-				return itemWidth;
-			},
-		});
-		Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-			configurable: true,
-			get() {
-				return flowWidth;
-			},
-		});
-		(globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
-			observe() {}
-			disconnect() {}
-		};
-	};
-
-	afterEach(() => {
-		if (realOffset) Object.defineProperty(HTMLElement.prototype, "offsetWidth", realOffset);
-		if (realClient) Object.defineProperty(HTMLElement.prototype, "clientWidth", realClient);
-		(globalThis as { ResizeObserver?: unknown }).ResizeObserver = realRO;
-	});
-
-	it("宽度不足：尾部条目退出主栏、进「⋯」菜单，窗口变宽后回来", () => {
-		stubLayout(60, 200); // 每条 60、容器 200 → 只放得下 3 条
-		const rows = [
-			hostEntry("host:brand"),
-			hostEntry("host:open-project"),
-			hostEntry("host:chat"),
-			hostEntry("host:terminal"),
-			hostEntry("host:git"),
-			hostEntry("host:search"),
-		];
-		const { container } = mount("chat", rows);
-		expect(flowItems(container).length).toBe(3);
-		const more = container.querySelector<HTMLButtonElement>(".plugin-topbar-more > button");
-		expect(more).toBeTruthy();
-		act(() => more!.click());
-		// 退进菜单的是原样控件（tb-tab/chip 包一层关菜单），不是扁平菜单行。
-		const menuItems = document.querySelectorAll(".plugin-topbar-menu .plugin-topbar-menu-keep");
-		expect(menuItems.length).toBe(3);
-		expect(document.querySelectorAll(".plugin-topbar-menu .plugin-topbar-menu-keep > .tb-tab").length).toBe(2);
 	});
 });

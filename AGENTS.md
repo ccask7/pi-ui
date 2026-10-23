@@ -99,8 +99,8 @@ ccui/
 │   │   ├── sounds.ts           # WebAudio 提示音
 │   │   ├── notify.ts           # 桌面/OS 通知（PWA）：是否吞掉通知的判定（Windows 最小化检测）+ 诊断",
 │   │   ├── download.ts         # 下载（fetch→blob，绕开 Chrome Safe Browsing）
-│   │   ├── ui-slots.ts         # ★ 宿主 UI 扩展点引擎（issue #146 完整版）：BUILTIN_UI_ITEMS（109 条宿主内置入口，覆盖 12 个 slot；其中 browser/sound/language/theme/update/github 六个默认 `hidden:true`，落在「⋯」溢出菜单里）+ buildUiSlots（宿主默认→插件贡献→插件 arrange→用户偏好 四层合并，22 个 slot）+ splitOverflow/restoreUiItem
-│   │   ├── topbar-fit.ts       # ★ 顶栏「放不下的自动进 ⋯」纯函数（fitTopbar）：按实测宽度从尾部丢，宽度 0 的条目（桌面端 CSS 藏起的 ☰/📁）不占位也不进菜单，测不到宽度全保留，有单测
+│   │   ├── ui-slots.ts         # ★ 宿主 UI 扩展点引擎（issue #146 完整版）：BUILTIN_UI_ITEMS（109 条宿主内置入口，覆盖 12 个 slot；；默认全部常驻，顶栏放不下时横向滚动）+ buildUiSlots（宿主默认→插件贡献→插件 arrange→用户偏好 四层合并，22 个 slot）+ splitOverflow/restoreUiItem
+│   │   ├── topbar-fit.ts       # 手机端顶栏固定位名单（MOBILE_ASIDE_TOPBAR_IDS：📁 钉在整条最右，不在横向滚动区里）。原 fitTopbar 溢出测量随「⋯」菜单删除
 │   │   ├── context-menu-state.ts # ★ 通用右键菜单状态（contextmenu.* 槽位的 open/close + 定位/禁用/键盘导航纯函数，有单测）
 │   │   ├── composer-bridge.ts  # ★ 输入框注入桥：宿主（扩展/插件）把内容塞进输入框草稿的模块级 sink 注册点，有单测（配 composer-draft.ts 的合并/去重纯函数）
 │   │   ├── caret-visual-line.ts # ★ 输入框光标的首/末**视觉行**判定（镜像 div 量 offsetTop，自动折行算行；无布局时回落逻辑行），供 ↑/↓ 翻输入历史用，有单测 + 真浏览器回归（tests/composer-history-test.mjs）

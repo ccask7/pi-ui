@@ -66,21 +66,19 @@ try {
 	// 会点在那个马上被重载抹掉的页面上 —— 先等重载过去再点（见 lib/page-stability.mjs）。
 	await waitForStablePage(page);
 
-	// 等插件清单到达，再从顶栏插件面板切到插件视图（插件视图 tab 默认不钉顶栏，
-	// 只有用户在面板里钉住才出现 —— 见 ui-slots 的 withPluginViewItems）。
-	// 插件入口被实测溢出丢进「⋯」时，菜单里仍是同一个 chip（keep 包装）→ 同一个 locator 两种情形都命中。
-	// 注：不用 hasText: "🧩" 定位 —— 入口图标已换成矢量 FiBox（旧 Windows 缺 🧩 字形）。
-	const plugBtn = page.locator('button.chip[aria-haspopup="menu"]').first();
-	await plugBtn.waitFor({ state: "attached", timeout: 15000 }).catch(() => {});
-	if ((await plugBtn.count()) === 0) {
-		await page.locator(".plugin-topbar-more > button").first().click();
-		await plugBtn.waitFor({ state: "attached", timeout: 5000 });
+	// 等插件清单到达，再进插件视图。「插件」菜单已删：插件视图要么以 tab 形式钉在顶栏
+	// 直流里，要么从 设置 → 插件 → 插件视图 的「打开」按钮进入。
+	const plugTab = page.locator(".topbar-flow .plugin-topbar-item", { hasText: /编辑器|Editor/ }).first();
+	if ((await plugTab.count()) > 0) {
+		await plugTab.click();
+	} else {
+		await page.locator('button.chip[data-tip*="设置"], button.chip[data-tip*="Settings"]').first().click();
+		await page.locator(".settings-tab", { hasText: /插件|Plugins/ }).first().click();
+		const openBtn = page.locator(".set-row", { hasText: /编辑器|Editor/ }).locator("button").first();
+		await openBtn.waitFor({ timeout: 15000 });
+		check("设置 → 插件 → 插件视图 列出编辑器", (await openBtn.count()) > 0);
+		await openBtn.click();
 	}
-	await plugBtn.click();
-	const row = page.locator(".pm-panel .pm-row-main", { hasText: "编辑器" }).first();
-	await row.waitFor({ timeout: 15000 });
-	check("插件面板列出 📝 编辑器", (await row.count()) > 0);
-	await row.click();
 
 	// 视图挂载 + 文件树渲染
 	await page.waitForSelector(".vsc .vsc-tree .vsc-row", { timeout: 15000 });

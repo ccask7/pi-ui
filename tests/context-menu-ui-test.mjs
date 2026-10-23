@@ -437,58 +437,6 @@ async function main() {
 		await until(async () => (await page.locator(".settings-modal").count()) === 0, 20, 200);
 	}
 
-	// ---- 隐藏的内置顶栏入口仍能在「⋯」溢出菜单里点到（不是死按钮） -----------
-	// 布局页把「后台任务」隐藏 → 主栏的按钮消失、它落到溢出菜单；点它必须真的打开面板。
-	// 这条的不变量：隐藏 ≠ 失去入口（插件能整理宿主 UI，但锁不死用户）。
-	if (modalOpen) {
-		await tap(
-			page,
-			page
-				.locator(
-					'button.chip[data-tip*="设置"], button.chip[data-tip*="Settings"], button[title*="设置"], button[title*="Settings"]',
-				)
-				.first(),
-		);
-		if (await until(async () => (await page.locator(".settings-modal").count()) > 0, 30, 250)) {
-			await tap(page, page.locator(".settings-tab", { hasText: /界面布局|UI layout/ }).first());
-			const topbarSlot = page.locator(".set-ui-slot", { hasText: /顶栏|Top bar/ }).first();
-			const tasksRow = topbarSlot.locator(".set-row", { hasText: /后台任务|Background tasks/ }).first();
-			if (await until(async () => (await tasksRow.count()) > 0, 30, 250)) {
-				await tap(page, tasksRow.locator('input[type="checkbox"]').first());
-				await tap(page, page.locator(".settings-modal .modal-close").first());
-				await until(async () => (await page.locator(".settings-modal").count()) === 0, 20, 200);
-				const mainGone = (await page.locator("button.bg-task-chip").count()) === 0;
-				check("隐藏后主栏的后台任务按钮消失", mainGone);
-				await tap(page, page.locator(".plugin-topbar-more > button").first());
-				const inOverflow = await until(
-					async () =>
-						(await page
-							.locator(".plugin-topbar-menu")
-							.filter({ hasText: /后台任务|Background tasks/ })
-							.count()) > 0,
-					20,
-					200,
-				);
-				check("隐藏后它出现在「⋯」溢出菜单里", inOverflow);
-				// 菜单型宿主条目（如「后台任务」）在溢出菜单里是**整块搬过来的 chip**（包在
-				// `.plugin-topbar-menu-keep` 里，没有 `role=menuitem`）——动作类才有 role。两者都要能点到。
-				await tap(
-					page,
-					page
-						.locator(".plugin-topbar-menu .plugin-topbar-menu-keep, .plugin-topbar-menu [role=menuitem]")
-						.filter({ hasText: /后台任务|Background tasks/ })
-						.first(),
-				);
-				const tasksOpen = await until(
-					async () => (await page.getByText(/后台任务|Background tasks/).count()) > 0,
-					20,
-					200,
-				);
-				check("点溢出菜单里的它能真的打开面板（不是死按钮）", tasksOpen);
-			}
-		}
-	}
-
 	check("页面没有 JS 报错", errors.filter((e) => !/favicon|net::ERR/.test(e)).length === 0);
 	if (errors.length)
 		console.log(
