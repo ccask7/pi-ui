@@ -11,7 +11,7 @@ export interface DesktopShellWindow {
 	piDesktop?: {
 		isDesktop?: unknown;
 		updater?: unknown;
-		setTitleBarOverlay?: (color: string, symbolColor: string) => Promise<unknown>;
+		setTitleBarOverlay?: (color: string, symbolColor: string, height?: number) => Promise<unknown>;
 	};
 	navigator?: { userAgent?: unknown };
 }
@@ -84,5 +84,8 @@ export function syncTitlebarOverlay(): void {
 			.padStart(2, "0");
 	const hex = `#${channel(r)}${channel(g)}${channel(b)}`;
 	const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-	void api.setTitleBarOverlay(hex, luminance > 140 ? "#26262b" : "#e4e4e7");
+	// 按钮条高度 = 顶栏实测高度（含下边框），CSS 里改 padding/控件高会自动跟随。
+	const box = document.querySelector(".topbar")?.getBoundingClientRect();
+	const height = box && box.height > 0 ? Math.round(box.height) : undefined;
+	void api.setTitleBarOverlay(hex, luminance > 140 ? "#26262b" : "#e4e4e7", height);
 }

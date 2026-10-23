@@ -4120,7 +4120,9 @@ body.panel-resizing .scm-divider::after {
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	padding: 10px 16px;
+	/* 上下 5px + 控件 26 + 下边框 1 = 顶栏总高 37px（桌面壳 WCO 按钮条高度由渲染端
+	   实测这个盒子后经 IPC 同步，改这里不用再动 desktop/main.ts）。 */
+	padding: 5px 16px;
 	border-bottom: 1px solid var(--border);
 	background: var(--topbar-bg, var(--bg-elev));
 	flex-shrink: 0;
@@ -4186,9 +4188,9 @@ body.panel-resizing .scm-divider::after {
 
 .topbar {
 	position: relative;
-	/* 顶栏控件统一高度（只有图标没文字时也就是正方形边长）：桌面 28px，
+	/* 顶栏控件统一高度（只有图标没文字时也就是正方形边长）：桌面 26px，
 	   窄屏（≤768px）在媒体查询里覆盖成 30px，与 .chip / .tb-tab 的 height 同口径。 */
-	--topbar-ctl-h: 28px;
+	--topbar-ctl-h: 26px;
 }
 
 /* 顶栏的**单一扁直流**（方案 A）：所有条目都是本容器的直接子节点 —— 没有按种类包裹的
@@ -4229,13 +4231,19 @@ body.panel-resizing .scm-divider::after {
 /* 顶栏控件统一高度：按钮高度不能跟着文案的字体 metrics 跑 —— 纯英文标签
    （版本号 `v0.89.0`、`Git`）的行盒比中文标签矮 2~3px，同样是 .chip/.tb-tab 高度
    却不一样（真机实测：更新按钮 24.5px vs 其它 27px，Git tab 24px vs 对话 26px）。
-   定高 28px（与 .chip.github 同高）+ 本来就有的 align-items:center，内容垂直居中。
-   溢出菜单里搬进来的 chip 另有 30px 规则（.plugin-topbar-menu.portal .chip，
-   portal 挂在 body 下不在 .topbar 内，不受这条影响）。 */
+   定高走 --topbar-ctl-h（26px）+ 本来就有的 align-items:center，内容垂直居中；
+   顶栏总高 = 26 + 上下 padding 5×2 + 下边框 1 = 37px（改 --topbar-ctl-h 或 .topbar
+   的 padding 都会改顶栏高度，桌面壳的窗口按钮条高度由渲染端实测跟进）。
+   纵向 padding 归零：定高后靠 align-items: center 居中，避免 14px 内容盒把 12.5px
+   文字挤出去。溢出菜单里搬进来的 chip 另有 30px 规则（.plugin-topbar-menu.portal .chip，
+   portal 挂在 body 下不在 .topbar 内，不受这条影响）；窄屏那段媒体查询在文件末尾，
+   会覆盖回它自己的 30px 口径。 */
 .topbar .chip,
 .topbar .tb-tab,
 .topbar .plugin-topbar-item {
-	height: 28px;
+	height: var(--topbar-ctl-h);
+	padding-top: 0;
+	padding-bottom: 0;
 	-webkit-user-select: none;
 	user-select: none;
 	-webkit-touch-callout: none;
