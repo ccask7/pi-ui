@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import {
 	FiFolder,
 	FiFolderPlus,
@@ -14,7 +14,6 @@ import type { ChatState } from "../use-chat";
 import { PluginIcon } from "../plugin-icon";
 import { useI18n } from "../i18n";
 import type { UiSlotEntry } from "../ui-slots";
-import { MOBILE_ASIDE_TOPBAR_IDS } from "../topbar-fit";
 import { openContextMenu } from "../context-menu-state";
 import { appSend, useAppField } from "../app-globals";
 import { ProjectPicker } from "./ProjectPicker";
@@ -32,31 +31,6 @@ import { focusComposer } from "../composer-bridge";
  * 行为：点外面 / Esc 关闭（与 Dropdown/ContextMenu 一致）；窗口缩放或滚动时重算锚点
  * （移动端横滑顶栏时菜单跟着走，而不是飘在原地）。
  */
-/**
- * 手机端断点（与 styles.css 的 mobile ≤768px 同口径）：matchMedia 监听，跨断点实时切换。
- * jsdom / SSR（无 matchMedia）回落 false —— 宁可全画，也不清空顶栏。
- */
-function useIsMobileTopbar(): boolean {
-	const [isMobile, setIsMobile] = useState(
-		() =>
-			typeof window !== "undefined" &&
-			typeof window.matchMedia !== "undefined" &&
-			window.matchMedia("(max-width: 768px)").matches,
-	);
-	useEffect(() => {
-		if (typeof window === "undefined" || typeof window.matchMedia === "undefined") return;
-		const mq = window.matchMedia("(max-width: 768px)");
-		const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-		if (typeof mq.addEventListener === "function") mq.addEventListener("change", onChange);
-		else mq.addListener(onChange);
-		return () => {
-			if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", onChange);
-			else mq.removeListener(onChange);
-		};
-	}, []);
-	return isMobile;
-}
-
 interface TopBarProps {
 	chat: ChatState;
 	view: "chat" | "terminal" | "git" | `plugin:${string}`;
@@ -176,8 +150,6 @@ export function TopBar({
 		});
 	};
 
-	/** 手机端断点（见 useIsMobileTopbar）：旁置项（📁）按断点挂到整条最右。 */
-	const isMobile = useIsMobileTopbar();
 	/**
 	 * 顶栏宿主内置条目的节点工厂（与 FooterBar 的 hostNodes 同模式）：`renderZoneFlow`
 	 * 按 slot 顺序逐条查表，查不到 / 条件不满足（返回 null）即跳过、不占位。
@@ -222,9 +194,7 @@ export function TopBar({
 			) : null,
 		"host:files":
 			view === "chat" && tabOn("files") ? (
-				// 桌面与手机同一节点（带文字）：文字显隐统一走顶栏文字总开关
-				// （.topbar.no-labels），不再有手机端独立的纯图标分支；手机端钉在
-				// 整条最右（见 mobileAsideItems），不参与横向滚动。
+				// 文字显隐统一走顶栏文字总开关（.topbar.no-labels）。
 				<button
 					type="button"
 					className="panel-toggle has-label"
@@ -401,14 +371,10 @@ export function TopBar({
 	}
 	/** 条目自己的对齐段（脏值回落 start，与合并引擎同口径）。 */
 	const zoneOf = (it: { entry: UiSlotEntry | null }): "start" | "center" | "end" => it.entry?.align ?? "start";
-	/** 手机端固定位（MOBILE_ASIDE_TOPBAR_IDS：📁 文件列表开关）挂在直流外面、钉在整条最右，
-	 *  不参与横向滚动；桌面端为空，直流保持单一扁平（slot 顺序直排）。 */
-	const mobileAsideItems = isMobile ? flowItems.filter((it) => MOBILE_ASIDE_TOPBAR_IDS.has(it.id)) : [];
-	const flowShown = isMobile ? flowItems.filter((it) => !MOBILE_ASIDE_TOPBAR_IDS.has(it.id)) : flowItems;
 	/** 三段落位（段内仍是 slot 顺序 → 布局页 ↑↓ 的效果与界面一致）。 */
-	const segStart = flowShown.filter((it) => zoneOf(it) === "start");
-	const segCenter = flowShown.filter((it) => zoneOf(it) === "center");
-	const segEnd = flowShown.filter((it) => zoneOf(it) === "end");
+	const segStart = flowItems.filter((it) => zoneOf(it) === "start");
+	const segCenter = flowItems.filter((it) => zoneOf(it) === "center");
+	const segEnd = flowItems.filter((it) => zoneOf(it) === "end");
 	// 顶栏按钮文字总开关（设置 → 界面布局 → 顶栏，默认开）：关掉后顶栏只剩图标
 	// （数字角标保留；溢出菜单里仍带文字；实现见 styles.css 的 .topbar.no-labels）。
 	const hideTopbarText = chat.settings?.uiLayout?.topbarText === false;
@@ -429,11 +395,6 @@ export function TopBar({
 					<Fragment key={it.id}>{it.node}</Fragment>
 				))}
 			</div>
-			{/* 手机端固定位：📁 纯图标钉在整条顶栏最右，不在可横向滚动的直流里。 */}
-			{mobileAsideItems.map((it) => (
-				<Fragment key={it.id}>{it.node}</Fragment>
-			))}
-
 			{projectPickerOpen && (
 				<ProjectPicker
 					open

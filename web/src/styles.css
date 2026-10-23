@@ -1682,9 +1682,6 @@ button.session-item.elsewhere-item.confirm {
 }
 /* ⋯ 溢出菜单是纵向滚动容器（portal 到 body）：同款 data-tip 气泡往下探会被裁掉，
    菜单里一律退回原生 title（菜单行里本来就有完整的文字标签）。 */
-.plugin-topbar-menu.portal [data-tip]:hover::after {
-	display: none;
-}
 
 /* download icon : save the file (any kind, incl. binary/archives) */
 .file-attach.download {
@@ -2365,39 +2362,6 @@ select.status-select {
 select.plugin-topbar-item.plugin-topbar-select {
 	max-width: 180px;
 }
-.plugin-topbar-overflow-select {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 8px;
-	padding: 6px 10px;
-}
-.plugin-topbar-overflow-select select {
-	max-width: 160px;
-}
-.plugin-topbar-more {
-	position: relative;
-}
-.plugin-topbar-menu {
-	position: absolute;
-	top: calc(100% + 6px);
-	right: 0;
-	z-index: 40;
-	display: flex;
-	flex-direction: column;
-	/* 行与行之间留一点空隙（保样式的 chip 行都有边框，贴在一起太挤）。 */
-	gap: 4px;
-	/* 宽度自适应内容、最窄：shrink-to-fit（内容多宽菜单多宽），上限 320px；
-	   不设 min-width，行少字短时不留空。百分比宽度的行按自身内容参与
-	   intrinsic 计算，菜单宽度 = 最宽行的内容宽。 */
-	width: max-content;
-	max-width: min(320px, calc(100vw - 16px));
-	padding: 6px;
-	border: 1px solid var(--border-soft);
-	border-radius: 10px;
-	background: var(--bg-elev, #1c1e24);
-	box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
-}
 /* issue #183：必须是直子选择器 —— 溢出菜单里搬进来的是整块宿主控件
    （Dropdown 的 .chip 触发器 + .dd-menu、BrowserControl 的 .chip 等），
    后代选择器会盖掉它们的 display（.chip 的 inline-flex、.dd-item 的 flex
@@ -2406,91 +2370,9 @@ select.plugin-topbar-item.plugin-topbar-select {
    收紧选择器不丢任何东西。 */
 /* GitHub 外链在菜单里也是 chip 行（图标 + GitHub 文字，与其他行同外观）：
    顶栏本体的圆形（.chip.github：28px 圆、居中、无内边距）在这里压回正常行。 */
-.plugin-topbar-menu.portal > a.chip.github {
-	width: 100%;
-	justify-content: flex-start;
-	height: auto;
-	padding: 5px 10px;
-	border-radius: 9px;
-	color: var(--text);
-}
-.plugin-topbar-menu > button,
-.plugin-topbar-menu > a.plugin-topbar-menu-link {
-	display: block;
-	width: 100%;
-	padding: 6px 10px;
-	border: 0;
-	border-radius: 6px;
-	background: transparent;
-	color: inherit;
-	font: inherit;
-	text-align: left;
-	text-decoration: none;
-	cursor: pointer;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.plugin-topbar-menu > button:hover,
-.plugin-topbar-menu > a.plugin-topbar-menu-link:hover {
-	background: var(--bg-elev2);
-}
-/* 溢出菜单里的折叠按钮保持折叠前样式（chip/tab 原样，只统一宽度顶满菜单、
-   左对齐），不再漂成无边框扁平行。直子选择器（issue #183 的教训：后代选择器会
-   盖掉搬进来控件的 display）。图标与下拉箭头照旧（箭头在右端）。
-   .plugin-topbar-menu-keep 是 TopBar 给原样节点包的关菜单层（点后关 ⋯）。
-   注意桌面端 .panel-toggle 平时 display:none，进了菜单要显出来
-   （移动端它本来就是 30px 方块，这里只统一宽度）。 */
-.plugin-topbar-menu.portal > .dropdown,
-.plugin-topbar-menu.portal > .plugin-topbar-menu-keep {
-	display: flex;
-	width: 100%;
-}
-.plugin-topbar-menu.portal > .dropdown > button.chip,
-.plugin-topbar-menu.portal > a.chip,
-.plugin-topbar-menu.portal > span.chip,
-.plugin-topbar-menu.portal > .plugin-topbar-menu-keep > .chip,
-.plugin-topbar-menu.portal > .plugin-topbar-menu-keep > .tb-tab,
-.plugin-topbar-menu.portal > .plugin-topbar-menu-keep > .plugin-topbar-item {
-	width: 100%;
-	justify-content: flex-start;
-}
-.plugin-topbar-menu.portal > .plugin-topbar-menu-keep > .panel-toggle {
-	display: inline-flex;
-	width: 100%;
-	justify-content: flex-start;
-	align-items: center;
-	/* 与菜单里其他 chip 行同外观（边框 + 底色 + 圆角 + 内边距），不再是透明扁平行 */
-	border: 1px solid var(--border);
-	border-radius: 9px;
-	background: var(--chip-bg, var(--bg-elev2));
-	padding: 5px 10px;
-}
-/* 上面那条把 background/border 写死后，通用 :hover 会被盖掉（0,4,0 > 0,3,0），
-   这里补一条菜单作用域的悬浮高亮，与 .chip:hover 同效果 */
-.plugin-topbar-menu.portal > .plugin-topbar-menu-keep > .panel-toggle.has-label:hover {
-	border-color: var(--accent);
-	background: var(--accent-soft);
-}
-/* 桌面端（>768px）：文件列表抽屉开关整体隐藏（含 ⋯ 菜单里那份 —— 用 :has 藏整行，
-   避免空 wrapper 吃掉菜单的纵向 gap；桌面右栏常驻、有自己的折叠按钮，抽屉开关无意义）。 */
-@media (min-width: 769px) {
-	.plugin-topbar-menu.portal > .plugin-topbar-menu-keep:has(> .panel-toggle.has-label) {
-		display: none;
-	}
-}
 /* 箭头（.dd-caret）是行内最后一个元素 —— 用 auto 外边距推到右端。 */
-.plugin-topbar-menu.portal > .dropdown > button.chip .dd-caret {
-	margin-left: auto;
-}
 /* issue #162：portal 到 body 的那份（fixed + 实测钳制定位，不再被
    .topbar-flow 的 overflow 裁剪；与 .ctx-menu 同路）。 */
-.plugin-topbar-menu.portal {
-	position: fixed;
-	z-index: 70;
-	max-height: min(60vh, 480px);
-	overflow-y: auto;
-}
 /* issue #183：portal 自己是纵向滚动容器 —— 按 CSS Overflow 3 §3.1，只写
    overflow-y:auto 会让 overflow-x 也算成 auto。搬进来的 Dropdown 的 .dd-menu
    是绝对定位（min-width:340px、right:0），在 320px 的 portal 里向左探出约
@@ -2500,199 +2382,8 @@ select.plugin-topbar-item.plugin-topbar-select {
    移动端 ≤768px 的 fixed 底栏规则不受影响）。已知代价：滚动容器切到 visible
    会重置滚动偏移 —— 从滚到底的长菜单里开下拉会跳回顶部（长菜单 + 嵌套下拉
    同时出现才撞得上的 edge case）。 */
-.plugin-topbar-menu.portal:has(.dd-menu) {
-	overflow: visible;
-}
 
 /* 插件面板（顶栏 🧩 入口，Chrome 扩展图标的位置）：列出全部已装插件，每行一个
-   「钉到顶栏」开关。portal 到 body + fixed（与 .plugin-topbar-menu.portal 同招，
-   理由见 TopbarOverflowMenu 的注释）。
-   视觉直接对齐隔壁的「⋯」溢出菜单（.plugin-topbar-menu，已迭代多轮且手机端可用）——
-   两个弹层同一个触发器区域，不该有两套观感：border-soft + 圆角 10 + bg-elev +
-   同一条投影 + 同样的 6px 内边距/4px 行距。
-   注：CONTRACT 里写的 --panel / --hover 在本仓从未定义（--muted / --border-subtle
-   也只作为带 fallback 的引用存在，见 css-tokens.test.ts 的 GUEST_FALLBACK_TOKENS），
-   所以这里一律用真实 token：--bg-elev / --bg-elev2 / --border-soft / --text-dim。 */
-.pm-panel {
-	position: fixed;
-	z-index: 70;
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	width: max-content;
-	min-width: 240px;
-	max-width: min(360px, calc(100vw - 16px));
-	max-height: min(70vh, 560px);
-	overflow: hidden;
-	padding: 6px;
-	border: 1px solid var(--border-soft);
-	border-radius: 10px;
-	background: var(--bg-elev, #1c1e24);
-	box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
-}
-.pm-list {
-	flex: 1 1 auto;
-	min-height: 0;
-	overflow-y: auto;
-}
-/* 标题行：与菜单里的 chip 行同一左缩进（10px），小号灰字。 */
-.pm-head {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 2px 10px 6px;
-	color: var(--text-dim);
-	font-size: 11px;
-	letter-spacing: 0.2px;
-}
-.pm-head-icon {
-	font-size: 12px;
-}
-.pm-empty {
-	padding: 6px 10px 8px;
-	color: var(--text-faint);
-	font-size: 12px;
-}
-/* 行：与菜单里搬进来的 chip 行同几何（圆角 9、左缩进 10、hover = --bg-elev2），
-   但行高按面板的语义固定 36px（一排一个插件，行高一致才扫得快）。 */
-.pm-row {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	min-height: 36px;
-	padding: 0 6px 0 10px;
-	border-radius: 9px;
-}
-.pm-row.drop-target {
-	background: var(--accent-soft);
-	box-shadow: inset 0 0 0 2px var(--accent);
-}
-.pm-row:hover {
-	background: var(--bg-elev2);
-}
-.pm-row-main {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	flex: 1;
-	min-width: 0;
-	height: 36px;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: inherit;
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
-}
-/* 纯渲染器 / 报错的插件：行还在（面板承诺列出全部已装插件），但不可点开。 */
-.pm-row-main:disabled {
-	cursor: default;
-	opacity: 0.55;
-}
-.pm-drag {
-	display: inline-flex;
-	flex: none;
-	align-items: center;
-	justify-content: center;
-	width: 18px;
-	height: 28px;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: var(--text-faint);
-	cursor: grab;
-}
-.pm-drag:active {
-	cursor: grabbing;
-}
-.pm-drag:focus-visible,
-.pm-pin:focus-visible,
-.pm-manage:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
-}
-.pm-row .pm-icon,
-.pm-row .plugin-icon-glyph {
-	display: inline-flex;
-	flex: none;
-	align-items: center;
-	justify-content: center;
-	width: 18px;
-	height: 18px;
-	font-size: 15px;
-	line-height: 1;
-}
-.pm-name {
-	flex: none;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-.pm-sub {
-	flex: 1;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	color: var(--text-faint);
-	font-size: 11px;
-}
-/* Chrome 式图钉：未固定是斜线图钉，固定后用强调色实心图钉。 */
-.pm-pin {
-	display: inline-flex;
-	flex: none;
-	align-items: center;
-	justify-content: center;
-	width: 30px;
-	height: 30px;
-	padding: 0;
-	border: none;
-	border-radius: 7px;
-	background: transparent;
-	color: var(--text-faint);
-	cursor: pointer;
-	transition:
-		color 0.15s,
-		background 0.15s;
-}
-.pm-pin:hover {
-	background: var(--bg-elev3, var(--border));
-	color: var(--text);
-}
-.pm-pin.on {
-	color: var(--accent);
-}
-.pm-pin svg {
-	width: 17px;
-	height: 17px;
-}
-.pm-manage {
-	display: flex;
-	align-items: center;
-	gap: 9px;
-	width: 100%;
-	min-height: 38px;
-	margin-top: 2px;
-	padding: 0 10px;
-	border: 0;
-	border-top: 1px solid var(--border-soft);
-	background: transparent;
-	color: var(--text-dim);
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
-}
-.pm-manage:hover {
-	color: var(--text);
-	background: var(--bg-elev2);
-}
-
-/* Mobile panel drawers: transparent wrappers on desktop, so the classic
-   3-column layout is untouched. Toggled fixed drawers kick in ≤768px. */
-.panel-drawer {
-	display: contents;
-}
 /* 桌面端面板折叠：平时 `.panel-drawer` 是 `display: contents`（透明占位），
    折叠时显式移除，让主区占满；移动端抽屉不参与折叠。 */
 .panel-drawer.hidden {
@@ -2718,21 +2409,6 @@ select.plugin-topbar-item.plugin-topbar-select {
 .panel-toggle.has-label:hover {
 	border-color: var(--accent);
 	background: var(--accent-soft);
-}
-.drawer-backdrop {
-	position: fixed;
-	inset: 0;
-	z-index: 55;
-	background: rgba(0, 0, 0, 0.5);
-	animation: drawer-fade 0.2s ease;
-}
-@keyframes drawer-fade {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
 }
 
 /* 视图 tab 的胶囊外观已搬到 .tb-tab（顶栏扁平化：不再有 .view-switch 容器，
@@ -3658,18 +3334,6 @@ body.panel-resizing .scm-divider::after {
 }
 
 /* Narrow screens: shrink the files column so the diff keeps usable width. */
-@media (max-width: 768px) {
-	.scm-files,
-	.scm-history {
-		width: 200px;
-	}
-	.scm-branch-current {
-		max-width: 150px;
-	}
-	.scm-select {
-		min-width: 90px;
-	}
-}
 
 /* ------------------------------------------------------------------ statusbar */
 
@@ -4235,19 +3899,6 @@ body.panel-resizing .scm-divider::after {
    顶栏总高 = 26 + 上下 padding 4×2 + 下边框 1 = 35px（改 --topbar-ctl-h 或 .topbar
    的 padding 都会改顶栏高度，桌面壳的窗口按钮条高度由渲染端实测跟进）。
    纵向 padding 归零：定高后靠 align-items: center 居中，避免 14px 内容盒把 12.5px
-   文字挤出去。溢出菜单里搬进来的 chip 另有 30px 规则（.plugin-topbar-menu.portal .chip，
-   portal 挂在 body 下不在 .topbar 内，不受这条影响）；窄屏那段媒体查询在文件末尾，
-   会覆盖回它自己的 30px 口径。 */
-.topbar .chip,
-.topbar .tb-tab,
-.topbar .plugin-topbar-item {
-	height: var(--topbar-ctl-h);
-	padding-top: 0;
-	padding-bottom: 0;
-	-webkit-user-select: none;
-	user-select: none;
-	-webkit-touch-callout: none;
-}
 
 /* 视图 tab（chat / terminal / git / 插件视图）：旧版靠 .view-switch 容器画胶囊，
    扁平化后每个 tab 自带外观（选中态用强调色底，与 .chip:hover 同一套观感）。 */
@@ -4540,20 +4191,6 @@ body.panel-resizing .scm-divider::after {
 	border-color: var(--accent);
 }
 /* 窄窗口（手机/窄分栏）：标签与控件上下堆叠，标签不再截断 */
-@media (max-width: 720px) {
-	.plugin-settings-field {
-		flex-direction: column;
-		align-items: stretch;
-		gap: 6px;
-	}
-	.plugin-settings-label {
-		flex: 0 0 auto;
-		width: 100%;
-	}
-	.plugin-settings-label-text {
-		white-space: normal;
-	}
-}
 .plugin-settings-actions {
 	display: flex;
 	gap: 8px;
@@ -7100,15 +6737,6 @@ span.msg-editor-hint svg {
 }
 
 /* 窄屏：三列挤不下，说明换到下一行（名字/类型并排）。 */
-@media (max-width: 640px) {
-	.tool-schema-row {
-		grid-template-columns: minmax(90px, 1fr) minmax(80px, 1fr);
-	}
-
-	.tool-schema-desc {
-		grid-column: 1 / -1;
-	}
-}
 
 /* 思考 / 工具 head 的折叠键与复制键：同一 ghost 图标按钮（28px）。 */
 /* ------------------------- 对话列表卡片头：公用一套 .chead -----------------
@@ -8543,12 +8171,6 @@ div.chead[role="button"]:focus-visible,
    --chat-rail 统一处理（见文件顶部「中央列几何」）——列窄到会被 rail 压住时
    两侧一起缩同样的距离，消息列与输入框仍然等宽、左右边缘对齐。 */
 
-@media (max-width: 640px) {
-	/* On phones the rail would cover most of the conversation — hide it. */
-	.qn-rail {
-		display: none;
-	}
-}
 
 /* ------------------------------------------------------------- plan board */
 
@@ -9483,14 +9105,6 @@ div.chead[role="button"]:focus-visible,
 	background: transparent;
 }
 
-@media (max-width: 640px) {
-	.chip-model {
-		max-width: 120px;
-	}
-	.brand-name {
-		display: none;
-	}
-}
 
 /* ------------------------------------------------------ dialog inline panel */
 /* 扩展问卷（ui.select/confirm/input）：非模态内联面板，插在输入框上方，
@@ -10597,104 +10211,6 @@ div.chead[role="button"]:focus-visible,
 }
 /* 窄窗口：左栏改成顶部横滑 chip 条 —— 纯图标在触屏上是猜谜（title 长按不出来，
    还有 FiClock / FiSliders 重复图标），文字 + 计数必须保留；内容区独占整宽 */
-@media (max-width: 640px) {
-	.settings-modal {
-		/* 底部弹层里尽量撑高，减少内容区滚动 */
-		height: 92vh;
-		max-height: 94vh;
-	}
-	.settings-layout {
-		flex-direction: column;
-		gap: 8px;
-		min-width: 0;
-	}
-	.settings-layout > * {
-		min-width: 0;
-	}
-	.settings-rail {
-		width: auto;
-		flex: none;
-		flex-direction: row;
-		align-items: stretch;
-		gap: 6px;
-		overflow-x: auto;
-		overflow-y: hidden;
-		padding: 2px 2px 6px;
-		/* 横滑条不露滚动条（手势可滑） */
-		scrollbar-width: none;
-		-webkit-overflow-scrolling: touch;
-	}
-	.settings-rail::-webkit-scrollbar {
-		display: none;
-	}
-	.settings-tab {
-		flex: none;
-		width: auto;
-		min-height: 40px;
-		padding: 5px 12px 5px 5px;
-		gap: 8px;
-		border: 1px solid var(--border-soft);
-		border-radius: 999px;
-		background: var(--bg-elev);
-		white-space: nowrap;
-	}
-	.settings-tab.active {
-		border-color: var(--accent);
-	}
-	.settings-tab-icon {
-		width: 24px;
-		height: 24px;
-		border-radius: 8px;
-		font-size: 12px;
-	}
-	.settings-tab .set-count {
-		margin-left: 2px;
-	}
-	/* 手机上卡片收紧；行控件组允许整行换行 */
-	.settings-modal .set-section {
-		border-radius: 12px;
-		padding: 10px 12px 8px;
-	}
-	.settings-modal .set-row-actions {
-		max-width: none;
-	}
-	.settings-modal .set-field-row > .set-input,
-	.settings-modal .set-field-row > .set-select {
-		width: 110px;
-	}
-	.settings-modal .set-mode-row > .set-select {
-		width: 150px;
-	}
-	/* 触控：开关行加高，开关本体放大 */
-	.settings-modal .set-row,
-	.settings-modal .set-catalog-row,
-	.settings-modal .set-grant-row {
-		padding: 12px 4px;
-	}
-	.settings-modal .set-switch {
-		width: 44px;
-		height: 26px;
-	}
-	.settings-modal .set-switch-knob {
-		width: 22px;
-		height: 22px;
-	}
-	.settings-modal .set-switch.on .set-switch-knob {
-		left: 20px;
-	}
-	.token-chip,
-	.set-btn-mini {
-		min-height: 32px;
-		font-size: 12px;
-	}
-	/* iOS：输入框字号 <16px 时聚焦整页自动缩放，锁 16px 免缩放 */
-	.settings-modal .set-input,
-	.settings-modal .set-prompt-input,
-	.settings-modal input[type="text"],
-	.settings-modal textarea {
-		font-size: 16px;
-	}
-}
 
 .set-section {
 	display: flex;
@@ -12441,12 +11957,6 @@ button.source-default-toggle {
 	white-space: nowrap;
 }
 
-@media (max-width: 640px) {
-	.form-grid,
-	.model-row {
-		grid-template-columns: 1fr;
-	}
-}
 
 /* ------------------------------------------------------------ sound settings */
 
@@ -13297,406 +12807,6 @@ button.source-default-toggle {
 
 /* ================================================================ mobile (≤768px) */
 
-@media (max-width: 768px) {
-	/* ---- topbar：桌面与手机渲染**同一份 slot 数据**（同一套顺序/对齐/显隐）----
-	   宽度放不下的条目由 TopBar 实测后从尾部退进「⋯」溢出菜单（web/src/topbar-fit.ts），
-	   所以这里只做**密度**：统一控件高度、把中段折回行内自然流。 */
-	/* 拖拽分隔条仅桌面端有意义 */
-	.resize-handle {
-		display: none;
-	}
-	.topbar {
-		padding: 8px 10px;
-		gap: 8px;
-		flex-wrap: nowrap;
-		/* 顶栏所有控件统一高度（视图 tab / chip / ☰📁 折叠按钮），单行内不会
-		   出现高矮参差；折叠按钮宽度也取该值 → 正方形（与 tab 等高）。 */
-		--topbar-ctl-h: 30px;
-	}
-	/* 中段（align=center）：窄屏不再走 spacer 的“两侧平分”居中 —— 空间本来就紧，
-	   让它回到行内自然流（否则会把左右两段挤成两行）。`display: contents` 让 spacer
-	   不产生盒子：左/中/右三段贴成一串、段界处不再有双份 gap（0 宽的 flex item 照样
-	   吃两侧 gap，看起来像中间被撑开）；DOM 还在，所以上面那套 `.tb-spacer ~` 的
-	   气泡定位选择器照常生效（`display: none` 会把它断掉）。 */
-	.topbar-flow .tb-spacer {
-		display: contents;
-	}
-	/* tab：显式定高（与 chip、折叠按钮同高）。 */
-	.tb-tab {
-		height: var(--topbar-ctl-h, 30px);
-		padding: 5px 10px;
-	}
-	/* chip（新对话 / “⋯” 更多）：与 tab、折叠按钮同高。 */
-	.topbar .chip {
-		height: var(--topbar-ctl-h, 30px);
-	}
-	/* 插件条目与「⋯」按钮（也是 .plugin-topbar-item）：同行里不许比邻居高一截。 */
-	.topbar .plugin-topbar-item {
-		height: var(--topbar-ctl-h, 30px);
-		padding: 0 9px;
-	}
-	/* 只显示图标时保持正方形：窄屏上面刚把 tab / 插件条目的 padding 调过，
-	   这里再压回去（桌面那条在文件前部，被本块的后定义覆盖）。 */
-	.topbar.no-labels .tb-tab,
-	.topbar.no-labels .plugin-topbar-item,
-	.topbar.no-labels .panel-toggle,
-	.topbar.no-labels .chip:not(:has(svg ~ svg)):not(:has(.bg-task-badge)) {
-		width: var(--topbar-ctl-h, 30px);
-		padding: 0;
-	}
-	/* issue #183：portal 挂在 document.body 下，没有 .topbar 祖先（变量
-	   --topbar-ctl-h 声明在 .topbar 上，作用域外不可见），搬进来的 chip 在此
-	   断点下与顶栏同高需要自己声明。桌面端两边都是 auto 高，无需补。 */
-	.plugin-topbar-menu.portal {
-		--topbar-ctl-h: 30px;
-	}
-	.plugin-topbar-menu.portal .chip {
-		height: var(--topbar-ctl-h, 30px);
-	}
-	/* 菜单里**搬进来的整块控件**必须保留文字标签：上面那条全局的
-	   `.chip > span { display:none }`（窄屏省宽度用）在菜单里会退化成“一排看不懂的图标”
-	   —— 菜单里的行本来就是纵向列，宽度不缺，标签才是可认性。 */
-	.plugin-topbar-menu.portal .chip > span {
-		display: inline;
-	}
-	/* 品牌不再是手机端特例：显隐走布局页 hidden 偏好，名称文字走顶栏文字总开关
-	   （.topbar.no-labels 藏 .brand-name 只剩 π）；放不下由实测溢出接管 —— 手机端与桌面端同一套配置。 */
-	.chip > span {
-		display: none;
-	}
-	/* 顶栏按钮（新对话 / 各工具 chip）保留文字标签：宽度不够时不再靠隐藏文字省宽度，
-	   而是把尾部条目实测后送进「⋯」（见 TopBar / topbar-fit），所以这里不藏标签。 */
-	.topbar .chip > span {
-		display: inline;
-	}
-
-	/* ---- composer: 输入框内底部工具条（模型/思考/附件 左，发送/停止/排队 右）。
-	   恢复 chip 标签显示（上面的全局规则会隐藏它们），并让模型名可截断。
-	   手机端工具条保证单行：左侧可收缩（模型/思考文本收缩 → 截断 → 只剩图标），
-	   发送/停止/排队 始终固定在右侧。收缩与截断的规则在基础样式里，这里只放宽
-	   标签宽度、把工具条锁成单行，并在下面一个阈值里直接切成纯图标。 ---- */
-	.composer-tools .chip > span {
-		display: inline;
-	}
-	.composer-tools .chip-model {
-		max-width: 96px;
-	}
-	.composer-tools .chip {
-		padding: 5px 8px;
-	}
-	/* 工具条不换行：左侧收缩，发送按钮始终在右。 */
-	.composer-tools {
-		flex-wrap: nowrap;
-	}
-	.composer-tools-left {
-		flex: 1 1 auto;
-		min-width: 0;
-		flex-wrap: nowrap;
-	}
-	.composer-tools-right {
-		flex-shrink: 0;
-	}
-	/* 窄屏：模型 / 思考 只剩图标（chip 也放大成 34×30 见方，手指点得着），
-	   文字交给 title 悬浮提示。阈值 560px：带标签时 428~520px 左边一组会压到
-	   右边（右侧最宽是运行中的「排队|插队」对半胶囊 78px + 停止 38px，英文标签
-	   更宽），所以留到 560px 再启用。右侧按钮本身在窄屏不再变形（对半胶囊已是
-	   图标态，固定 78px，不受此阈值影响）。 */
-	@media (max-width: 560px) {
-		.composer-tools .chip > span.chip-model,
-		.composer-tools .chip > span.chip-sub {
-			display: none;
-		}
-		.composer-tools .dd-caret {
-			display: none;
-		}
-		.composer-tools .chip {
-			padding: 6px 9px;
-			min-width: 34px;
-			min-height: 30px;
-			justify-content: center;
-		}
-	}
-	.topbar-flow {
-		gap: 6px;
-		flex: 1 1 auto;
-		/* 永不折行、也永不横滑：**放不下的（包括超长文案那种单个条目比顶栏还宽的）
-		   一律由实测退进「⋯」**（fitTopbar 从尾部丢，单个条目自己超宽时它自己进菜单，
-		   见 web/src/topbar-fit.ts）。overflow:hidden 只做意外溢出的兜底裁切 —— 不留滚动，
-		   避免“顶栏能横拖、看不出还有多少入口”这种交互。 */
-		flex-wrap: nowrap;
-		overflow: hidden;
-	}
-
-	/* Dropdown menus become bottom sheets: fixed positioning so no ancestor
-	   overflow can clip them, and they can't overflow the viewport sideways. */
-	.dropdown .dd-menu {
-		position: fixed;
-		left: 12px;
-		right: 12px;
-		top: auto;
-		bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-		max-width: none;
-		max-height: 55vh;
-		z-index: 90;
-	}
-	.dropdown.left .dd-menu {
-		left: 12px;
-		right: 12px;
-	}
-	/* 模型下拉底栏：取消桌面端 min-width:440px 兜底（宽度=视口-24px，不超屏）；
-	   服务商侧栏压窄，避免挤压模型列表。 */
-	.dropdown .dd-menu.dd-menu-model {
-		min-width: 0;
-	}
-	.dd-provider-col {
-		min-width: 0;
-		max-width: 132px;
-	}
-
-	/* Sound settings panel fills the bottom-sheet width. */
-	.sound-menu {
-		width: 100%;
-	}
-	.chip {
-		padding: 6px 9px;
-	}
-
-	/* panel drawer toggle buttons (top-left / top-right) */
-	.panel-toggle {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: var(--topbar-ctl-h, 30px);
-		height: var(--topbar-ctl-h, 30px);
-		border: 1px solid var(--border);
-		border-radius: 9px;
-		background: var(--bg-elev2);
-		color: var(--text-dim);
-		font-size: 15px;
-		cursor: pointer;
-		flex-shrink: 0;
-	}
-	.panel-toggle:active {
-		background: var(--accent-soft);
-		color: var(--accent);
-	}
-
-	/* ---- side panels become sliding drawers ---- */
-
-	/* File tree: hover-revealed attach buttons don't work on touch — always
-	   show them; hide the hover-only tooltip bubbles. */
-	.file-item .file-attach {
-		display: inline-flex;
-	}
-	.file-attach::after,
-	.file-attach::before {
-		display: none;
-	}
-	.panel-drawer {
-		display: block;
-		position: fixed;
-		top: 0;
-		bottom: 0;
-		z-index: 60;
-		width: min(300px, 86vw);
-		background: var(--bg-elev);
-		transition: transform 0.25s ease;
-	}
-	.panel-drawer.drawer-left {
-		left: 0;
-		border-right: 1px solid var(--border);
-		box-shadow: 8px 0 30px rgba(0, 0, 0, 0.35);
-		transform: translateX(-105%);
-	}
-	.panel-drawer.drawer-right {
-		right: 0;
-		border-left: 1px solid var(--border);
-		box-shadow: -8px 0 30px rgba(0, 0, 0, 0.35);
-		transform: translateX(105%);
-	}
-	.panel-drawer.open {
-		transform: translateX(0);
-	}
-	.panel-drawer .panel {
-		width: 100%;
-		height: 100%;
-		border: none;
-	}
-
-	/* ---- terminal: the left column (commands + tabs) becomes a drawer ---- */
-	.term-main {
-		position: relative;
-		/* Same padding move as the base rule (see .term-main above). */
-		padding: 54px 8px 8px;
-	}
-	.term-commands {
-		position: fixed;
-		left: 0;
-		top: 0;
-		bottom: 0;
-		z-index: 60;
-		width: min(300px, 86vw);
-		transform: translateX(-105%);
-		transition: transform 0.25s ease;
-		box-shadow: 8px 0 30px rgba(0, 0, 0, 0.35);
-		border-right: 1px solid var(--border);
-	}
-	.term-commands.open {
-		transform: translateX(0);
-	}
-	.term-side-toggle {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		position: absolute;
-		top: 10px;
-		left: 10px;
-		z-index: 20;
-		width: 36px;
-		height: 36px;
-		border: 1px solid var(--border);
-		border-radius: 9px;
-		background: var(--bg-elev2);
-		color: var(--text-dim);
-		font-size: 15px;
-		cursor: pointer;
-	}
-	.term-side-toggle:active {
-		background: var(--accent-soft);
-		color: var(--accent);
-	}
-	/* Make room for the floating toggle so it doesn't cover the prompt:
-	   padding moved to .term-main (see base rule — FitAddon measures the
-	   parent element, so the measured container must have no padding). */
-
-	/* ---- chat ---- */
-	/* 中央列留白改由列 token 决定（见 .main 的「中央列几何」）：手机上左右各
-	   14px（= 改前 .msg 自己那 14px 内边距，消息文字/卡片保持原来的呼吸感；
-	   输入框也从 10px 调到 14px，两边随之齐平）。 */
-	.main {
-		--chat-pad: 14px;
-	}
-	.msg {
-		padding: 6px 0 12px;
-	}
-	.inputbar {
-		padding: 10px var(--chat-inset) 12px;
-	}
-	.inputbox {
-		padding: 8px 8px 8px 10px;
-		gap: 6px;
-	}
-	.inputbox textarea {
-		font-size: 16px; /* avoid iOS auto-zoom on focus */
-	}
-	.inputbox .btn {
-		width: 40px;
-		height: 40px;
-	}
-	/* 触摸目标跟上 40px：排队/插队胶囊与单粒键 */
-	.inputbox .split-send {
-		width: 82px;
-		height: 40px;
-	}
-	.inputbox .split-send.single {
-		width: 40px;
-	}
-	.attach-chip {
-		max-width: 78vw;
-	}
-
-	/* ---- overlays: near-fullscreen bottom sheets ---- */
-	.modal-backdrop,
-	.fp-overlay {
-		padding: 10px;
-		align-items: flex-end;
-	}
-	/* 问卷内联面板：宽度跟着列 token（= 输入框同宽），这里只限高 */
-	.dialog-inline {
-		max-height: 55vh;
-	}
-	.question-conv-title {
-		max-width: 140px;
-	}
-	.modal,
-	.fp {
-		width: 100%;
-		max-width: 100%;
-		max-height: 94vh;
-		border-radius: 14px;
-	}
-	.fp {
-		height: 92vh;
-	}
-	.fp-markdown {
-		padding: 16px 14px 24px;
-		font-size: 13.5px;
-	}
-	.fp-markdown img {
-		max-height: 50vh;
-	}
-
-	.project-picker {
-		left: 8px;
-		right: 8px;
-		top: 44px;
-		width: auto;
-		height: min(420px, calc(100vh - 80px));
-	}
-
-	/* ---- footer: phones show connection dot / context / cache-hit / rate / cwd on one line ----
-	 * 引擎徽标、成本、消息数、插件状态在手机上不显示（省宽度）；
-	 * 连接状态仅保留圆点隐藏文字；缓存命中率与实时速率保留，上下文只剩数字，
-	 * 路径不够宽时自己截断。 */
-	.statusbar {
-		flex-wrap: nowrap;
-		gap: 6px;
-		padding: 6px 10px;
-		font-size: 10.5px;
-	}
-	.status-sep,
-	.status-item:not(.status-conn):not(.status-ctx):not(.status-cache):not(.status-rate):not(.status-host-metrics):not(
-			.status-cwd
-		) {
-		display: none;
-	}
-	.status-conn .status-conn-label {
-		display: none;
-	}
-	/* 三项信息各自固定宽度，不参与压缩（内容被截断会读不出来）。 */
-	.status-ctx,
-	.status-cache,
-	.status-rate {
-		flex-shrink: 0;
-	}
-	/* 上下文：手机上只留「已用 / 窗口」数字（标签与进度条占地且信息冗余）。 */
-	.status-ctx .ctx-label,
-	.status-ctx .ctx-bar {
-		display: none;
-	}
-	/* 状态栏右侧：宽度不够时收缩（内部工作目录省略号截断，点开选择器仍能看到完整路径）。 */
-	.statusbar-right {
-		max-width: 45%;
-	}
-	.rate-spin {
-		display: inline-block;
-	}
-	/* 窄屏隐藏主机资源监控，保留工作目录 */
-	@media (max-width: 560px) {
-		.status-host-metrics {
-			display: none;
-		}
-	}
-	/* 极窄屏：路径再让一点宽度给数字。 */
-	@media (max-width: 420px) {
-		.statusbar-right {
-			max-width: 35%;
-		}
-	}
-	.status-cwd-input {
-		font-size: 12px; /* avoid iOS auto-zoom on focus */
-	}
-}
 .dd-all-item.warn {
 	background: rgba(245, 158, 11, 0.08);
 	color: var(--amber);
@@ -13734,25 +12844,6 @@ button.source-default-toggle {
 
 /* 手机版：收紧横条，隐藏次要信息（模型 tag / 路径 / 时间），
  * 只留图标的折叠/展开键，标题单行省略。 */
-@media (max-width: 640px) {
-	.msg-model {
-		display: none;
-	}
-	.attachcard-path,
-	.skillcard-path {
-		display: none;
-	}
-	.msg-collapsed-time {
-		display: none;
-	}
-	.msg-collapsed-role {
-		min-width: 0;
-	}
-	.msg-collapsed-action {
-		font-size: 0;
-		gap: 0;
-	}
-}
 /* 触屏：复制键常显（无 hover）。 */
 @media (hover: none) {
 	.msg-text-copy,
@@ -13918,18 +13009,6 @@ button.source-default-toggle {
 	overflow: auto;
 	white-space: pre-wrap;
 	word-break: break-word;
-}
-@media (max-width: 720px) {
-	/* 窄屏：文件名可占整行，按钮只留图标（title/aria-label 仍在），避免挤成两行。 */
-	.present-item-name {
-		max-width: 100%;
-	}
-	.present-btn.labeled span {
-		display: none;
-	}
-	.present-item-head {
-		flex-wrap: wrap;
-	}
 }
 
 /* ---- 保存为图片：右侧停靠，对话仍可勾选 ---- */
@@ -14109,32 +13188,6 @@ button.source-default-toggle {
 .saveimg-error {
 	font-size: 12px;
 	color: var(--red);
-}
-@media (max-width: 768px) {
-	.saveimg-dialog {
-		width: 100%;
-		max-width: 100%;
-		max-height: 94vh;
-	}
-	.saveimg-dock {
-		top: auto;
-		left: 0;
-		width: 100%;
-		max-width: 100%;
-		height: 48vh;
-		border-left: none;
-		border-top: 1px solid var(--border);
-	}
-	.messages-wrap.messages-exporting .messages {
-		padding-inline-end: max(0px, calc(var(--chat-inset) - var(--msgs-gutter, 0px)));
-		padding-bottom: 48vh;
-	}
-	.saveimg-input {
-		width: 140px;
-	}
-	.saveimg-copy {
-		margin-left: auto;
-	}
 }
 
 /* ---- Inline File Pill (正文内联文件微标) ---- */
@@ -14403,4 +13456,20 @@ html.desktop-shell .topbar .tb-spacer {
 	text-align: right;
 	font-size: 11px;
 	color: var(--text-faint);
+}
+
+/* ===== 手机端支持已移除 =====
+   不设 768/640 断点：布局永远是桌面形态。窗口拖窄到 960px 以下时整页横向滚动
+   （面板固定宽 + 消息列内缩不变，不会挤压变形）。 */
+body {
+	overflow-x: auto;
+}
+.app {
+	min-width: 960px;
+}
+/* 顶栏「文件列表」开关（host:files）：原先只有窄屏才显示，现在桌面也需要 ——
+   右栏缺省收起，顶栏这个按钮是把它调出来的主要入口。 */
+.panel-toggle {
+	display: inline-flex;
+	align-items: center;
 }

@@ -614,18 +614,6 @@ export function App() {
 			return !v;
 		});
 	}, []);
-	// Mobile: which side panel is open as a drawer (null = both closed).
-	const [drawer, setDrawer] = useState<"left" | "right" | null>(null);
-	// Viewport class: ≤768px turns the side panels into sliding drawers
-	// (matches the CSS breakpoint) — used to lazy-load panel data only when
-	// a drawer is actually open on mobile.
-	const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 768px)").matches);
-	useEffect(() => {
-		const mq = window.matchMedia("(max-width: 768px)");
-		const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-		mq.addEventListener("change", onChange);
-		return () => mq.removeEventListener("change", onChange);
-	}, []);
 	// Setup modal: one-time prompt when the pi agent config is missing.
 	const [setupDismissed, setSetupDismissed] = useState(false);
 	// Custom model config panel (model dropdown → 管理模型).
@@ -991,18 +979,10 @@ export function App() {
 		}
 	};
 
-	// Side panels live in mobile drawers — any action inside them (session
-	// switch, cwd change, file list…) should close the drawer. Stable wrapper
-	// so RightPanel's polling effect doesn't churn (send is stable).
+	// 面板内的动作（切会话 / 换 cwd / 文件操作…）统一走这里：切到 chat 视图 + 原样转发。
+	// 稳定包装是为了不让 RightPanel 的轮询 effect 反复重建（send 本身是稳定的）。
 	const panelSend = useCallback(
 		(msg: ClientMessage) => {
-			// Only close the mobile drawer on an explicit navigation/action. Mounting
-			// LeftPanel fires read-only list_* probes that must NOT collapse the
-			// freshly-opened drawer (they run through panelSend too). Otherwise the
-			// drawer opens and immediately snaps shut.
-			if (!msg.type.startsWith("list_") && !msg.type.startsWith("get_")) {
-				setDrawer(null);
-			}
 			if (msg.type === "new_chat" || msg.type === "switch_conversation" || msg.type === "switch_session") {
 				setView((prev) => (prev !== "chat" ? "chat" : prev));
 			}
@@ -1314,9 +1294,8 @@ export function App() {
 						terminalOpenRequested.current = false;
 					}
 					setView(v);
-					setDrawer(null);
 				}}
-				onOpenPanel={setDrawer}
+				onOpenPanel={(side) => (side === "right" ? toggleRight() : toggleLeft())}
 				onOpenSettings={() => {
 					setSettingsInitialSection(undefined);
 					setSettingsOpen(true);
@@ -1415,19 +1394,14 @@ export function App() {
 					className="layout"
 					style={{ "--left-w": `${leftWidth}px`, "--right-w": `${rightWidth}px` } as CSSProperties}
 				>
-					{drawer && <div className="drawer-backdrop" onClick={() => setDrawer(null)} />}
 					<div className={`view-pane ${view === "chat" ? "" : "hidden"}`}>
-						{!isMobile && leftCollapsed && <PanelRail side="left" onClick={toggleLeft} />}
-						<div
-							className={`panel-drawer drawer-left ${drawer === "left" ? "open" : ""}${
-								isMobile ? "" : leftCollapsed ? " hidden" : ""
-							}`}
-						>
+						{leftCollapsed && <PanelRail side="left" onClick={toggleLeft} />}
+						<div className={`panel-drawer drawer-left${leftCollapsed ? " hidden" : ""}`}>
 							<LeftPanel
-								collapsible={!isMobile}
+								collapsible
 								onToggleCollapse={toggleLeft}
 								panelSend={panelSend}
-								active={!isMobile || drawer === "left"}
+								active
 								sessionFile={chat.state?.sessionFile ?? null}
 								conversations={chat.conversations}
 								sessions={chat.sessions}
@@ -1441,7 +1415,7 @@ export function App() {
 								onUiAction={onUiAction}
 							/>
 						</div>
-						{!isMobile && <ResizeHandle side="left" width={leftWidth} onResize={resizeLeft} />}
+						<ResizeHandle side="left" width={leftWidth} onResize={resizeLeft} />
 						<main className={wide ? "main wide-chat" : "main"}>
 							{/* 标签栏：运行的对话（原左栏分区）——只占对话区顶部，不横跨左右面板。 */}
 							<ChatTabBar
@@ -1893,27 +1867,17 @@ export function App() {
 								sessionId={chat.state?.sessionId ?? ""}
 							/>
 						</main>
-						{!isMobile && <ResizeHandle side="right" width={rightWidth} onResize={resizeRight} />}
-						<div
-							className={`panel-drawer drawer-right ${drawer === "right" ? "open" : ""}${
-								isMobile ? "" : rightCollapsed ? " hidden" : ""
-							}`}
-						>
+						<ResizeHandle side="right" width={rightWidth} onResize={resizeRight} />
+						<div className={`panel-drawer drawer-right${rightCollapsed ? " hidden" : ""}`}>
 							<RightPanel
-								collapsible={!isMobile}
+								collapsible
 								onToggleCollapse={toggleRight}
 								panelSend={panelSend}
 								files={chat.files}
 								fileChanged={chat.fileChanged}
 								widgets={chat.widgets}
-								onAttach={(path, name, mode, isDir) => {
-									setDrawer(null);
-									attach(path, name, mode, isDir);
-								}}
-								onPreview={(path, name) => {
-									setDrawer(null);
-									openFile(path, name);
-								}}
+								onAttach={(path, name, mode, isDir) => attach(path, name, mode, isDir)}
+								onPreview={(path, name) => openFile(path, name)}
 								onNotice={(level, text) => pushNotice(level, text)}
 								/* 宿主 UI 扩展点（issue #146）：右栏 tab 条（插件 tab）、文件右键菜单条目
 								   （contextmenu.file：host 内置条目由右栏自己分派）与插件配置。 */
@@ -1924,7 +1888,7 @@ export function App() {
 								send={send}
 							/>
 						</div>
-						{!isMobile && rightCollapsed && <PanelRail side="right" onClick={toggleRight} />}
+						{rightCollapsed && <PanelRail side="right" onClick={toggleRight} />}
 					</div>
 					<div className={`view-pane ${view === "terminal" ? "" : "hidden"}`}>
 						<Suspense fallback={null}>

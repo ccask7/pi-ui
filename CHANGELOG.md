@@ -16,6 +16,14 @@
 
 ### Changed
 
+- **手机端支持整体移除（桌面-only）** —— 本 fork 只做 Windows 桌面壳 + 桌面浏览器，窄屏布局长期是纯负担：
+  - `styles.css` 删掉全部 11 个 `@media (max-width: …)` 断点（约 610 行）与抽屉/溢出菜单的死规则（约 330 行），`.app` 设 `min-width: 960px`、`body` 允许横向滚动 —— 窗口拖窄不再挤压变形，而是整页横向滚动。
+  - `App.tsx` 删掉 `isMobile` / `drawer` 状态、抽屉遮罩与面板滑入分支；左右面板只保留桌面折叠（顶栏 ☰ / 文件列表按钮改为直接切换折叠，右栏缺省收起）。
+  - `TopBar.tsx` 删除 `useIsMobileTopbar` 与手机端旁置位（📁）；`topbar-fit.ts`、`touch-device.ts`、`use-media-query.ts` 三个模块删除。
+  - `ChatInput` 不再按触屏设备分流：**回车一律发送**（Shift+Enter 换行），点快捷短语后照常回焦。
+  - 顶栏「文件列表」按钮（`host:files`）现在桌面可见（原来只在窄屏显示），配合右栏缺省收起。
+  - 单测删除 `media-query` / `touch-device` / `topbar-overflow-menu` 三个文件；真 Chrome E2E 的手机视口用例不再适用（后续按需清理）。
+
 - **顶栏「⋯」溢出菜单删除** —— 它是「放不下/被隐藏的条目收进来」的入口。删掉后：空间不够时顶栏改为**横向滚动**；原菜单里的两项各有新家 —— **浏览器操作**（page-picker 扩展入口）搬到 **设置 → 插件** 页顶部（状态 / 未就绪时的安装步骤 / 已授权页面可「引用到对话」/ 打开扩展设置页），**版本号** 移到 **设置 → 通用** 页底部一行小字。
 - `web/src/topbar-fit.ts` 里配套的 `fitTopbar` / `sortOverflowMenuItems` 纯函数与 `tests/unit/topbar-fit.test.ts` 删除（只剩手机端固定位名单 `MOBILE_ASIDE_TOPBAR_IDS`）；`BUILTIN_UI_ITEMS` 里的 `host:browser` 与 `host:update` 两条内置条目同步删除，`topbar.overflow` 槽位不再有内置条目。
 - 受影响的 E2E 脚本（`ui-layout` / `context-menu` / `ssh-plugin` / `vscode-editor`）里依赖「⋯ → 声音/主题/插件菜单」的步骤已改写：插件视图改走「顶栏插件 tab，否则 设置 → 插件 → 插件视图 → 打开」。

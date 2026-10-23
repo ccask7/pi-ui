@@ -18,7 +18,6 @@ import { filterSlashCommands } from "../slash-filter";
 import { mapFileHits, mapPageHits, matchAtToken, normalizeAtHits, type AtHit } from "../at-mention";
 import { getLastBrowserControlPages, pokeBrowserControl } from "../browser-control";
 import { getPluginComposerProvider, listPluginComposerProviders } from "../plugin-host";
-import { detectTouchFirstDevice } from "../touch-device";
 import { groupByAlign } from "../ui-slots";
 
 import { ModelThinking } from "./ModelThinking";
@@ -26,11 +25,6 @@ import { PresetBar, type AgentPresetInfo } from "./PresetBar";
 import { PermissionBar } from "./PermissionBar";
 import type { PermissionOption, UiAgentPreset } from "../types";
 import { useTemplates } from "./PromptTemplates";
-
-/** True on touch-first devices (phones / tablets driven by a soft keyboard) —
- *  see `touch-device.ts` for the detection rules (Windows 触屏笔记本不算触屏，
- *  否则回车只换行、发不出去). */
-const IS_TOUCH = detectTouchFirstDevice();
 
 /** 输入框高度的拖拽范围（px）：composerH 是手动拉出的**保底高度**（默认没拖过是
  * 自适应、上限 220，与历史行为一致）。拖过之后：内容少时撑到这个高度（主动拉高
@@ -273,11 +267,9 @@ export const ChatInput = memo(function ChatInput({
 	// 宿主触发聚焦（点击新对话等）。
 	useEffect(() => {
 		registerFocusSink(() => {
-			if (!IS_TOUCH) {
-				requestAnimationFrame(() => {
-					taRef.current?.focus();
-				});
-			}
+			requestAnimationFrame(() => {
+				taRef.current?.focus();
+			});
 		});
 		return () => registerFocusSink(null);
 	}, []);
@@ -487,9 +479,8 @@ export const ChatInput = memo(function ChatInput({
 	const prevSessionKeyRef = useRef<string | null>(null);
 	useEffect(() => {
 		const isNewChat = messages.length === 0;
-		const sessionChanged = prevSessionKeyRef.current !== draftSessionKey;
 		prevSessionKeyRef.current = draftSessionKey;
-		if (ready && isNewChat && (!IS_TOUCH || sessionChanged)) {
+		if (ready && isNewChat) {
 			requestAnimationFrame(() => {
 				taRef.current?.focus();
 			});
@@ -1045,10 +1036,7 @@ export const ChatInput = memo(function ChatInput({
 			onSent();
 			const m = modelState?.model;
 			if (m) recordModelUsage(`${m.provider}/${m.id}`);
-			// 触屏设备点击快捷短语后不回焦输入框：点按钮时虚拟键盘本未弹出，回焦会
-			// 立刻把它弹起来盖住界面（发送按钮/回车路径本就处于键盘开启状态，不受
-			// 影响，仍保留 submit() 里的回焦）。桌面端保留回焦，方便直接接着输入。
-			if (!IS_TOUCH) taRef.current?.focus();
+			taRef.current?.focus();
 		} else {
 			onNotice("error", t("netDisconnected"));
 		}
@@ -1217,15 +1205,8 @@ export const ChatInput = memo(function ChatInput({
 			});
 			return;
 		}
-		// Enter semantics: on touch-first devices (soft keyboard, no physical
-		// Shift — see touch-device.ts) Enter inserts a newline and sending goes
-		// through the on-screen button (Ctrl/Cmd+Enter also sends). Everywhere
-		// else (desktop, incl. Windows 触屏笔记本) plain Enter sends.
+		// Enter 发送（Shift+Enter 换行）。手机端已移除，不再按设备类型分流。
 		if (e.key === "Enter") {
-			if (IS_TOUCH) {
-				// Plain Return → default textarea behavior (insert a line break).
-				if (!e.shiftKey && !(e.ctrlKey || e.metaKey)) return;
-			}
 			if (!e.shiftKey) {
 				e.preventDefault();
 				submit();
