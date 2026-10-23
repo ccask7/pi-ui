@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { randomUuid } from "../uuid";
-import { FiEdit2, FiMenu, FiPlay, FiPlus, FiRefreshCw, FiTerminal, FiTrash2, FiX } from "react-icons/fi";
+import { FiEdit2, FiPlay, FiPlus, FiRefreshCw, FiTerminal, FiTrash2, FiX } from "react-icons/fi";
 import type { ChatState, TerminalMeta } from "../use-chat";
 import type { CommandDef } from "../types";
 import { TermXterm } from "./TermXterm";
@@ -51,7 +51,6 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 	const t = useT();
 	const [activeId, setActiveId] = useState<string | null>(null);
 	// Mobile: the left column (commands + tabs) slides in as a drawer.
-	const [sideOpen, setSideOpen] = useState(false);
 	// Command list editing state.
 	const [isNew, setIsNew] = useState(false);
 	const [editingIdx, setEditingIdx] = useState<number | null>(null);
@@ -78,7 +77,6 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 	useEffect(() => {
 		if (chat.terminalActiveId) {
 			setActiveId(chat.terminalActiveId);
-			setSideOpen(false);
 		}
 	}, [chat.terminalActiveId]);
 
@@ -111,7 +109,6 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 			exitCode: null,
 		});
 		setActiveId(id);
-		setSideOpen(false);
 	};
 
 	const openShell = () =>
@@ -162,7 +159,6 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 				onClick={() => {
 					if (renamingTab) return;
 					setActiveId(tab.id);
-					setSideOpen(false);
 				}}
 			>
 				<span className={`term-tab-dot ${tab.running ? "run" : "exit"}`} />
@@ -305,7 +301,7 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 	return (
 		<div className="terminal-view">
 			{/* ---------------- left: command list + terminal tabs ---------------- */}
-			<aside className={`term-side term-commands ${sideOpen ? "open" : ""}`}>
+			<aside className="term-side term-commands">
 				<div className="panel-header">
 					<span className="panel-title">{t("commands")}</span>
 					<div className="panel-header-actions">
@@ -431,10 +427,6 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 
 			{/* ---------------- right: terminals ---------------- */}
 			<div className="term-main">
-				{sideOpen && <div className="drawer-backdrop" onClick={() => setSideOpen(false)} />}
-				<button type="button" className="term-side-toggle" title={t("commands")} onClick={() => setSideOpen((v) => !v)}>
-					<FiMenu />
-				</button>
 				{chat.terminals.length === 0 ? (
 					<div className="term-empty">
 						<FiTerminal className="term-empty-icon" />
