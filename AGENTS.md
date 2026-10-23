@@ -248,6 +248,8 @@ npm run pack:extension   # 打浏览器扩展 zip → release/（仅本地用，
 **提交习惯**：正常分次提交（一次改动一个 commit，中文提交信息）；不要为了“只要一个提交”去 `--amend`/squash 已有历史，也不要为此 force push。
 （本仓当前只有 `Initial commit` 一个提交，那是历史压缩的一次性结果，不是往后的做法。）
 
+**打包与推送由用户自己发起**：改完代码只跑 `typecheck` / `format` / `lint` / `test` 并分次提交，**不要**自行跑 `npm run build:desktop` / `desktop:dist` / `electron-builder`，也**不要**自行 `git push`（含 `--tags`）—— 什么时候出包、什么时候推远端，等用户明确要求。
+
 ## 6. 版本与发布（本 fork）
 
 不发布 npm、不建 Release 资产；版本线自己走。
