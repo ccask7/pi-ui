@@ -180,7 +180,7 @@ export function applyUiSlotCardinality<T extends { id: string; hidden: boolean }
  * 宿主内置条目 —— **逐项对应代码里真实存在的入口**（不臆造）：
  *
  *   topbar.primary   web/src/components/TopBar.tsx：品牌（π 标识＋名称合一） /
- *                    ☰ openHistory / 📁 openFiles / ＋ newChat /
+ *                    ☰ openHistory / ＋ newChat /
  *                    视图开关三连（chat·terminal·git，缺省 align=end）/ 搜索 / 浏览器操作 /
  *                    后台任务 / 设置 / 声音 / 语言 / 主题 / 版本（更新）/ GitHub。
  *                    **完全扁平**：所有条目是 `.topbar-flow` 的直接子节点，同级、无任何
@@ -267,17 +267,6 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		// 缺省落左区之首要位置（start）：手机端 ☰ 就是顶栏最左一个按钮。
 	},
 
-	{
-		id: "host:files",
-		slot: "topbar.primary",
-		labelKey: "openFiles",
-		icon: "folder",
-		kind: "action",
-		order: 97,
-		group: "panels",
-		// 缺省落右区之尾（end）：手机端 📁 是顶栏最右一个按钮（⋯ 之前）。
-		align: "end",
-	},
 	{
 		id: "host:new-ephemeral-chat",
 		slot: "topbar.primary",

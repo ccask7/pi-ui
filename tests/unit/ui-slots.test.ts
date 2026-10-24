@@ -169,8 +169,7 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:tasks",
 			"host:settings",
 			"host:new-ephemeral-chat",
-			"host:files",
-			// order 200：尾部条目 = 实测溢出的第一顺位被收起者（见 BUILTIN_UI_ITEMS 注释）
+			// 尾部条目 = 实测溢出的第一顺位被收起者（见 BUILTIN_UI_ITEMS 注释）
 		]);
 		expect(ids(slots.bottombar)).toEqual([
 			"host:conn",
@@ -214,7 +213,7 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 		const top = slots["topbar.primary"];
 		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual([]);
 		// 常驻 = 「切视图（chat/terminal/git） / 起新活（new-ephemeral-chat） /
-		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目、搜索、面板开关
+		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目、搜索、左栏开关
 		expect(top.filter((e) => !e.hidden).map((e) => e.id)).toEqual([
 			"host:history",
 			"host:brand",
@@ -226,7 +225,6 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:tasks",
 			"host:settings",
 			"host:new-ephemeral-chat",
-			"host:files",
 		]);
 		// 缺省收起是「内置默认」，不写成用户覆盖 —— 否则布局页会把它们标成「已自定义」，
 		// 「恢复」按钮还会把它们恢复成同一个值
@@ -546,16 +544,17 @@ describe("buildUiSlots / 第 4 层：用户偏好（最高）", () => {
 	});
 
 	it("order 列表：列出的按列表顺序排在最前，未列出的保持原顺序", () => {
-		const slots = build([], { layout: { order: ["host:files", "host:chat"] } });
-		expect(ids(slots["topbar.primary"]).slice(0, 2)).toEqual(["host:files", "host:chat"]);
-		// 其余仍按权重排：files/chat 置顶之后是 history(0) → brand(1) → open-project(3) …
+		const slots = build([], { layout: { order: ["host:tasks", "host:chat"] } });
+		expect(ids(slots["topbar.primary"]).slice(0, 2)).toEqual(["host:tasks", "host:chat"]);
+		// 其余仍按权重排：tasks/chat 置顶之后是 history(0) → brand(1) → open-project(3) …
 		expect(ids(slots["topbar.primary"]).slice(2, 5)).toEqual(["host:history", "host:brand", "host:open-project"]);
 		expect(slots["topbar.primary"].find((e) => e.id === "host:chat")?.userOverrides).toEqual(["order"]);
 	});
 
 	it("order 列表里的历史 id（条目已不存在）被忽略", () => {
+		// host:files 曾是真条目、现已删除 → 与幽灵 id 一样被忽略，不能顶到第一位
 		const slots = build([], { layout: { order: ["ghost:gone", "host:files"] } });
-		expect(ids(slots["topbar.primary"])[0]).toBe("host:files");
+		expect(ids(slots["topbar.primary"])[0]).toBe("host:history");
 		expect(slots["topbar.primary"]).toHaveLength(BUILTIN_UI_ITEMS.filter((i) => i.slot === "topbar.primary").length);
 	});
 

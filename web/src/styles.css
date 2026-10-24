@@ -347,7 +347,7 @@ body.panel-resizing {
 }
 
 /* ---- Panel chrome: collapse button / rail / header ---- */
-/* 收起按钮 resting 态即带底色 + 边框（与窄屏顶栏 .panel-toggle 同级），
+/* 收起按钮 resting 态即带底色 + 边框（与顶栏 .panel-toggle 同级），
    前景用 --control-fg（默认正文次级色）而非 --text-faint，避免在部分主题下
    因 --text-faint 与背景接近而看不见（issue #100）。 */
 .panel-collapse-btn {
@@ -2391,29 +2391,11 @@ select.plugin-topbar-item.plugin-topbar-select {
 .panel-drawer.hidden {
 	display: none;
 }
-/* 顶栏「文件列表」开关（host:files）：右栏缺省收起，这是把它调出来的主要入口 ——
-   手机端移除后不再有「窄屏才显示」的口径，桌面直接可见。 */
+/* 顶栏面板开关（今天只剩 ☰ 历史 / 左栏）：纯图标按钮，手机端移除后桌面直接可见。 */
 .panel-toggle {
 	display: inline-flex;
 	align-items: center;
 }
-/* 带文字的开关：外观与其他 chip 按钮对齐。 */
-.panel-toggle.has-label {
-	width: auto;
-	padding: 0 10px;
-	gap: 6px;
-	font-size: 12.5px;
-	color: var(--text);
-	/* 与 .chip 完全一致的交互态（过渡 + 悬浮高亮边框） */
-	transition:
-		border-color 0.15s,
-		background 0.15s;
-}
-.panel-toggle.has-label:hover {
-	border-color: var(--accent);
-	background: var(--accent-soft);
-}
-
 /* 视图 tab 的胶囊外观已搬到 .tb-tab（顶栏扁平化：不再有 .view-switch 容器，
    每个 tab 是自己的一个条目，见 .topbar-flow 那一段）。 */
 

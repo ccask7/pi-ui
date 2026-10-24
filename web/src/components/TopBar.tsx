@@ -1,6 +1,5 @@
 import { Fragment, useState, type ReactNode } from "react";
 import {
-	FiFolder,
 	FiFolderPlus,
 	FiGitBranch,
 	FiMenu,
@@ -111,7 +110,6 @@ export function TopBar({
 		"host:tasks",
 		"host:settings",
 		"host:new-ephemeral-chat",
-		"host:files",
 	];
 	const topEntries: { id: string; entry: UiSlotEntry | null }[] =
 		uiPrimary !== undefined
@@ -190,21 +188,6 @@ export function TopBar({
 					onClick={() => onOpenPanel("left")}
 				>
 					<FiMenu />
-				</button>
-			) : null,
-		"host:files":
-			view === "chat" && tabOn("files") ? (
-				// 文字显隐统一走顶栏文字总开关（.topbar.no-labels）。
-				<button
-					type="button"
-					className="panel-toggle has-label"
-					data-tip={t("openFiles")}
-					// 文字总开关关掉后 span 会 display:none，可访问名称不能只靠可见文字。
-					aria-label={t("openFiles")}
-					onClick={() => onOpenPanel("right")}
-				>
-					<FiFolder />
-					<span>{t("openFiles")}</span>
 				</button>
 			) : null,
 		"host:new-ephemeral-chat": (
