@@ -47,7 +47,10 @@ ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder
 - 端口：随机空闲口，不抢 `8787`，可与网页版并存。`PI_WEB_PORT` 显式指定时优先，
   但**已占用就退回随机口**（从 ccui 自己的终端里跑 `desktop:dev` 会继承它的 `PI_WEB_PORT`）。
 - 图标：复用网页版的 `web/public/icons/icon-1024.png`，electron-builder 自己转 `.ico`，
-  换图标只改这一处（网页版 PWA 图标同步变）。
+  换图标只改这一处（网页版 PWA 图标同步变）。整套资产由仓库根的
+  `node make-icons.mjs <源图>` 生成：它先探测源图的像素网格抹掉 JPEG 噪点，再导出
+  圆角方形 11 个尺寸 + maskable 3 个安全区尺寸 + favicon-32/64 + 多尺寸 `icon.ico`；
+  大尺寸最近邻（保留像素块）、≤48px 走平滑（16px 还认得出是张脸）。
 - 数据：`PI_WEB_DATA_DIR` 默认 `<userData>/data`（Windows 上 `%APPDATA%/ccui/data`），
   和 `~/.pi-web` 隔离。
 - 启动工作区（cwd）按优先级：`PI_WEB_CWD` 显式指定 → 恢复上次项目（读
