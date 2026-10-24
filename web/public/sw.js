@@ -22,8 +22,8 @@
  * risk serving stale theme/plugin code or caching anything sensitive.
  */
 
-const STATIC_CACHE = "ccui-static-v1";
-const SHELL_CACHE = "ccui-shell-v1";
+const STATIC_CACHE = "ccui-static-v2";
+const SHELL_CACHE = "ccui-shell-v2";
 
 // App root within this origin — "/" for root deployments, "/pi/" behind an
 // nginx sub-path reverse proxy. All path checks below are relative to it, so

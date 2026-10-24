@@ -153,8 +153,15 @@ export function TopBar({
 	const hostNodes: Record<string, ReactNode> = {
 		"host:brand": (
 			<span className="brand">
-				{/* 与应用图标同一份资产（make-icons.mjs 产出），顶栏不再自己画 π 字形。 */}
-				<img className="brand-logo" src={appUrl("/icons/icon-64.png")} alt="" aria-hidden="true" draggable={false} />
+				{/* 与应用图标同一份资产（make-icons.mjs 产出），顶栏不再自己画 π 字形。
+				    URL 带 build id：SW 对 /icons/ 走 cache-first，不换 URL 换图标后仍会看到旧图。 */}
+				<img
+					className="brand-logo"
+					src={appUrl(`/icons/icon-64.png?v=${typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : ""}`)}
+					alt=""
+					aria-hidden="true"
+					draggable={false}
+				/>
 				<span className="brand-name">ccui</span>
 			</span>
 		),
