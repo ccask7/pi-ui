@@ -21,7 +21,7 @@ describe("normalizePanelOpacity", () => {
 		expect(normalizePanelOpacity(-0.4)).toBe(0);
 	});
 
-	it("非数字回退默认（100 = 实色）", () => {
+	it("非数字回退默认（62 = 与主题自带值一致）", () => {
 		expect(normalizePanelOpacity(null)).toBe(DEFAULT_PANEL_OPACITY);
 		expect(normalizePanelOpacity(undefined)).toBe(DEFAULT_PANEL_OPACITY);
 		expect(normalizePanelOpacity("62")).toBe(DEFAULT_PANEL_OPACITY);
@@ -30,7 +30,10 @@ describe("normalizePanelOpacity", () => {
 		expect(normalizePanelOpacity({})).toBe(DEFAULT_PANEL_OPACITY);
 	});
 
-	it("默认值是不透明（100）", () => {
-		expect(DEFAULT_PANEL_OPACITY).toBe(100);
+	// 缺省必须留出透图余量：100（实色）会让背景图完全看不见，
+	// 用户会以为「上传背景图没生效」（回归自 0.0.3 之后的实测反馈）。
+	it("默认值与 styles.css 的 --wallpaper-panel-alpha 一致（62，能透出背景图）", () => {
+		expect(DEFAULT_PANEL_OPACITY).toBe(62);
+		expect(DEFAULT_PANEL_OPACITY).toBeLessThan(100);
 	});
 });

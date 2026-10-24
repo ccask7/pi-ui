@@ -8,7 +8,10 @@
  *  --msgs-bg / --inputbox-bg 共用同一个变量），所以「透明度」只需覆盖这一个
  * 变量，不用改动任何组件样式。
  *
- * 语义：值 = 容器色占比 0–100 → 100 = 实色（不透图）、0 = 全透明。
+ * 语义：值 = 容器色占比 0–100 → 100 = 实色（**完全挡住背景图**）、0 = 全透明。
+ * 缺省 62 与 styles.css / 各主题自带的 `--wallpaper-panel-alpha` 一致 ——
+ * 早前缺省写成 100（实色）会让「上传背景图」看起来完全没生效：图确实铺上了，
+ * 但每个容器都实色挡着，一点都露不出来。
  * 单独生效、不跟随主题（内联变量优先于主题 <link>，换主题也不丢）；
  * 没有背景图时看不出差别（背后就是 body 实色底）。
  *
@@ -19,7 +22,7 @@ import { useSyncExternalStore } from "react";
 export const PANEL_OPACITY_KEY = "ccui:panel-opacity";
 /** styles.css 里所有容器表面共用的透图率变量。 */
 export const PANEL_OPACITY_VAR = "--wallpaper-panel-alpha";
-export const DEFAULT_PANEL_OPACITY = 100;
+export const DEFAULT_PANEL_OPACITY = 62;
 /** 保存后广播（桌面壳据此重新同步标题栏按钮条配色）。 */
 export const PANEL_OPACITY_CHANGE_EVENT = "ccui:panel-opacity-change";
 
