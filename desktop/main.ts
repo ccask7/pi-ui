@@ -17,7 +17,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -41,6 +41,45 @@ function resolveWebDir(): string | null {
 		process.exit(1);
 	}
 	return devWeb;
+}
+
+/**
+ * 窗口透明（整体不透明度功能的壳侧前提）。
+ *
+ * `transparent` 是 BrowserWindow 的**构造期**选项，运行中翻不了；所以开关存这里
+ * （userData/window-prefs.json），启动时按它建窗口。缺省 true：页面默认不透明度
+ * 100% 时观感与普通窗口一致，用户拖动滑杆才有区别。
+ *
+ * 关掉它（设置 → 界面设置 → 窗口透明）= 下次启动用普通不透明窗口，规避 Windows 上
+ * 透明窗口拖拽缩放的抖动/残影。
+ */
+interface WindowPrefs {
+	transparent: boolean;
+}
+let windowTransparent = true;
+/** 重建窗口期间为 true：这段时间内的 window-all-closed 不算「用户关掉窗口」。 */
+let recreatingWindow = false;
+
+function windowPrefsPath(): string {
+	return join(app.getPath("userData"), "window-prefs.json");
+}
+
+function readWindowPrefs(): WindowPrefs {
+	try {
+		const raw = JSON.parse(readFileSync(windowPrefsPath(), "utf8")) as { transparent?: unknown };
+		return { transparent: raw.transparent !== false };
+	} catch {
+		return { transparent: true };
+	}
+}
+
+function writeWindowPrefs(prefs: WindowPrefs): void {
+	try {
+		mkdirSync(dirname(windowPrefsPath()), { recursive: true });
+		writeFileSync(windowPrefsPath(), JSON.stringify(prefs), "utf8");
+	} catch (err) {
+		console.warn(`[desktop] 写 window-prefs.json 失败：${(err as Error).message}`);
+	}
 }
 
 /** 取一个系统分配的空闲 TCP 口（桌面模式不用固定 8787，避免和网页版冲突）。 */
@@ -232,17 +271,28 @@ async function startServerSidecar(cwd: string): Promise<string> {
 }
 
 async function createWindow(): Promise<void> {
-	mainWin = new BrowserWindow({
+	const win = new BrowserWindow({
 		width: 1280,
 		height: 860,
 		autoHideMenuBar: true,
+		// 整体不透明度（对齐 Windows Terminal 的 opacity）：窗口本身透明，页面用
+		// CSS 的 --window-opacity 决定自己画多实。transparent 只能在构造期给，开关
+		// 值来自 window-prefs.json（设置里的「窗口透明」开关），改后重启生效。
+		transparent: windowTransparent,
+		backgroundColor: windowTransparent ? "#00000000" : "#1a1b1e",
 		// WCO（VS Code 同款）：系统只留右上角 min/max/close 覆盖条，标题栏交给网页
 		// （顶栏 CSS app-region: drag，见 styles.css 的 html.desktop-shell 段）。
 		// 初始配色对 welcome.html 的深色底；进主界面后由 syncTitlebarOverlay 跟随主题。
 		// 高度先给个默认值（welcome.html 阶段顶栏还没渲染），进主界面后
 		// syncTitlebarOverlay 会把实测的顶栏高度传进来（当前 35 = 控件 26 + 上下 4 + 边框 1）。
 		titleBarStyle: "hidden",
-		titleBarOverlay: { color: "#1a1b1e", symbolColor: "#e4e4e7", height: 35 },
+		// 透明窗口下按钮条必须交给系统透出（#RRGGBBAA 的 0 alpha），否则右上角
+		// 会留一块实色矩形；渲染端 syncTitlebarOverlay 之后会按需再覆盖。
+		titleBarOverlay: {
+			color: windowTransparent ? "#00000000" : "#1a1b1e",
+			symbolColor: "#e4e4e7",
+			height: 35,
+		},
 		webPreferences: {
 			preload: join(here, "preload.cjs"),
 			contextIsolation: true,
@@ -250,8 +300,9 @@ async function createWindow(): Promise<void> {
 			sandbox: true,
 		},
 	});
+	mainWin = win;
 	// 外链丢给系统浏览器，别在应用窗口里导航走。
-	mainWin.webContents.setWindowOpenHandler(({ url: u }) => {
+	win.webContents.setWindowOpenHandler(({ url: u }) => {
 		if (!isAllowedExternalUrl(u)) {
 			console.warn(`[desktop] 已拦截非 allowlist 外链（新窗口）：${u}`);
 			return { action: "deny" };
@@ -263,7 +314,7 @@ async function createWindow(): Promise<void> {
 	// target="_blank"），而对话正文里的裸 href 与 JS 主动跳转（location.href/assign）
 	// 走的是同帧导航 —— 默认会被允许，直接把应用窗口带走（无地址栏、无后退键，只能重启）。
 	// 应用自身 origin（重载/前端路由）放行，其余一律转系统浏览器。
-	mainWin.webContents.on("will-navigate", (e, target) => {
+	win.webContents.on("will-navigate", (e, target) => {
 		let u: URL;
 		try {
 			u = new URL(target);
@@ -280,8 +331,10 @@ async function createWindow(): Promise<void> {
 		console.log(`[desktop] will-navigate 拦截，已用系统浏览器打开：${target}`);
 		void shell.openExternal(target);
 	});
-	mainWin.on("closed", () => {
-		mainWin = null;
+	win.on("closed", () => {
+		// 重建窗口（整体不透明度的「窗口透明」开关）时旧窗口先 close、新窗口已建好：
+		// 只有「关的就是当前窗口」才清引用，否则会把新窗口的引用抹掉。
+		if (mainWin === win) mainWin = null;
 	});
 }
 
@@ -326,7 +379,10 @@ ipcMain.handle("desktop:pick-directory", async () => {
 let lastOverlay = "";
 ipcMain.handle("desktop:titlebar-overlay", (_e, color: unknown, symbolColor: unknown, height: unknown) => {
 	if (typeof color !== "string" || typeof symbolColor !== "string") return;
-	if (!/^#[0-9a-fA-F]{6}$/.test(color) || !/^#[0-9a-fA-F]{6}$/.test(symbolColor)) return;
+	// 颜色：hex6（实色）或 hex8（#RRGGBBAA —— 透明窗口下渲染端发 00 alpha，让按钮条
+	// 区域跟页面一起透出桌面，否则右上角会留一块实色矩形）。
+	if (!/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color) || !/^#[0-9a-fA-F]{6}$/.test(symbolColor))
+		return;
 	const h =
 		typeof height === "number" && Number.isFinite(height) && height >= 20 && height <= 120
 			? Math.round(height)
@@ -336,6 +392,38 @@ ipcMain.handle("desktop:titlebar-overlay", (_e, color: unknown, symbolColor: unk
 	lastOverlay = key;
 	console.log(`[desktop] 标题栏按钮条：${color} / ${symbolColor} / ${h ?? "高度不变"}px`);
 	mainWin?.setTitleBarOverlay({ color, symbolColor, ...(h ? { height: h } : {}) });
+});
+
+/**
+ * 读/写「窗口透明」开关。
+ * get：渲染端只用来显示开关状态（权威值在本进程的 window-prefs.json）。
+ * set：写盘 + **重建窗口**立即生效 —— transparent 是构造期选项，Electron 不支持
+ *      运行中翻转；重建时沿用当前 bounds，server sidecar 与 origin 都不动，
+ *      所以只是页面重载一次（项目与对话由 client-state / 服务端恢复）。
+ */
+ipcMain.handle("desktop:get-window-transparent", () => ({ transparent: windowTransparent }));
+
+ipcMain.handle("desktop:set-window-transparent", async (_e, on: unknown) => {
+	const next = on === true;
+	windowTransparent = next;
+	writeWindowPrefs({ transparent: next });
+	if (!mainWin) return { transparent: next };
+	const old = mainWin;
+	const bounds = old.getBounds();
+	lastOverlay = ""; // 新窗口的按钮条要重新设一次
+	// 顺序很重要：**先建新窗口再销毁旧窗口**。反过来的话，destroy 后窗口数为 0 会触发
+	// window-all-closed → app.quit()，整进程直接退出（实测）。
+	recreatingWindow = true;
+	try {
+		await createWindow();
+		mainWin?.setBounds(bounds);
+		old.destroy();
+		if (appOrigin) await mainWin?.loadURL(appOrigin).catch(() => {});
+		else await mainWin?.loadFile(join(here, "welcome.html")).catch(() => {});
+	} finally {
+		recreatingWindow = false;
+	}
+	return { transparent: next };
 });
 
 // 返回 null = 成功（窗口已切到真 UI）；返回字符串 = 给用户看的错误。
@@ -367,6 +455,8 @@ if (!app.requestSingleInstanceLock()) {
 // 进程挂在 "waiting for app ready…"，窗口永远不开（改成 .then 回调里 await 即可）。
 void app.whenReady().then(async () => {
 	console.log("[desktop] app ready");
+	windowTransparent = readWindowPrefs().transparent;
+	console.log(`[desktop] 窗口透明：${windowTransparent ? "开" : "关"}`);
 	try {
 		await createWindow();
 		// dev 联调：指向已跑起来的 vite(:5173)，前提是另起 dev:server
@@ -390,6 +480,8 @@ void app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
+	// 重建窗口的瞬间窗口数可能为 0（见 desktop:set-window-transparent），此时不能退。
+	if (recreatingWindow) return;
 	if (process.platform !== "darwin") app.quit();
 });
 app.on("activate", () => {

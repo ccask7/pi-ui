@@ -78,7 +78,23 @@ ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder
     20~120px 后 `setTitleBarOverlay`。所以改顶栏 padding / `--topbar-ctl-h` 时**不用**再动
     `main.ts`（只有 welcome.html 阶段的默认高度还留着 35，仅作初值）。
   - 坑：颜色解析要兼容 `color(srgb 0.07 0.08 0.11 / 0.6)` 这类回读格式（分量 0~1 浮点，
-    不是 0~255）；overlay 不接受 alpha，必须合成成不透明色。
+    不是 0~255）；不透明窗口下 overlay **不能**吃 alpha，必须合成成不透明色 ——
+    例外见下面的「窗口透明」：那时反过来要主动发 `#00000000`。
+- **窗口透明（整体不透明度）**：对齐 Windows Terminal 的 `opacity`。
+  窗口用 `transparent: true` + `backgroundColor: "#00000000"`，页面用 CSS 变量
+  `--window-opacity`（设置 → 界面设置 → 整体不透明度，缺省 100% = 实心）决定自己画多实：
+  `body` 底色 = `color-mix(in srgb, var(--bg) var(--window-opacity), transparent)`，
+  壁纸层 `body.has-wallpaper::before { opacity: var(--window-opacity) }`（图跟着透），
+  终端容器与 xterm 主题底色同乘（`buildTermTheme` 解析成 `rgba()`，xterm 不认
+  `color-mix()`/`var()`）。`html` 必须 `background: transparent`，否则最外层照样挡桌面。
+  - `transparent` 是 BrowserWindow **构造期**选项，运行中翻不了 → 开关持久化在
+    `%APPDATA%/ccui/window-prefs.json`（主进程读写），设置里的「窗口透明」关掉后
+    **重建窗口**立即生效（沿用 bounds，server sidecar 与 origin 不动，页面重载一次）。
+    缺省开：不透明度 100% 时观感与普通窗口一致，拖滑杆才有区别。
+  - 透明时 `syncTitlebarOverlay()` 改发 `#00000000`（主进程颜色校验接受 hex8），
+    按钮条跟着页面透出桌面；不透明时仍按 `.topbar`+`body` 合成 hex6。
+  - 已知限制：Windows 10 没有 Mica/Acrylic（`backgroundMaterial` 仅 Win11），所以是
+    纯 alpha 不模糊；无边框透明窗口拖拽缩放可能有轻微抖动 —— 卡就关掉「窗口透明」。
 - 单实例锁：`requestSingleInstanceLock()`。
 - 安全：`contextIsolation + sandbox`，renderer 无 node，外链经 scheme allowlist
   （`external-url.ts`）走系统浏览器；同帧导航（`will-navigate`）同样拦截——

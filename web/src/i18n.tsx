@@ -1384,11 +1384,14 @@ export const zh = {
 	wallpaperClear: "清除",
 	wallpaperUpload: "上传图片",
 	wallpaperUploadFailed: "图片读取失败或过大，请换一张试试",
-	/* 面板透明度（--wallpaper-panel-alpha） */
-	panelOpacityTitle: "面板透明度",
-	panelOpacityDesc:
-		"顶栏、侧栏、卡片、消息区、输入框这些底板有多透：0% = 完全透明（图直接透出），100% = 实色。配了背景图才看得出差别；单独设置，不跟随主题。",
-	panelOpacityLabel: "不透明度",
+	/* 整体不透明度（窗口级，--window-opacity）+ 兜底开关 */
+	windowOpacityTitle: "整体不透明度",
+	windowOpacityDesc:
+		"整个窗口的透明度（和 Windows Terminal 里的「不透明度」同义）：100% = 实心，越小越能透出窗口背后的桌面/其它窗口；配了背景图时图也跟着一起透。单独设置，不跟随主题。",
+	windowOpacityLabel: "不透明度",
+	windowTransparentTitle: "窗口透明",
+	windowTransparentDesc:
+		"这是整体不透明度的前提。关掉后窗口变成普通不透明窗口（下次启动生效，滑杆随之失效）—— Windows 上透明窗口拖拽缩放可能抖动，觉得卡就关掉它。",
 	skillFullTextLabel: "技能全文注入",
 	skillFullTextDesc: "把技能文件正文直接展开进系统提示词（单文件 8KB、总量 32KB 封顶），否则只列名录由模型按需读取",
 	skillFullTextShort: "全文",
@@ -2881,11 +2884,14 @@ const en: Record<keyof typeof zh, string> = {
 	wallpaperClear: "Clear",
 	wallpaperUpload: "Upload image",
 	wallpaperUploadFailed: "Couldn't read the image (or it's too big) — try another one",
-	/* Panel transparency (--wallpaper-panel-alpha) */
-	panelOpacityTitle: "Panel transparency",
-	panelOpacityDesc:
-		"How see-through the panels are (top/bottom bars, side panels, cards, message area, input box): 0% = fully transparent (the image shows through), 100% = solid. Only noticeable with a background image; set on its own, not tied to the theme.",
-	panelOpacityLabel: "Opacity",
+	/* Overall opacity (window level, --window-opacity) + fallback switch */
+	windowOpacityTitle: "Overall opacity",
+	windowOpacityDesc:
+		"Opacity of the whole window (same idea as Windows Terminal's opacity setting): 100% = solid; lower values let the desktop / other windows behind show through, and the background image becomes see-through too. Set independently of the theme.",
+	windowOpacityLabel: "Opacity",
+	windowTransparentTitle: "Transparent window",
+	windowTransparentDesc:
+		"Prerequisite for the opacity slider. Turning it off gives a plain opaque window (applies on next launch; the slider then does nothing) — transparent windows can stutter while dragging/resizing on Windows, so turn it off if it feels laggy.",
 	skillFullTextLabel: "Inject full skill text",
 	skillFullTextDesc:
 		"Expand skill file contents inline into the system prompt (8KB per file, 32KB total cap); otherwise only a catalog is listed and the model reads files on demand",

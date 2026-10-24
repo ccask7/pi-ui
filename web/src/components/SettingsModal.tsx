@@ -75,7 +75,12 @@ import { useWideChat, saveChatWidthSettings } from "../chat-width-settings";
 import { usePresentAutoOpen, savePresentAutoOpen } from "../present-settings";
 import { useProjectTitle, saveTitleSettings } from "../title-settings";
 import { sanitizeWallpaperUrl, fileToWallpaperUrl, saveWallpaperSettings, useWallpaperSettings } from "../wallpaper";
-import { savePanelOpacity, usePanelOpacity } from "../panel-opacity";
+import {
+	saveWindowOpacity,
+	saveWindowTransparent,
+	useWindowOpacity,
+	useWindowTransparent,
+} from "../window-opacity";
 import { useT, useI18n } from "../i18n";
 import {
 	buildUiSlots,
@@ -465,8 +470,10 @@ export function SettingsModal({
 	// 聊天背景图（纯前端 localStorage，见 wallpaper.ts）：地址输入框用本地草稿，
 	// 失焦/回车才提交（避免边输边校验）；压暗/模糊滑杆直接提交即时预览。
 	const wallpaper = useWallpaperSettings();
-	// 面板透明度（纯前端 localStorage，见 panel-opacity.ts）：单独设置、不跟随主题。
-	const panelOpacity = usePanelOpacity();
+	// 整体不透明度（纯前端 localStorage，见 window-opacity.ts）：窗口级透明，
+	// 对齐 Windows Terminal 的 opacity；「窗口透明」是它的兜底开关。
+	const windowOpacity = useWindowOpacity();
+	const windowTransparent = useWindowTransparent();
 	const [wallpaperDraft, setWallpaperDraft] = useState(wallpaper.url);
 	const wallpaperFocus = useRef(false);
 	const wallpaperFileRef = useRef<HTMLInputElement>(null);
@@ -2225,30 +2232,42 @@ export function SettingsModal({
 										</div>
 									)}
 								</div>
-								<hr className="set-sep" />
-								{/* 面板透明度（styles.css 的 --wallpaper-panel-alpha）：单独设置、不跟随主题 */}
+							</div>
+						)}
+
+						{/* ---- 整体不透明度（窗口级，--window-opacity）+ 兜底开关 ---- */}
+						{tab === "appearance" && (
+							<div className="set-section">
+								<div className="set-section-title">
+									<FiSun className="set-section-icon" />
+									{t("windowOpacityTitle")}
+									<HintTip text={t("windowOpacityDesc")} />
+								</div>
 								<div className="set-row">
 									<div className="set-row-info">
-										<div className="set-row-name">
-											{t("panelOpacityTitle")}
-											<HintTip text={t("panelOpacityDesc")} />
-										</div>
 										<div className="wallpaper-sliders">
 											<label className="wallpaper-slider">
-												<span>{t("panelOpacityLabel")}</span>
+												<span>{t("windowOpacityLabel")}</span>
 												<input
 													type="range"
 													min={0}
 													max={100}
 													step={1}
-													value={panelOpacity}
-													onChange={(e) => savePanelOpacity(Number(e.target.value))}
+													value={windowOpacity}
+													disabled={!windowTransparent}
+													onChange={(e) => saveWindowOpacity(Number(e.target.value))}
 												/>
-												<output>{panelOpacity}%</output>
+												<output>{windowOpacity}%</output>
 											</label>
 										</div>
 									</div>
 								</div>
+								<ToggleRow
+									title={t("windowTransparentTitle")}
+									tip={t("windowTransparentDesc")}
+									enabled={windowTransparent}
+									onToggle={() => saveWindowTransparent(!windowTransparent)}
+								/>
 							</div>
 						)}
 

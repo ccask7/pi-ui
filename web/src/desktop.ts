@@ -12,6 +12,8 @@ export interface DesktopShellWindow {
 		isDesktop?: unknown;
 		updater?: unknown;
 		setTitleBarOverlay?: (color: string, symbolColor: string, height?: number) => Promise<unknown>;
+		getWindowTransparent?: () => Promise<{ transparent: boolean }>;
+		setWindowTransparent?: (on: boolean) => Promise<{ transparent: boolean }>;
 	};
 	navigator?: { userAgent?: unknown };
 }
@@ -66,6 +68,16 @@ export function syncTitlebarOverlay(): void {
 	if (!isDesktopShell()) return;
 	const api = (window as unknown as DesktopShellWindow).piDesktop;
 	if (typeof api?.setTitleBarOverlay !== "function") return;
+	// 整体不透明度 < 100 时窗口是透明的：按钮条必须一起交给系统（00 alpha），
+	// 否则右上角会留一块实色矩形，和整窗的透出效果对不上。
+	const rawOpacity = getComputedStyle(document.documentElement).getPropertyValue("--window-opacity").trim();
+	const opacity = rawOpacity.endsWith("%") ? Number(rawOpacity.slice(0, -1)) : Number(rawOpacity);
+	if (Number.isFinite(opacity) && opacity < 100) {
+		const boxT = document.querySelector(".topbar")?.getBoundingClientRect();
+		const heightT = boxT && boxT.height > 0 ? Math.round(boxT.height) : undefined;
+		void api.setTitleBarOverlay("#00000000", "#e4e4e7", heightT);
+		return;
+	}
 	const layers: Rgba[] = [];
 	for (const selector of [".topbar", "body"]) {
 		const el = document.querySelector(selector);

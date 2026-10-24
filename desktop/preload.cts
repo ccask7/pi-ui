@@ -27,4 +27,10 @@ contextBridge.exposeInMainWorld("piDesktop", {
 	/** 主题切换后同步标题栏按钮条（WCO）颜色与高度；颜色只收不透明 hex6，高度是顶栏实测像素。 */
 	setTitleBarOverlay: (color: string, symbolColor: string, height?: number): Promise<void> =>
 		ipcRenderer.invoke("desktop:titlebar-overlay", color, symbolColor, height),
+	/** 读「窗口透明」开关的权威值（主进程 window-prefs.json）。 */
+	getWindowTransparent: (): Promise<{ transparent: boolean }> =>
+		ipcRenderer.invoke("desktop:get-window-transparent"),
+	/** 写「窗口透明」开关：主进程会重建窗口（transparent 是构造期选项）。 */
+	setWindowTransparent: (on: boolean): Promise<{ transparent: boolean }> =>
+		ipcRenderer.invoke("desktop:set-window-transparent", on),
 });

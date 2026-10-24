@@ -111,17 +111,42 @@ export function useTheme() {
 	return { themes, theme, switchTheme, reloadThemes };
 }
 
+/**
+ * 把 CSS 颜色（hex/rgb/color-mix 计算结果）+ 窗口 alpha 组成 xterm 认识的
+ * `rgba()`：xterm 自己的颜色解析器不认 `color-mix()`，所以这里借一个探针元素
+ * 让浏览器把 `--term-bg` 解析成 rgb() 三元组，再补 alpha。
+ */
+function termBackground(alpha: number): string {
+	// 必须解析成 rgb()/rgba()：xterm 自己解析颜色，不认 `var(--term-bg)`。
+	const probe = document.createElement("span");
+	probe.style.color = "var(--term-bg)";
+	probe.style.display = "none";
+	document.body.appendChild(probe);
+	const rgb = getComputedStyle(probe).color;
+	probe.remove();
+	const nums = rgb.match(/[\d.]+/g);
+	if (!nums || nums.length < 3) return alpha >= 1 ? "rgb(11, 13, 18)" : "transparent";
+	const [r, g, b] = nums.slice(0, 3).map((n) => Math.round(Number(n)));
+	if (alpha >= 1) return `rgb(${r}, ${g}, ${b})`;
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 /** CSS variable → xterm theme. Reads the --term-* palette from the *currently
  * applied* stylesheet (the injected theme <link>), so the terminal canvas
- * follows the active theme automatically. Defaults mirror the dark theme. */
+ * follows the active theme automatically. Defaults mirror the dark theme.
+ * 底色额外乘「整体不透明度」（--window-opacity）：窗口调透明后终端画布也得透，
+ * 否则整块终端视图是唯一不跟手的区域（转成 rgba + allowTransparency）。 */
 export function buildTermTheme(): Record<string, string> {
 	const cs = getComputedStyle(document.documentElement);
 	const v = (name: string, fallback: string) => {
 		const val = cs.getPropertyValue(name).trim();
 		return val || fallback;
 	};
+	const rawAlpha = cs.getPropertyValue("--window-opacity").trim();
+	const alpha = rawAlpha.endsWith("%") ? Number(rawAlpha.slice(0, -1)) / 100 : Number(rawAlpha);
+	const bgAlpha = Number.isFinite(alpha) ? Math.min(1, Math.max(0, alpha)) : 1;
 	return {
-		background: v("--term-bg", "#0b0d12"),
+		background: termBackground(bgAlpha),
 		foreground: v("--term-fg", "#e6e8ef"),
 		cursor: v("--term-cursor", "#8b5cf6"),
 		cursorAccent: v("--term-cursor-accent", "#0b0d12"),

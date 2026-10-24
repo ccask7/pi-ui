@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import type { CommandDef } from "../types";
 import { buildTermTheme, THEME_CHANGE_EVENT } from "../theme";
+import { WINDOW_OPACITY_CHANGE_EVENT } from "../window-opacity";
 import { shouldStartTouchScroll, touchWheelDeltaY } from "../term-touch";
 import { useI18n } from "../i18n";
 import { appSend } from "../app-globals";
@@ -86,6 +87,8 @@ export function TermXterm({
 		if (!container) return;
 
 		const term = new Terminal({
+			// 整体不透明度 < 100 时画布要能透出底下的壁纸/桌面（见 buildTermTheme）。
+			allowTransparency: true,
 			theme: buildTermTheme(),
 			fontFamily: '"SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace',
 			fontSize: 13,
@@ -104,6 +107,8 @@ export function TermXterm({
 			term.options.theme = buildTermTheme();
 		};
 		window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+		// 整体不透明度改了，终端画布底色（rgba）也要重算，否则它停在旧 alpha。
+		window.addEventListener(WINDOW_OPACITY_CHANGE_EVENT, onThemeChange);
 
 		// xterm maps Ctrl+V to ^V (0x16, readline quoted-insert) and Ctrl+C to
 		// ^C, preventDefault()ing both, so the browser's native copy/paste never
