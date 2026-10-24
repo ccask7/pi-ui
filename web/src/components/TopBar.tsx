@@ -9,6 +9,7 @@ import {
 	FiTerminal,
 } from "react-icons/fi";
 import type { ChatState } from "../use-chat";
+import { appUrl } from "../base-url";
 import { PluginIcon } from "../plugin-icon";
 import { useI18n } from "../i18n";
 import type { UiSlotEntry } from "../ui-slots";
@@ -152,7 +153,8 @@ export function TopBar({
 	const hostNodes: Record<string, ReactNode> = {
 		"host:brand": (
 			<span className="brand">
-				<span className="brand-logo">π</span>
+				{/* 与应用图标同一份资产（make-icons.mjs 产出），顶栏不再自己画 π 字形。 */}
+				<img className="brand-logo" src={appUrl("/icons/icon-64.png")} alt="" aria-hidden="true" draggable={false} />
 				<span className="brand-name">ccui</span>
 			</span>
 		),

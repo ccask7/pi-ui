@@ -179,7 +179,7 @@ export function applyUiSlotCardinality<T extends { id: string; hidden: boolean }
 /**
  * 宿主内置条目 —— **逐项对应代码里真实存在的入口**（不臆造）：
  *
- *   topbar.primary   web/src/components/TopBar.tsx：品牌（π 标识＋名称合一） /
+ *   topbar.primary   web/src/components/TopBar.tsx：品牌（应用图标＋名称合一） /
  *                    ＋ newChat /
  *                    视图开关三连（chat·terminal·git，缺省 align=end）/ 搜索 / 浏览器操作 /
  *                    后台任务 / 设置 / 声音 / 语言 / 主题 / 版本（更新）/ GitHub。
@@ -226,7 +226,7 @@ export function applyUiSlotCardinality<T extends { id: string; hidden: boolean }
  *                    file.preview.toolbar 在 FilePreview 的 .fp-head-actions 尾部。
  */
 export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
-	// ---- 品牌（左上角 π 标识与名称合一） ----
+	// ---- 品牌（左上角应用图标与名称合一） ----
 	// kind=badge：纯展示，无动作。单一条目承载整个品牌块（渲染层见 TopBar 的 host:brand），
 	// 对齐/隐藏/改名/调序全部直通 —— 不再有「名称的 align 存而不用」的双 id 包袱。
 	// TABS 白名单不管品牌（渲染层不用 tabOn 判断它）。
@@ -238,7 +238,7 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		order: 1,
 		group: "brand",
 	},
-	// 「打开项目」：品牌之后的第一个动作按钮（缺省落顶栏左区，手机端在 ☰ / π 之后）。
+	// 「打开项目」：品牌之后的第一个动作按钮（缺省落顶栏左区，紧贴品牌之后）。
 	// 点开的是与左栏 📁+ 同一个项目选择器（浏览磁盘目录 / 选当前目录 / ＋新建项目后切过去）——
 	// 宿主实现留在拥有它的组件内（TopBar 的 hostNodes，`host:*` 的惯例）。
 	{
