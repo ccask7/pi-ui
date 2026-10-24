@@ -159,7 +159,6 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 	it("无插件、无偏好时：返回全部槽位，按 order 排序，文案走 t(labelKey)", () => {
 		const slots = build([]);
 		expect(ids(slots["topbar.primary"])).toEqual([
-			"host:history",
 			"host:brand",
 			"host:open-project",
 			"host:chat",
@@ -208,14 +207,14 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 
 	/** 这条断言是「顶栏默认长什么样」的唯一入口 —— 想改默认口径就改这里与 BUILTIN_UI_ITEMS。
 	 *  「⋯」溢出菜单删除后不再有「缺省收进菜单」的条目：默认全常驻，放不下就横向滚动。 */
-	it("默认没有隐藏条目，常驻 10 条", () => {
+	it("默认没有隐藏条目，常驻 9 条", () => {
 		const slots = build([]);
 		const top = slots["topbar.primary"];
 		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual([]);
 		// 常驻 = 「切视图（chat/terminal/git） / 起新活（new-ephemeral-chat） /
-		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目、搜索、左栏开关
+		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目、搜索
+		// （面板开关 ☰/📁 已从顶栏删除，侧栏入口改由面板边缘展开条承担）
 		expect(top.filter((e) => !e.hidden).map((e) => e.id)).toEqual([
-			"host:history",
 			"host:brand",
 			"host:open-project",
 			"host:chat",
@@ -546,15 +545,15 @@ describe("buildUiSlots / 第 4 层：用户偏好（最高）", () => {
 	it("order 列表：列出的按列表顺序排在最前，未列出的保持原顺序", () => {
 		const slots = build([], { layout: { order: ["host:tasks", "host:chat"] } });
 		expect(ids(slots["topbar.primary"]).slice(0, 2)).toEqual(["host:tasks", "host:chat"]);
-		// 其余仍按权重排：tasks/chat 置顶之后是 history(0) → brand(1) → open-project(3) …
-		expect(ids(slots["topbar.primary"]).slice(2, 5)).toEqual(["host:history", "host:brand", "host:open-project"]);
+		// 其余仍按权重排：tasks/chat 置顶之后是 brand(1) → open-project(3) → chat/terminal/git …
+		expect(ids(slots["topbar.primary"]).slice(2, 5)).toEqual(["host:brand", "host:open-project", "host:terminal"]);
 		expect(slots["topbar.primary"].find((e) => e.id === "host:chat")?.userOverrides).toEqual(["order"]);
 	});
 
 	it("order 列表里的历史 id（条目已不存在）被忽略", () => {
-		// host:files 曾是真条目、现已删除 → 与幽灵 id 一样被忽略，不能顶到第一位
-		const slots = build([], { layout: { order: ["ghost:gone", "host:files"] } });
-		expect(ids(slots["topbar.primary"])[0]).toBe("host:history");
+		// host:files / host:history 都曾是真条目、现已删除 → 与幽灵 id 一样被忽略，不能顶到第一位
+		const slots = build([], { layout: { order: ["ghost:gone", "host:files", "host:history"] } });
+		expect(ids(slots["topbar.primary"])[0]).toBe("host:brand");
 		expect(slots["topbar.primary"]).toHaveLength(BUILTIN_UI_ITEMS.filter((i) => i.slot === "topbar.primary").length);
 	});
 

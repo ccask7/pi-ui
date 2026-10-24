@@ -2,7 +2,6 @@ import { Fragment, useState, type ReactNode } from "react";
 import {
 	FiFolderPlus,
 	FiGitBranch,
-	FiMenu,
 	FiMessageSquare,
 	FiSearch,
 	FiSettings,
@@ -54,7 +53,6 @@ interface TopBarProps {
 	/** 顶栏右键菜单的条目（contextmenu.topbar 槽位；插件可往里加项）。 */
 	uiContextTopbar?: UiSlotEntry[];
 	/** Open a side panel as a mobile drawer ("left" = history, "right" = files). */
-	onOpenPanel: (side: "left" | "right") => void;
 	/** Open the settings panel (system prompt / skills / extensions / presets). */
 	onOpenSettings: () => void;
 	/** Open the background-task panel (AI-started servers — stop individually or all). */
@@ -71,7 +69,6 @@ export function TopBar({
 	uiContextTopbar,
 	onUiAction,
 	onViewChange,
-	onOpenPanel,
 	onOpenSettings,
 	onOpenBgTasks,
 	onOpenGlobalSearch,
@@ -100,7 +97,6 @@ export function TopBar({
 	 * 没拿到 slot 数据就把顶栏清空是最糟的降级（与旧版 hostOn 同口径）。
 	 */
 	const FALLBACK_TOPBAR_IDS = [
-		"host:history",
 		"host:brand",
 		"host:open-project",
 		"host:chat",
@@ -172,24 +168,6 @@ export function TopBar({
 				<span className="chip-sub">{t("openProject")}</span>
 			</button>
 		),
-		// 面板抽屉开关只在 chat 视图渲染：抽屉节点躺在 chat 视图的面板树里
-		// （App.tsx 的 .panel-drawer 是 `.view-pane` 的子节点，非 chat 视图整棵
-		// display:none），所以终端 / Git / 插件视图里点它只会拉出一层遮罩、
-		// 抽屉永远不出现 —— 而且顶栏这个 ☰ 会和终端面板自己的 ☰ 并排成两个。
-		"host:history":
-			view === "chat" && tabOn("history") ? (
-				<button
-					type="button"
-					className="panel-toggle"
-					data-tip={t("openHistory")}
-					// 纯图标按钮：可访问名称只能走 aria-label（title 会和 data-tip
-					// 的即时气泡叠成双提示，故顶栏直流内一律不用原生 title）。
-					aria-label={t("openHistory")}
-					onClick={() => onOpenPanel("left")}
-				>
-					<FiMenu />
-				</button>
-			) : null,
 		"host:new-ephemeral-chat": (
 			<button
 				type="button"

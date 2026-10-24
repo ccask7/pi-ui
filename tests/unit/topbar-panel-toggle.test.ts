@@ -19,9 +19,8 @@ import { setAppSend, setAppGlobals, resetAppGlobals } from "../../web/src/app-gl
  * 三个容器 + align 落三个容器区」的旧结构。重构后这些容器与例外全部删除 ——
  * 谁再往顶栏塞结构性包装（按种类分组、把某个条目钉死在一端），这里就会红。
  *
- * 另含 `.panel-toggle`（☰ 历史 / 📁 文件）的**视图门禁**：抽屉节点是 chat 视图面板树的
- * 子节点，非 chat 视图整棵 display:none，画出来只会给一个点了没反应的按钮（手机上还会
- * 和终端面板自己的 ☰ 并排成两个）。
+ * 面板开关（☰ 历史 / 📁 文件）已全部从顶栏删除 —— 侧栏入口只剩面板边缘的展开条
+ * （`PanelRail`）与面板自己的收起键，所以这里不再有「抽屉按钮」的断言。
  *
  * 零 token / 零端口：真 jsdom + 真 React 渲染，只断言 DOM 结构与回调。
  */
@@ -135,7 +134,7 @@ describe("TopBar 是单一扁直流（无按种类包裹的容器、无贴边例
 		expect(container.querySelector(".view-switch")).toBeNull();
 		expect(container.querySelector(".topbar-desktop")).toBeNull();
 		expect(container.querySelector(".topbar-actions")).toBeNull();
-		for (const sel of ['[role="tab"]', "button.panel-toggle", "button.newchat"]) {
+		for (const sel of ['[role="tab"]', "button.newchat"]) {
 			const el = flow!.querySelector(sel);
 			expect(el, sel).toBeTruthy();
 			expect(el!.parentElement, sel).toBe(flow);
@@ -171,33 +170,14 @@ describe("TopBar 是单一扁直流（无按种类包裹的容器、无贴边例
 		expect(spacerIndexes(container)).toEqual([]);
 	});
 
-	it("☰ 不再是贴边例外：位置只由 slot 顺序决定，点击仍开左栏", () => {
-		// history 排在 chat 之前 → 它就是第一个条目（旧版无论如何都钉在顶栏最左）
-		const { container, opened } = mount("chat", [hostEntry("host:history"), hostEntry("host:chat")]);
-		const items = flowItems(container);
-		expect(items[0].classList.contains("panel-toggle")).toBe(true);
-		act(() => (items[0] as HTMLButtonElement).click());
-		expect(opened).toEqual(["left"]);
-	});
-
-	it("align 对 ☰ 同样生效（不再被贴边规则吃掉）", () => {
-		const { container } = mount("chat", [hostEntry("host:chat"), { ...hostEntry("host:history"), align: "end" }]);
-		const [sp2] = spacerIndexes(container);
-		expect(sp2).toBeGreaterThanOrEqual(0);
-		const kids = flowKids(container);
-		expect(kids.findIndex((el) => el.classList.contains("panel-toggle"))).toBeGreaterThan(sp2);
-	});
-
 	it("文字总开关：topbarText=false 时 header 挂 no-labels（桌面手机同一套，无独立分支）", () => {
 		const { container } = mount("chat", undefined, undefined, undefined, {
 			settings: { uiLayout: { topbarText: false } },
 		});
 		expect(container.querySelector("header.topbar.no-labels")).toBeTruthy();
-		// 文字节点仍在 DOM（藏是 CSS 的事）；纯图标的 ☰ 抽屉开关在「只显示图标」下不变样。
+		// 文字节点仍在 DOM（藏是 CSS 的事）。
 		expect(container.querySelector(".brand-name")).toBeTruthy();
-		const toggle = container.querySelector(".topbar-flow .panel-toggle");
-		expect(toggle).toBeTruthy();
-		expect(toggle!.querySelector("svg")).toBeTruthy();
+		expect(container.querySelector(".topbar-flow .tb-tab")).toBeTruthy();
 	});
 
 	it("用 emoji 当图标的顶栏按钮带 .chip-emoji（免被「只显示图标」的 span 隐藏规则误杀）", () => {
@@ -261,36 +241,18 @@ describe("TopBar 是单一扁直流（无按种类包裹的容器、无贴边例
 	});
 });
 
-describe("TopBar 面板抽屉按钮的视图门禁", () => {
-	it("chat 视图：只剩 ☰ 一个面板按钮（右栏顶栏入口已删），点击开左栏", () => {
-		const { container, opened } = mount("chat");
-		const toggles = Array.from(container.querySelectorAll<HTMLButtonElement>("button.panel-toggle"));
-		expect(toggles.length).toBe(1);
-		// 纯图标的 ☰ 按钮没有可见文字：名字必须挂在 aria-label 上，否则读屏器无名。
-		expect(toggles[0].getAttribute("aria-label")).toBeTruthy();
-		act(() => toggles[0].click());
-		expect(opened).toEqual(["left"]);
-	});
-
-	// 这三个视图里抽屉节点都是 display:none 的（App.tsx 的 .view-pane.hidden）→
-	// 按钮点不出抽屉，只会留下遮罩；终端视图还额外有自己面板的 ☰，就是用户看到的两个。
-	for (const view of ["terminal", "git", "plugin:demo-mailbox"] as const) {
-		it(`${view} 视图：不渲染面板抽屉按钮`, () => {
+describe("顶栏不再有面板开关（☰ / 📁 均已删除）", () => {
+	// 右栏缺省收起 → 入口是右边缘展开条；左栏同理。顶栏不该再出现任何 .panel-toggle
+	// （类也一并删了，这里断言的是「结构上不存在」而不是 CSS 隐藏）。
+	for (const view of ["chat", "terminal", "git", "plugin:demo-mailbox"] as const) {
+		it(`${view} 视图：没有面板开关按钮`, () => {
 			const { container, opened } = mount(view);
 			expect(container.querySelectorAll("button.panel-toggle").length).toBe(0);
+			// 顶栏本身照常渲染（视图 tab 是每个视图都有的条目）。
+			expect(container.querySelector(".topbar-flow .tb-tab")).toBeTruthy();
 			expect(opened).toEqual([]);
 		});
 	}
-
-	// 布局页/插件 arrange 把内置入口藏了 → 主栏按钮消失，但它必须能从「⋯」溢出菜单点回来
-	// （issue #146：隐藏 ≠ 失去入口；否则用户一旦手滑藏了就会得到一个点了没反应的按钮，
-	//  这与设置面板「界面布局」页的承诺不符）。
-	it("隐藏 host:history 时不渲染面板按钮", () => {
-		const { container, opened } = mount("chat", [hostEntry("host:chat", false)]);
-		expect(container.querySelectorAll("button.panel-toggle").length).toBe(0);
-		expect(opened).toEqual([]);
-	});
-
 });
 
 describe("TopBar「打开项目」入口（host:open-project）", () => {

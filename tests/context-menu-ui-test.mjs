@@ -192,18 +192,11 @@ async function main() {
 	await page.waitForSelector(".chat-input, .inputbar, textarea", { timeout: 30000 });
 	await settle(page);
 
-	// 右栏（文件树）在桌面端默认展开；若被收起再点顶栏「文件列表」（**不能**用
-	// title*="文件" —— 全局搜索的提示文案里也有「文件」，会点开搜索弹窗盖住整个页面）。
+	// 右栏（文件树）在桌面端默认展开；若被收起就用右边缘的展开条拉出来
+	// （顶栏的「文件列表」按钮已删除，见 CHANGELOG）。
 	const dirRow = page.locator('.panel-right .file-item.dir[data-path="subproject"]').first();
 	if (!(await until(async () => (await dirRow.count()) > 0, 8, 250))) {
-		await tap(
-			page,
-			page
-				.locator(
-					'button.panel-toggle[aria-label*="文件列表"], button.panel-toggle[aria-label*="Files"], button[title*="文件列表"], button[title*="Files"]',
-				)
-				.first(),
-		);
+		await tap(page, page.locator(".panel-rail-right").first());
 	}
 	check("右栏文件树列出了子目录", await until(async () => (await dirRow.count()) > 0, 40, 250));
 
@@ -332,7 +325,7 @@ async function main() {
 	}
 
 	// ---- 左栏：会话右键（contextmenu.session 槽位） ------------------------
-	// 左栏桌面端默认展开（收起时才有点开它的 ☰，见 TopBar 的 panel-toggle）。
+	// 左栏桌面端默认展开（收起时用左边缘的 `.panel-rail-left` 展开条；顶栏的 ☰ 已删除）。
 	const leftPanel = page.locator(".panel-left").first();
 	check("左栏可见", await until(async () => (await leftPanel.count()) > 0, 30, 250));
 

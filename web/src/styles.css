@@ -357,7 +357,7 @@ body.panel-resizing {
 }
 
 /* ---- Panel chrome: collapse button / rail / header ---- */
-/* 收起按钮 resting 态即带底色 + 边框（与顶栏 .panel-toggle 同级），
+/* 收起按钮 resting 态即带底色 + 边框（与顶栏图标按钮同级），
    前景用 --control-fg（默认正文次级色）而非 --text-faint，避免在部分主题下
    因 --text-faint 与背景接近而看不见（issue #100）。 */
 .panel-collapse-btn {
@@ -1622,13 +1622,11 @@ button.session-item.elsewhere-item.confirm {
    .chip 全局生效；顶栏的非 chip 控件（视图 tab / 抽屉开关 / 插件条目/⋯按钮）同款。 */
 .chip[data-tip],
 .topbar .tb-tab[data-tip],
-.topbar .panel-toggle[data-tip],
 .topbar .plugin-topbar-item[data-tip] {
 	position: relative;
 }
 .chip[data-tip]::after,
 .topbar .tb-tab[data-tip]::after,
-.topbar .panel-toggle[data-tip]::after,
 .topbar .plugin-topbar-item[data-tip]::after {
 	content: attr(data-tip);
 	position: absolute;
@@ -1650,7 +1648,6 @@ button.session-item.elsewhere-item.confirm {
 }
 .chip[data-tip]:hover::after,
 .topbar .tb-tab[data-tip]:hover::after,
-.topbar .panel-toggle[data-tip]:hover::after,
 .topbar .plugin-topbar-item[data-tip]:hover::after {
 	opacity: 1;
 }
@@ -2400,11 +2397,6 @@ select.plugin-topbar-item.plugin-topbar-select {
 }
 .panel-drawer.hidden {
 	display: none;
-}
-/* 顶栏面板开关（今天只剩 ☰ 历史 / 左栏）：纯图标按钮，手机端移除后桌面直接可见。 */
-.panel-toggle {
-	display: inline-flex;
-	align-items: center;
 }
 /* 视图 tab 的胶囊外观已搬到 .tb-tab（顶栏扁平化：不再有 .view-switch 容器，
    每个 tab 是自己的一个条目，见 .topbar-flow 那一段）。 */
@@ -3824,7 +3816,6 @@ body.panel-resizing .scm-divider::after {
 .topbar.no-labels .chip > span:not(.bg-task-badge):not(.plugin-icon-svg):not(.plugin-icon-glyph):not(.chip-emoji),
 .topbar.no-labels .tb-tab > span:not(.plugin-icon-svg):not(.plugin-icon-glyph):not(.chip-emoji),
 .topbar.no-labels .plugin-topbar-item > span:not(.plugin-icon-svg):not(.plugin-icon-glyph):not(.chip-emoji),
-.topbar.no-labels .panel-toggle > span:not(.plugin-icon-svg):not(.plugin-icon-glyph):not(.chip-emoji),
 .topbar.no-labels .brand-name {
 	display: none;
 }
@@ -3834,7 +3825,6 @@ body.panel-resizing .scm-divider::after {
    （.bg-task-badge）还得占位。 */
 .topbar.no-labels .tb-tab,
 .topbar.no-labels .plugin-topbar-item,
-.topbar.no-labels .panel-toggle,
 .topbar.no-labels .chip:not(:has(svg ~ svg)):not(:has(.bg-task-badge)) {
 	width: var(--topbar-ctl-h);
 	padding: 0;
@@ -3850,7 +3840,7 @@ body.panel-resizing .scm-divider::after {
 
 /* 顶栏的**单一扁直流**（方案 A）：所有条目都是本容器的直接子节点 —— 没有按种类包裹的
    容器（曾经的 .brand / .view-switch / .topbar-desktop 三件套已删），也没有两端贴边的
-   例外；每个条目自己带外观（.chip / .tb-tab / .plugin-topbar-item / .panel-toggle）。
+   例外；每个条目自己带外观（.chip / .tb-tab / .plugin-topbar-item）。
 
    align（start/center/end）在两个 .tb-spacer 上生效：它们 flex:1 平分剩余空间，于是
    条目被分成左/中/右三段。已知取舍：中段只有在左右两段内容宽度相近时才**几何精确**居中

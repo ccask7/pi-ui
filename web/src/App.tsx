@@ -1295,7 +1295,6 @@ export function App() {
 					}
 					setView(v);
 				}}
-				onOpenPanel={(side) => (side === "right" ? toggleRight() : toggleLeft())}
 				onOpenSettings={() => {
 					setSettingsInitialSection(undefined);
 					setSettingsOpen(true);
