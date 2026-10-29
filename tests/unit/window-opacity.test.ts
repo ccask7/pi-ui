@@ -3,12 +3,9 @@
  * 只测纯函数与缺省值 —— localStorage / DOM 在 node 环境不可用，
  * load/save/apply 都带 try/catch，不在单测范围内。
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import {
-	DEFAULT_WINDOW_OPACITY,
-	WINDOW_OPACITY_VAR,
-	normalizeWindowOpacity,
-} from "../../web/src/window-opacity.js";
+import { DEFAULT_WINDOW_OPACITY, WINDOW_OPACITY_VAR, normalizeWindowOpacity } from "../../web/src/window-opacity.js";
 
 describe("normalizeWindowOpacity", () => {
 	it("合法数字原样保留（取整）", () => {
@@ -43,4 +40,28 @@ describe("normalizeWindowOpacity", () => {
 	it("变量名与 styles.css / theme.ts 的约定一致", () => {
 		expect(WINDOW_OPACITY_VAR).toBe("--window-opacity");
 	});
+});
+
+describe("内置 VS Code 主题的整体不透明度", () => {
+	// 这些主题覆盖宿主默认的半透明表面；若覆盖回实色，body 的窗口 alpha 会被
+	// 顶栏/侧栏/消息区完全挡住，表现为滑杆只在默认主题下有效。
+	const surfaces = [
+		"--topbar-bg",
+		"--statusbar-bg",
+		"--panel-bg",
+		"--card-bg",
+		"--chip-bg",
+		"--msgs-bg",
+		"--inputbox-bg",
+	];
+
+	for (const id of ["vs-code-dark", "vs-code-light"]) {
+		it(`${id} 的大面积背景跟随 --window-opacity`, () => {
+			const css = readFileSync(new URL(`../../themes/${id}.css`, import.meta.url), "utf8");
+			for (const token of surfaces) {
+				const declaration = css.match(new RegExp(`${token}:\\s*([^;]+);`))?.[1];
+				expect(declaration, token).toContain("var(--window-opacity, 100%)");
+			}
+		});
+	}
 });

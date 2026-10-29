@@ -160,8 +160,8 @@ check(
 	`${conversations.length} listed`,
 );
 check(
-	"workspace-switch notices fired",
-	notices.some((n) => n.includes("已切换到工作目录")),
+	"workspace-switch success tips stay silent",
+	!notices.some((n) => n.includes("已切换到工作目录") || n.includes("正在切换到工作目录")),
 	notices.join(" | "),
 );
 

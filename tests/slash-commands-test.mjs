@@ -143,16 +143,7 @@ async function main() {
 	// 协议 v2：动作后的快照可能是全量 snapshot，也可能是 snapshot_delta
 	// （light state 同样携带 cwd）——两者都必须接受（见 conv-cwd-test 写法）。
 	await c.wait((m) => (m.type === "snapshot" || m.type === "snapshot_delta") && norm(m.state?.cwd) === norm(TMP_CWD));
-	const cwdSwitching = await c
-		.wait((m) => m.type === "notice" && typeof m.text === "string" && m.text.includes("正在切换到工作目录"), 6000)
-		.catch(() => null);
-	const cwdOk = await c
-		.wait((m) => m.type === "notice" && typeof m.text === "string" && m.text.includes("已切换到工作目录"), 6000)
-		.catch(() => null);
-	if (!cwdOk || !cwdOk.text.includes("已切换到工作目录")) {
-		throw new Error("FAIL: /cwd valid path did not switch workspace");
-	}
-	console.log(`[3] /cwd valid → ${cwdSwitching ? cwdSwitching.text + " → " : ""}${cwdOk.text}`);
+	console.log(`[3] /cwd valid → workspace switched without success tips`);
 
 	c.send({ type: "prompt", text: "/cwd /nonexistent-zzz" });
 	const cwdBad = await c.wait(

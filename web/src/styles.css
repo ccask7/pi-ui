@@ -180,6 +180,11 @@
 	/* 输入框盒子：与控件级底板同式，共用 --wallpaper-panel-alpha（与 --chip-bg
 	   同 alpha），主题无需单独覆盖——想调厚薄直接调 --wallpaper-panel-alpha。 */
 	--inputbox-bg: color-mix(in srgb, var(--bg-elev2) var(--wallpaper-panel-alpha, 62%), transparent);
+	--input-border: var(--border);
+	--chat-tabs-bg: transparent;
+	--chat-tab-bg: transparent;
+	--chat-tab-active-bg: var(--chip-bg);
+	--chat-tab-hover-bg: color-mix(in srgb, var(--bg-elev2) 45%, transparent);
 	/* 下拉弹窗/菜单背景（声音/语言/主题/模型选择/思考强度/版本更新等 .dd-menu）：
 	   必须实色——密集列表叠在消息流上，半透会透出底下文字无法阅读；
 	   所以默认直接用 --bg-elev2 实色，不跟随 --chip-bg 的壁纸半透。 */
@@ -1186,6 +1191,111 @@ button.session-item.elsewhere-item.confirm {
 	font-size: 10.5px;
 	color: var(--text-faint);
 	flex-shrink: 0;
+}
+
+/* 项目 → 历史会话：轻量分组、无 guide line，当前会话用中性整行底色。 */
+.lp-tree-heading {
+	cursor: default;
+}
+.lp-tree-heading:hover {
+	color: var(--text-faint);
+	background: transparent;
+}
+.project-tree-scroll {
+	padding: 2px 8px 8px;
+}
+.lp-tree-project + .lp-tree-project {
+	margin-top: 6px;
+}
+.lp-tree-project-row {
+	min-height: 32px;
+}
+.lp-tree-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 18px;
+	width: 18px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-faint);
+	font-size: 11px;
+	cursor: pointer;
+}
+.lp-tree-toggle:hover {
+	color: var(--text);
+}
+.lp-tree-toggle:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -2px;
+}
+.lp-row.lp-tree-project-row .project-item {
+	flex: 0 1 auto;
+	gap: 6px;
+	min-height: 30px;
+	margin-bottom: 0;
+	padding: 5px 2px;
+	border-radius: 4px;
+}
+.lp-tree-project-row .project-item:hover {
+	background: var(--glow-05);
+}
+.lp-row.lp-tree-project-row .project-item.active {
+	padding: 5px 2px;
+	border: 0;
+	background: transparent;
+	color: var(--text);
+}
+.lp-tree-project-row .project-info {
+	flex: 0 1 auto;
+}
+.lp-tree-project-row .project-name {
+	font-weight: 500;
+}
+.lp-tree-project-row .project-item.active .project-name {
+	font-weight: 600;
+}
+.lp-tree-project-row .project-item.active .project-icon {
+	color: var(--text-dim);
+}
+.lp-tree-children {
+	position: relative;
+	margin-left: 16px;
+}
+.lp-tree-session-row .session-item {
+	gap: 6px;
+	min-height: 30px;
+	margin-bottom: 0;
+	padding: 5px 7px;
+	border-radius: 4px;
+}
+.lp-tree-session-row .session-item:hover {
+	background: var(--glow-05);
+}
+.lp-tree-session-row .session-item.active,
+.lp-tree-session-row .session-item.active:hover {
+	padding: 5px 7px;
+	border: 0;
+	background: var(--bg-elev2);
+	color: var(--text);
+	box-shadow: none;
+}
+.lp-tree-session-row .session-item.active .session-title {
+	font-weight: 600;
+}
+.lp-tree-session-row .session-time {
+	font-size: 10px;
+}
+.lp-tree-empty {
+	padding: 7px 7px 9px;
+	text-align: left;
+	font-size: 11px;
+}
+.lp-tree-project-row .lp-del.lp-project-new-chat:hover {
+	color: var(--accent);
+	background: var(--accent-soft);
 }
 
 /* 左栏行包装 + 悬停删除按钮（最近项目 / 历史对话的两步确认删除）：
@@ -3326,7 +3436,7 @@ body.panel-resizing .scm-divider::after {
 	padding: 5px 16px;
 	border-top: 1px solid var(--border);
 	background: var(--statusbar-bg, var(--bg-elev));
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--text-faint);
 	white-space: nowrap;
 	overflow: hidden;
@@ -3361,40 +3471,15 @@ body.panel-resizing .scm-divider::after {
 	color: var(--border);
 }
 
-.ctx-bar {
-	display: inline-block;
-	position: relative;
-	width: 46px;
-	height: 5px;
-	border-radius: 3px;
-	background: var(--bg-elev2);
-	border: 1px solid var(--border-soft);
-	overflow: hidden;
-	vertical-align: middle;
+.status-ctx,
+.status-token-stats {
+	font-variant-numeric: tabular-nums;
 }
-/* 压缩软上限标记线（issue #229）：琥珀色竖线，到线即自动压缩 */
-.ctx-cap-marker {
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	width: 2px;
-	margin-left: -1px;
-	background: var(--amber);
+.status-ctx.mid {
+	color: var(--amber);
 }
-.ctx-bar-fill {
-	display: block;
-	height: 100%;
-	border-radius: 2px;
-	transition: width 0.3s ease;
-}
-.ctx-bar.ok .ctx-bar-fill {
-	background: var(--green);
-}
-.ctx-bar.mid .ctx-bar-fill {
-	background: var(--amber);
-}
-.ctx-bar.warn .ctx-bar-fill {
-	background: var(--red);
+.status-ctx.warn {
+	color: var(--red);
 }
 
 /* 实时缓存命中率 (footer) — 颜色镜像 catop 的命中阈值 */
@@ -3456,11 +3541,6 @@ body.panel-resizing .scm-divider::after {
 	margin-left: auto;
 }
 
-.status-host-metrics {
-	flex-shrink: 0;
-	font-variant-numeric: tabular-nums;
-}
-
 /* Right-aligned workspace path in the status bar — click to edit. */
 .status-cwd {
 	max-width: 100%;
@@ -3472,7 +3552,7 @@ body.panel-resizing .scm-divider::after {
 	border: 1px solid var(--border);
 	background: var(--bg-elev);
 	font: inherit;
-	font-size: 11px;
+	font-size: 12px;
 	cursor: pointer;
 	padding: 2px 8px;
 	border-radius: 5px;
@@ -6290,6 +6370,99 @@ span.msg-editor-hint svg {
 	border: 1px solid var(--border);
 }
 
+/* ----------------------------------------------------- activity timeline */
+
+.activity-group {
+	margin: 6px 0 10px;
+	color: var(--text-dim);
+	font-size: 12px;
+}
+
+.activity-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	min-height: 30px;
+	padding: 3px 4px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.activity-head:hover {
+	background: var(--glow-05);
+	color: var(--text);
+}
+
+.activity-chevron,
+.activity-state {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 14px;
+	height: 18px;
+}
+
+.activity-state {
+	color: var(--text-faint);
+}
+
+.activity-state.running {
+	color: var(--accent);
+}
+
+.activity-state.running > svg {
+	animation: toolcall-spin 1s linear infinite;
+}
+
+.activity-state.error,
+.activity-group.failed .activity-title {
+	color: var(--red);
+}
+
+.activity-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.activity-timeline {
+	margin: 2px 0 4px 10px;
+	padding-left: 10px;
+	border-left: 1px solid var(--border-soft);
+}
+
+.activity-timeline .thinking,
+.activity-timeline .toolcall {
+	margin: 2px 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	box-shadow: none;
+}
+
+.activity-timeline .chead {
+	min-height: 30px;
+	padding: 2px 4px;
+	border-radius: 4px;
+}
+
+.activity-timeline .thinking-icon {
+	display: none;
+}
+
+.activity-timeline .thinking-body,
+.activity-timeline .toolcall-body {
+	margin-left: 26px;
+	border-top: 0;
+}
+
 /* -------------------------------------------------------------- thinking */
 
 .thinking {
@@ -8590,7 +8763,7 @@ div.chead[role="button"]:focus-visible,
 	flex-direction: column;
 	gap: 8px;
 	background: var(--inputbox-bg, var(--bg-elev2));
-	border: 1px solid var(--border);
+	border: 1px solid var(--input-border);
 	border-radius: 16px;
 	padding: 10px;
 	transition:
@@ -13256,9 +13429,9 @@ html.desktop-shell .topbar .tb-spacer {
 	align-items: stretch;
 	flex: none;
 	height: 32px;
-	/* 只在对话区顶部：底色透明，直接叠 .main 的玻璃底（--msgs-bg），
-	   壁纸/半透明主题下与消息区同色，不会多出一条更亮的带子。 */
-	background: transparent;
+	/* 只在对话区顶部：默认透明，直接叠 .main 的玻璃底（--msgs-bg）；
+	   VS Code 主题覆盖为官方 tabsBackground，让活动标签与编辑区同色。 */
+	background: var(--chat-tabs-bg);
 	border-bottom: 1px solid var(--border-soft);
 	overflow-x: auto;
 	overflow-y: hidden;
@@ -13271,14 +13444,14 @@ html.desktop-shell .topbar .tb-spacer {
 	max-width: 240px;
 	border-right: 1px solid var(--border-soft);
 	color: var(--text-dim);
-	background: transparent;
+	background: var(--chat-tab-bg);
 }
 .chat-tab:hover {
-	background: color-mix(in srgb, var(--bg-elev2) 45%, transparent);
+	background: var(--chat-tab-hover-bg);
 }
 .chat-tab.active {
 	color: var(--text);
-	background: var(--chip-bg);
+	background: var(--chat-tab-active-bg);
 	/* 顶部 2px 强调线 = 当前标签（VS Code 的 active tab 语言） */
 	box-shadow: inset 0 2px 0 var(--accent);
 }

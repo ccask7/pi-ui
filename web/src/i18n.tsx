@@ -186,6 +186,7 @@ export const zh = {
 
 	/* left panel */
 	recentProjects: "最近项目",
+	projects: "项目",
 	runningConversations: "运行的对话",
 	elsewhereBadge: "另一处",
 	elsewhereTip: "在其他标签页 / 设备上打开的对话（运行中或已结束未关闭，右键可过户到本页查看）",
@@ -749,6 +750,8 @@ export const zh = {
 	/* thinking block */
 	thinkingNow: "思考中",
 	thinkingPreview: "思考：{preview}",
+	activityWorking: "正在工作 · {action}",
+	activityWorked: "已工作 {duration}",
 
 	/* terminal panel */
 	commands: "命令",
@@ -1645,6 +1648,7 @@ const en: Record<keyof typeof zh, string> = {
 
 	/* left panel */
 	recentProjects: "Recent projects",
+	projects: "Projects",
 	runningConversations: "Running chats",
 	elsewhereBadge: "Elsewhere",
 	elsewhereTip:
@@ -2218,6 +2222,8 @@ const en: Record<keyof typeof zh, string> = {
 	/* thinking block */
 	thinkingNow: "Thinking",
 	thinkingPreview: "Thinking: {preview}",
+	activityWorking: "Working · {action}",
+	activityWorked: "Worked for {duration}",
 
 	/* terminal panel */
 	commands: "Commands",

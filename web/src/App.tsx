@@ -1404,6 +1404,7 @@ export function App() {
 								sessionFile={chat.state?.sessionFile ?? null}
 								conversations={chat.conversations}
 								sessions={chat.sessions}
+								projectSessions={chat.projectSessions}
 								projects={chat.projects}
 								pathCompletions={chat.pathCompletions}
 								activeConversationId={chat.activeConversationId}

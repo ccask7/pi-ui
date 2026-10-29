@@ -511,6 +511,7 @@ export type ClientMessage =
 	 *  应答 `tool_info`。引擎不支持枚举工具定义时回 `unsupported: true`。 */
 	| { type: "get_tool_info"; name: string }
 	| { type: "list_sessions" }
+	| { type: "list_project_sessions"; path: string }
 	| { type: "switch_session"; path: string }
 	| { type: "switch_conversation"; id: string }
 	/** 手动过户：把另一处（elsewhere 行，owner/convId 标识）的对话整体搬到本页
@@ -2280,6 +2281,7 @@ export type ServerMessage =
 	/** Sent every ~2s so clients can detect half-open connections and display host metrics. */
 	| { type: "heartbeat"; hostMetrics?: UiHostMetrics }
 	| { type: "sessions"; sessions: SessionSummary[] }
+	| { type: "project_sessions"; path: string; sessions: SessionSummary[] }
 	/** Filename matches for the global search panel (reqId echo). Always sent
 	 *  in reply to a search_files request — ok:false means the walk failed. */
 	| {

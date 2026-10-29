@@ -31,6 +31,7 @@ import { Markdown, PluginWidgetBlock } from "./Markdown";
 import { StreamMarkdown } from "./StreamMarkdown";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolCallBlock, type ToolView } from "./ToolCallBlock";
+import { ActivityGroup } from "./ActivityGroup";
 import { useT, type Translate } from "../i18n";
 import { parseSkillBlock, type SkillBlock } from "../skill-block";
 import { isRasterImage, fileToProcessedImage } from "../image-paste";
@@ -641,6 +642,63 @@ export const Message = memo(function Message({
 	const exportForceThinking = exportSelected && exportImage.includeThinking;
 	const exportForceTools = exportSelected && exportImage.includeTools;
 
+	/** 一次助手回复只保留一个过程收纳；自然语言文本仍按原顺序独立显示。 */
+	const renderContent = (skipText = false): ReactNode[] => {
+		const activity =
+			message.role === "assistant" ? message.content.filter((block) => asThinking(block) || asToolCall(block)) : [];
+		let activityInserted = false;
+		const nodes: ReactNode[] = [];
+		message.content.forEach((block, i) => {
+			if (skipText && block.type === "text") return;
+			if (activity.length > 0 && (asThinking(block) || asToolCall(block))) {
+				if (activityInserted) return;
+				activityInserted = true;
+				nodes.push(
+					<ActivityGroup
+						key={`${message.id}-activity`}
+						blocks={activity}
+						startedAt={message.timestamp ?? Date.now()}
+						toolResults={toolResults}
+						liveOutputs={liveOutputs}
+						toolStatuses={toolStatuses}
+						streaming={streaming && isLast}
+						onKillBash={onKillBash}
+						toolsWrap={toolsWrap}
+						toolImages={toolImages}
+						thinkingWrap={thinkingWrap}
+						forceOpen={searchActive || exportForceThinking || exportForceTools}
+						uiContextToolCall={uiContextToolCall}
+						onUiAction={onUiAction}
+					/>,
+				);
+				return;
+			}
+			nodes.push(
+				<Block
+					key={`${message.id}-${i}`}
+					block={block}
+					toolResults={toolResults}
+					liveOutputs={liveOutputs}
+					toolStatuses={toolStatuses}
+					streaming={streaming}
+					isLast={isLast}
+					onKillBash={onKillBash}
+					toolsWrap={toolsWrap}
+					toolImages={toolImages}
+					thinkingWrap={thinkingWrap}
+					searchActive={searchActive}
+					forceThinking={exportForceThinking}
+					forceTools={exportForceTools}
+					role={message.role}
+					showCopy={copyAllowed}
+					uiContextToolCall={uiContextToolCall}
+					onUiAction={onUiAction}
+				/>,
+			);
+		});
+		return nodes;
+	};
+
 	return (
 		<div
 			ref={cardRef}
@@ -826,79 +884,14 @@ export const Message = memo(function Message({
 										<Markdown text={skillBlock.userMessage} hardBreaks />
 									</div>
 								)}
-								{message.content.map((block, i) =>
-									block.type === "text" ? null : (
-										<Block
-											key={`${message.id}-${i}`}
-											block={block}
-											toolResults={toolResults}
-											liveOutputs={liveOutputs}
-											toolStatuses={toolStatuses}
-											streaming={streaming}
-											isLast={isLast}
-											onKillBash={onKillBash}
-											toolsWrap={toolsWrap}
-											toolImages={toolImages}
-											thinkingWrap={thinkingWrap}
-											searchActive={searchActive}
-											forceThinking={exportForceThinking}
-											forceTools={exportForceTools}
-											role={message.role}
-											showCopy={copyAllowed}
-											uiContextToolCall={uiContextToolCall}
-											onUiAction={onUiAction}
-										/>
-									),
-								)}
+								{renderContent(true)}
 							</>
 						) : isCustomWidget ? (
 							<PluginWidgetBlock type={message.customType ?? ""} code={widgetPayload}>
-								{message.content.map((block, i) => (
-									<Block
-										key={`${message.id}-${i}`}
-										block={block}
-										toolResults={toolResults}
-										liveOutputs={liveOutputs}
-										toolStatuses={toolStatuses}
-										streaming={streaming}
-										isLast={isLast}
-										onKillBash={onKillBash}
-										toolsWrap={toolsWrap}
-										toolImages={toolImages}
-										thinkingWrap={thinkingWrap}
-										searchActive={searchActive}
-										forceThinking={exportForceThinking}
-										forceTools={exportForceTools}
-										role={message.role}
-										showCopy={copyAllowed}
-										uiContextToolCall={uiContextToolCall}
-										onUiAction={onUiAction}
-									/>
-								))}
+								{renderContent()}
 							</PluginWidgetBlock>
 						) : (
-							message.content.map((block, i) => (
-								<Block
-									key={`${message.id}-${i}`}
-									block={block}
-									toolResults={toolResults}
-									liveOutputs={liveOutputs}
-									toolStatuses={toolStatuses}
-									streaming={streaming}
-									isLast={isLast}
-									onKillBash={onKillBash}
-									toolsWrap={toolsWrap}
-									toolImages={toolImages}
-									thinkingWrap={thinkingWrap}
-									searchActive={searchActive}
-									forceThinking={exportForceThinking}
-									forceTools={exportForceTools}
-									role={message.role}
-									showCopy={copyAllowed}
-									uiContextToolCall={uiContextToolCall}
-									onUiAction={onUiAction}
-								/>
-							))
+							renderContent()
 						)}
 						{isEmptyStreaming && (
 							<div className="thinking-wait">

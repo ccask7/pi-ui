@@ -961,6 +961,7 @@ export interface DispatchSession {
 	 *  会永远停在「读取中」）。 */
 	getToolInfo?(name: string): void | Promise<void>;
 	refreshSessions(): Promise<void>;
+	refreshProjectSessions?(path: string): Promise<void>;
 	pushProjects(): Promise<void>;
 	removeProject(path: string): Promise<void>;
 	deleteSession(path: string): Promise<void>;
@@ -1919,6 +1920,10 @@ wss.on("connection", (ws) => {
 				break;
 			case "list_sessions":
 				void cs.refreshSessions();
+				break;
+			case "list_project_sessions":
+				if (cs.refreshProjectSessions) void cs.refreshProjectSessions(msg.path);
+				else if (msg.path === cs.cwd) void cs.refreshSessions();
 				break;
 			case "list_projects":
 				void cs.pushProjects();

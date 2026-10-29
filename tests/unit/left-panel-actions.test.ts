@@ -46,7 +46,18 @@ function mountLeftPanel(overrides: Record<string, unknown> = {}) {
 				messageCount: 1,
 			},
 		],
-		projects: [],
+		projectSessions: {
+			"/test": [
+				{
+					path: "session-1.jsonl",
+					name: "Test Session",
+					firstMessage: "Hello",
+					modified: Date.now(),
+					messageCount: 1,
+				},
+			],
+		},
+		projects: [{ path: "/test", lastUsed: Date.now() }],
 		activeConversationId: "",
 		panelSend,
 		pathCompletions: [
@@ -78,24 +89,24 @@ afterEach(() => {
 });
 
 describe("LeftPanel 标题栏操作与项目管理", () => {
-	it("projects=[] 时仍渲染“最近项目”标题栏和项目管理按钮，且不渲染项目滚动区", () => {
+	it("projects=[] 时仍渲染“项目”标题栏和项目管理按钮，并保留统一树滚动区", () => {
 		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
 		const { container } = mountLeftPanel({ projects: [] });
 
 		// 标题栏存在
 		const projectsSection = container.querySelector(".panel-projects");
 		expect(projectsSection).toBeTruthy();
-		expect(projectsSection?.textContent).toContain("最近项目");
+		expect(projectsSection?.textContent).toContain("项目");
 
 		// 项目管理按钮存在
 		const projectActionBtn = container.querySelector(".lp-project-action");
 		expect(projectActionBtn).toBeTruthy();
 
-		// 空项目区不渲染 .projects-scroll
-		expect(container.querySelector(".projects-scroll")).toBeNull();
+		expect(container.querySelector(".project-tree-scroll")).toBeTruthy();
+		expect(container.querySelector(".lp-sash")).toBeNull();
 	});
 
-	it("“历史对话”标题栏渲染新对话加号按钮，点击后发送 new_chat 且不影响折叠状态", () => {
+	it("“项目”标题栏渲染新对话加号按钮，点击后发送 new_chat", () => {
 		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
 		const { container, sent } = mountLeftPanel();
 
@@ -104,14 +115,27 @@ describe("LeftPanel 标题栏操作与项目管理", () => {
 		expect(newChatBtn?.title).toBeTruthy();
 		expect(newChatBtn?.getAttribute("aria-label")).toBeTruthy();
 
-		const sessionsSection = container.querySelector(".panel-sessions");
-		const wasCollapsed = sessionsSection?.classList.contains("collapsed");
-
-		// 点击加号
 		sent.length = 0;
 		act(() => newChatBtn!.click());
 		expect(sent).toEqual([{ type: "new_chat" }]);
-		expect(sessionsSection?.classList.contains("collapsed")).toBe(wasCollapsed);
+	});
+
+	it("当前项目默认展开；展开其他项目时按需请求该项目历史，不切换 cwd", () => {
+		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
+		const { container, sent } = mountLeftPanel({
+			projects: [
+				{ path: "/test", lastUsed: 2 },
+				{ path: "/other", lastUsed: 1 },
+			],
+		});
+
+		expect(container.querySelectorAll(".lp-tree-session-row")).toHaveLength(1);
+		const otherToggle = container.querySelectorAll<HTMLButtonElement>(".lp-tree-toggle")[1];
+		sent.length = 0;
+		act(() => otherToggle.click());
+		expect(sent).toEqual([{ type: "list_project_sessions", path: "/other" }]);
+		expect(sent.some((msg: any) => msg.type === "set_cwd")).toBe(false);
+		expect(otherToggle.getAttribute("aria-expanded")).toBe("true");
 	});
 
 	it("标题行容器与折叠按钮不产生嵌套 button（无 button button）", () => {

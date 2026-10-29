@@ -116,14 +116,7 @@ describe("BUILTIN_UI_ITEMS（宿主默认）", () => {
 		// （声音/语言 → 设置→通用，主题 → 界面设置，浏览器操作 → 插件页，版本号 → 通用页底部；
 		//   插件菜单、「新对话」与「⋯」溢出菜单已删）
 		expect(bySlot("topbar.primary")).toEqual(
-			expect.arrayContaining([
-				"host:chat",
-				"host:terminal",
-				"host:git",
-				"host:search",
-				"host:tasks",
-				"host:settings",
-			]),
+			expect.arrayContaining(["host:chat", "host:terminal", "host:git", "host:search", "host:tasks", "host:settings"]),
 		);
 		for (const gone of [
 			"host:sound",
@@ -136,17 +129,11 @@ describe("BUILTIN_UI_ITEMS（宿主默认）", () => {
 		]) {
 			expect(bySlot("topbar.primary")).not.toContain(gone);
 		}
-		// 底栏：上下文/成本/缓存/消息数/主机指标/工作目录
+		// 底栏：上下文/成本/缓存/消息数/工作目录
 		expect(bySlot("bottombar")).toEqual(
-			expect.arrayContaining([
-				"host:ctx",
-				"host:cost",
-				"host:cache",
-				"host:msg-count",
-				"host:host-metrics",
-				"host:cwd",
-			]),
+			expect.arrayContaining(["host:ctx", "host:cost", "host:cache", "host:msg-count", "host:cwd"]),
 		);
+		expect(bySlot("bottombar")).not.toContain("host:host-metrics");
 		expect(bySlot("contextmenu.session").length).toBeGreaterThan(0);
 		expect(bySlot("contextmenu.file").length).toBeGreaterThan(0);
 		// 消息区今天没有右键菜单 → 一条都不登记（宁缺勿造）；设置页是插件专属。
@@ -172,15 +159,15 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 		]);
 		expect(ids(slots.bottombar)).toEqual([
 			"host:conn",
-			"host:ctx",
-			"host:cost",
 			"host:cache",
+			"host:cost",
+			"host:ctx",
 			"host:msg-count",
 			"host:plugin-status",
 			"host:working",
-			"host:host-metrics",
 			"host:cwd",
 		]);
+		expect(slots.bottombar.find((e) => e.id === "host:msg-count")?.hidden).toBe(true);
 		const settings = slots["topbar.primary"].find((e) => e.id === "host:settings");
 		expect(settings?.label).toBe("#settingsTitle");
 		expect(settings?.labelKey).toBe("settingsTitle");
@@ -817,10 +804,10 @@ describe("modal.dialog（P1-2）", () => {
 });
 
 describe("bottombar align 分区（P1-2 收尾：路由走数据不走 id）", () => {
-	it("host:host-metrics 与 host:cwd 缺省 end，其余宿主条目缺省 start", () => {
+	it("host:cwd 缺省 end，其余宿主条目缺省 start", () => {
 		const slots = build([]);
 		const end = slots["bottombar"].filter((e) => e.align === "end").map((e) => e.id);
-		expect(end).toEqual(["host:host-metrics", "host:cwd"]);
+		expect(end).toEqual(["host:cwd"]);
 	});
 	it("arrange 与用户偏好能翻转分区（插件可把条目挪到右区）", () => {
 		const p = plugin(
@@ -834,7 +821,6 @@ describe("bottombar align 分区（P1-2 收尾：路由走数据不走 id）", (
 		const slots = build([p]);
 		expect(slots["bottombar"].filter((e) => e.align === "end").map((e) => e.id)).toEqual([
 			"host:cost",
-			"host:host-metrics",
 			"host:cwd",
 			"a:r",
 		]);

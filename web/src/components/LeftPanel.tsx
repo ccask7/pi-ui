@@ -2,19 +2,18 @@ import { memo, useEffect, useState, useCallback, useRef } from "react";
 import {
 	FiCheck,
 	FiChevronDown,
-	FiChevronUp,
+	FiChevronRight,
 	FiChevronsLeft,
 	FiEdit2,
 	FiFolder,
 	FiFolderPlus,
-	FiMessageSquare,
 	FiPlus,
 	FiTrash2,
 } from "react-icons/fi";
 import type { ConversationSummary, ProjectSummary, SessionSummary } from "../types";
-import { useT } from "../i18n";
+import { useI18n, useT } from "../i18n";
+import { formatRelativeTime } from "../relative-time";
 import { useAppField } from "../app-globals";
-import { applySashDrag, parseWeights } from "../panel-sash";
 import { ProjectPicker } from "./ProjectPicker.js";
 // 宿主 UI 扩展点（issue #146）：会话行的右键菜单走「slot 条目」这一条通道。
 import { LP_SECTION_ENTRY_IDS, type UiSlotEntry } from "../ui-slots";
@@ -30,12 +29,14 @@ interface LeftPanelProps {
 	sessionFile: string | null;
 	conversations: ConversationSummary[];
 	sessions: SessionSummary[];
+	projectSessions: Record<string, SessionSummary[]>;
 	projects: ProjectSummary[];
 	activeConversationId: string;
 	panelSend: (
 		msg:
 			| { type: "new_chat" }
 			| { type: "list_sessions" }
+			| { type: "list_project_sessions"; path: string }
 			| { type: "list_projects" }
 			| { type: "switch_session"; path: string }
 			| { type: "switch_conversation"; id: string }
@@ -75,16 +76,6 @@ interface LeftPanelProps {
 	pathCompletions?: { name: string; path: string; type: "dir" | "file" }[];
 }
 
-function formatModified(ts: number): string {
-	const d = new Date(ts);
-	const now = new Date();
-	const sameDay = d.toDateString() === now.toDateString();
-	if (sameDay) {
-		return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-	}
-	return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
 /** 打开 `contextmenu.session` 菜单时的被右键对象（kind 决定操作范围：见 showSessionMenu）。
  *  elsewhere = 「另一处」行：id 即对方会话内的 convId，owner 标识持有方（过户目标）。 */
 type SessionMenuTarget = {
@@ -104,52 +95,24 @@ function isEditableTarget(el: EventTarget | null): boolean {
 	return node.isContentEditable;
 }
 
-const LS_COLLAPSE_PROJECTS = "ccui:lp-collapse-projects";
-const LS_COLLAPSE_SESSIONS = "ccui:lp-collapse-sessions";
+const LS_EXPANDED_PROJECTS = "ccui:lp-expanded-projects";
 
-function useCollapsed(key: string, defaultCollapsed = false): [boolean, () => void] {
-	const [collapsed, setCollapsed] = useState(() => {
-		try {
-			const v = localStorage.getItem(key);
-			if (v === "1") return true;
-			if (v === "0") return false;
-		} catch {}
-		return defaultCollapsed;
-	});
-	const toggle = useCallback(() => {
-		setCollapsed((prev) => {
-			const next = !prev;
-			try {
-				localStorage.setItem(key, next ? "1" : "0");
-			} catch {}
-			return next;
-		});
-	}, [key]);
-	return [collapsed, toggle];
-}
-
-/* VSCode 风格可拖拽分割：展开区的 flex-grow 权重持久化，折叠区不占空间 */
-const LS_LP_SIZES = "ccui:lp-sizes";
-type LpWeights = { projects: number; convs: number; sessions: number };
-const DEFAULT_LP_WEIGHTS: LpWeights = { projects: 1, convs: 1, sessions: 1 };
-/** 折叠区仅留标题高度（与 styles.css 的 .lp-section.collapsed 对齐）。 */
-const LP_COLLAPSED_HEADER_PX = 32;
-/** 展开区最小高度（≈3 行，与 styles.css 的 .lp-section min-height 对齐）。 */
-const LP_MIN_SECTION_PX = 72;
-/** 存档解析与拖动换算都是纯函数，与右栏共用（见 `../panel-sash`）。 */
-function loadLpWeights(): LpWeights {
+function loadExpandedProjects(currentCwd: string): Set<string> {
 	try {
-		return parseWeights(localStorage.getItem(LS_LP_SIZES), DEFAULT_LP_WEIGHTS);
-	} catch {
-		// localStorage 不可用（隐私模式/SSR）→ 默认权重
-		return { ...DEFAULT_LP_WEIGHTS };
-	}
+		const raw = localStorage.getItem(LS_EXPANDED_PROJECTS);
+		if (raw !== null) {
+			const paths = JSON.parse(raw);
+			if (Array.isArray(paths)) return new Set(paths.filter((path): path is string => typeof path === "string"));
+		}
+	} catch {}
+	return currentCwd ? new Set([currentCwd]) : new Set();
 }
 
 export const LeftPanel = memo(function LeftPanel({
 	sessionFile,
 	conversations,
 	sessions,
+	projectSessions,
 	projects,
 	activeConversationId,
 	panelSend,
@@ -162,6 +125,12 @@ export const LeftPanel = memo(function LeftPanel({
 	onUiAction,
 }: LeftPanelProps) {
 	const t = useT();
+	const { locale } = useI18n();
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+		return () => window.clearInterval(timer);
+	}, []);
 	const currentFile = sessionFile;
 	// 连接态与当前工作目录走全局（web/src/app-globals.ts），不再从 App 传
 	// —— 这三个值整棵树都要，传参只会越传越漏。
@@ -174,8 +143,9 @@ export const LeftPanel = memo(function LeftPanel({
 	const [confirmDel, setConfirmDel] = useState<string | null>(null);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
-	const [collapseProjects, toggleProjects] = useCollapsed(LS_COLLAPSE_PROJECTS, false);
-	const [collapseSessions, toggleSessions] = useCollapsed(LS_COLLAPSE_SESSIONS, false);
+	const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => loadExpandedProjects(currentCwd));
+	const previousCwdRef = useRef(currentCwd);
+	const requestedProjectSessionsRef = useRef(new Set<string>());
 	/** 会话右键菜单（`contextmenu.session` 槽位）：见下面的 showSessionMenu / openSessionMenu /
 	 *  dispatchHostSessionEntry。宿主自己的两条（关闭已结束子代理 / 强行关闭对话）也在这个槽位里，
 	 *  与插件贡献的条目同排 —— 插件条目由 App 分发给插件，host 条目由本组件分派。 */
@@ -392,14 +362,17 @@ export const LeftPanel = memo(function LeftPanel({
 					setRenameDraft(conv?.title ?? target.label ?? "");
 					setRenaming(`conv:${scopeId}`);
 				} else if (target.kind === "history" && target.id) {
-					const sess = sessions.find((s) => s.path === target.id);
+					const sess =
+						Object.values(projectSessions)
+							.flat()
+							.find((s) => s.path === target.id) ?? sessions.find((s) => s.path === target.id);
 					setRenameDraft(sess?.name ?? target.label ?? "");
 					setRenaming(target.id);
 				}
 				return;
 			}
 		},
-		[panelSend, showSessionMenu, conversations, sessions],
+		[panelSend, showSessionMenu, conversations, sessions, projectSessions],
 	);
 	// 每次渲染把最新闭包挂给菜单用的那个 ref（同 App 的 chatRefForPlugins / ContextMenu 的
 	// activateRef：挂在 render 上的 ref，不是副作用）。
@@ -486,54 +459,18 @@ export const LeftPanel = memo(function LeftPanel({
 		[sessionMenuAvailable, showSessionMenu],
 	);
 
-	const panelRef = useRef<HTMLElement>(null);
-	const [weights, setWeights] = useState<LpWeights>(() => loadLpWeights());
 	useEffect(() => {
 		try {
-			localStorage.setItem(LS_LP_SIZES, JSON.stringify(weights));
+			localStorage.setItem(LS_EXPANDED_PROJECTS, JSON.stringify([...expandedProjects]));
 		} catch {}
-	}, [weights]);
+	}, [expandedProjects]);
 
-	const createSashHandler = useCallback(
-		(aboveKey: keyof LpWeights, belowKey: keyof LpWeights) => (e: React.PointerEvent<HTMLDivElement>) => {
-			e.preventDefault();
-			const target = e.currentTarget;
-			const startY = e.clientY;
-			const start = { ...weights };
-			const panel = panelRef.current;
-			if (!panel) return;
-			const visibleMeta = [
-				{ key: "projects" as const, visible: projects.length > 0, collapsed: collapseProjects },
-				{ key: "sessions" as const, visible: true, collapsed: collapseSessions },
-			].filter((s) => s.visible);
-			const collapsedCount = visibleMeta.filter((s) => s.collapsed).length;
-			const expandedKeys = visibleMeta.filter((s) => !s.collapsed).map((s) => s.key);
-			const totalWeight = expandedKeys.reduce((sum, k) => sum + (start[k] ?? 1), 0) || 1;
-			const available = Math.max(120, panel.clientHeight - collapsedCount * LP_COLLAPSED_HEADER_PX);
-			target.classList.add("dragging");
-			document.body.classList.add("lp-resizing");
-			const onMove = (ev: PointerEvent) => {
-				const { above, below } = applySashDrag({
-					start: { above: start[aboveKey] ?? 1, below: start[belowKey] ?? 1 },
-					deltaPx: ev.clientY - startY,
-					availablePx: available,
-					totalWeight,
-					minAbovePx: LP_MIN_SECTION_PX,
-					minBelowPx: LP_MIN_SECTION_PX,
-				});
-				setWeights((prev) => ({ ...prev, [aboveKey]: above, [belowKey]: below }));
-			};
-			const onUp = () => {
-				window.removeEventListener("pointermove", onMove);
-				window.removeEventListener("pointerup", onUp);
-				target.classList.remove("dragging");
-				document.body.classList.remove("lp-resizing");
-			};
-			window.addEventListener("pointermove", onMove);
-			window.addEventListener("pointerup", onUp);
-		},
-		[weights, projects.length, collapseProjects, collapseSessions],
-	);
+	useEffect(() => {
+		if (previousCwdRef.current === currentCwd) return;
+		previousCwdRef.current = currentCwd;
+		if (!currentCwd) return;
+		setExpandedProjects((prev) => new Set(prev).add(currentCwd));
+	}, [currentCwd]);
 
 	useEffect(() => {
 		if (!active || !ready || status !== "open") return;
@@ -541,6 +478,33 @@ export const LeftPanel = memo(function LeftPanel({
 		panelSend({ type: "list_sessions" });
 		panelSend({ type: "list_projects" });
 	}, [active, ready, status, cwd, panelSend]);
+
+	useEffect(() => {
+		if (status !== "open") requestedProjectSessionsRef.current.clear();
+	}, [status]);
+
+	useEffect(() => {
+		if (!active || !ready || status !== "open") return;
+		for (const path of expandedProjects) {
+			if (requestedProjectSessionsRef.current.has(path)) continue;
+			requestedProjectSessionsRef.current.add(path);
+			panelSend({ type: "list_project_sessions", path });
+		}
+	}, [active, ready, status, expandedProjects, panelSend]);
+
+	const toggleProject = (path: string) => {
+		setExpandedProjects((prev) => {
+			const next = new Set(prev);
+			if (next.has(path)) next.delete(path);
+			else next.add(path);
+			return next;
+		});
+	};
+
+	const openProject = (path: string) => {
+		setExpandedProjects((prev) => new Set(prev).add(path));
+		if (currentCwd !== path) panelSend({ type: "set_cwd", path });
+	};
 
 	const displayName = (s: SessionSummary): string => {
 		const title = s.name || s.firstMessage.trim();
@@ -571,218 +535,177 @@ export const LeftPanel = memo(function LeftPanel({
 		);
 	};
 
-	const sectionHeader = (
-		title: string,
-		collapsed: boolean,
-		onToggle: () => void,
-		count?: number,
-		actions?: React.ReactNode,
-	) => (
-		<div className="lp-section-header">
-			<button
-				type="button"
-				className="lp-section-title panel-section-title"
-				onClick={onToggle}
-				title={collapsed ? t("expandSection") : t("collapseSection")}
+	const renderSessionRow = (s: SessionSummary) => {
+		const active = currentFile === s.path;
+		return (
+			<div
+				className="lp-row lp-tree-session-row"
+				key={s.path}
+				onMouseLeave={() => setConfirmDel((k) => (k === `sess:${s.path}` ? null : k))}
+				onContextMenu={(e) => openSessionMenu(e, { id: s.path, kind: "history", label: displayName(s) })}
 			>
-				<span className="lp-section-title-text">
-					{title}
-					{count !== undefined ? ` (${count})` : ""}
-				</span>
-				<span className="lp-section-chevron">{collapsed ? <FiChevronDown /> : <FiChevronUp />}</span>
-			</button>
-			{actions ? <div className="lp-section-actions">{actions}</div> : null}
-		</div>
-	);
-
-	// 归一化权重：单展开时强制 flex=1 填满；多展开时按权重比例均值归一，避免 0.539 这类小数导致容器留空
-	const visibleMetaForFlex = [
-		{ key: "projects" as const, visible: projects.length > 0, collapsed: collapseProjects },
-		{ key: "sessions" as const, visible: true, collapsed: collapseSessions },
-	].filter((s) => s.visible);
-	const expandedForFlex = visibleMetaForFlex.filter((s) => !s.collapsed);
-	const totalWeightForFlex = expandedForFlex.reduce((sum, k) => sum + (weights[k.key] ?? 1), 0) || 1;
-	const effFlex = (k: keyof LpWeights) => {
-		if (expandedForFlex.length <= 1) return 1;
-		const w = weights[k] ?? 1;
-		return (w / totalWeightForFlex) * expandedForFlex.length;
+				<button
+					type="button"
+					className={`session-item ${active ? "active" : ""}`}
+					title={s.path}
+					onClick={() => {
+						if (renaming) return;
+						if (!active) panelSend({ type: "switch_session", path: s.path });
+					}}
+				>
+					<span className="session-info">
+						{renaming === s.path ? (
+							<input
+								autoFocus
+								className="session-rename-input"
+								value={renameDraft}
+								placeholder={t("renameSessionPlaceholder")}
+								onClick={(e) => e.stopPropagation()}
+								onChange={(e) => setRenameDraft(e.target.value)}
+								onKeyDown={(e) => {
+									e.stopPropagation();
+									if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+										const name = renameDraft.trim();
+										if (name) panelSend({ type: "rename_session", path: s.path, name });
+										setRenaming(null);
+									} else if (e.key === "Escape") {
+										setRenaming(null);
+									}
+								}}
+								onBlur={() => setRenaming(null)}
+							/>
+						) : (
+							<span className="session-title">{displayName(s)}</span>
+						)}
+					</span>
+					<span className="session-time">{formatRelativeTime(s.modified, now, locale === "zh" ? "zh" : "en")}</span>
+				</button>
+				<button
+					type="button"
+					className="lp-del lp-rename"
+					title={t("renameSession")}
+					onClick={(e) => {
+						e.stopPropagation();
+						setConfirmDel(null);
+						setRenameDraft(s.name ?? "");
+						setRenaming(s.path);
+					}}
+				>
+					<FiEdit2 />
+				</button>
+				{delButton(`sess:${s.path}`, t("deleteSession"), t("deleteSessionConfirm"), () =>
+					panelSend({ type: "delete_session", path: s.path }),
+				)}
+				{renderLeftSessions()}
+			</div>
+		);
 	};
 
 	return (
-		<aside ref={panelRef as React.RefObject<HTMLDivElement>} className="panel panel-left lp-panel">
+		<aside className="panel panel-left lp-panel">
 			{collapsible && onToggleCollapse && (
 				<button type="button" className="panel-collapse-btn" title={t("collapsePanel")} onClick={onToggleCollapse}>
 					<FiChevronsLeft />
 				</button>
 			)}
-			{/* Recent projects — collapsible, flex share */}
-			<div
-				className={`lp-section panel-projects ${collapseProjects || projects.length === 0 ? "collapsed" : ""}`}
-				style={projects.length > 0 && !collapseProjects ? { flex: `${effFlex("projects")} 1 0px` } : undefined}
-			>
-				{sectionHeader(
-					t("recentProjects"),
-					collapseProjects,
-					toggleProjects,
-					projects.length,
-					<button
-						type="button"
-						className="lp-section-action lp-project-action"
-						title={t("manageProjects")}
-						aria-label={t("manageProjects")}
-						onClick={() => setProjectPickerOpen(true)}
-					>
-						<FiFolderPlus />
-					</button>,
-				)}
-				{projects.length > 0 && !collapseProjects && (
-					<div className="lp-section-body projects-scroll">
-						{projects.map((p) => {
-							const active = currentCwd === p.path;
-							return (
+			<div className="lp-section project-tree-section panel-projects">
+				<div className="lp-section-header">
+					<div className="lp-section-title panel-section-title lp-tree-heading">
+						<span className="lp-section-title-text">
+							{t("projects")} ({projects.length})
+						</span>
+					</div>
+					<div className="lp-section-actions">
+						<button
+							type="button"
+							className="lp-section-action lp-project-action"
+							title={t("manageProjects")}
+							aria-label={t("manageProjects")}
+							onClick={() => setProjectPickerOpen(true)}
+						>
+							<FiFolderPlus />
+						</button>
+						<button
+							type="button"
+							className="lp-section-action lp-new-chat-action"
+							title={t("newChatTip")}
+							aria-label={t("newChat")}
+							onClick={() => {
+								panelSend({ type: "new_chat" });
+								focusComposer();
+							}}
+						>
+							<FiPlus />
+						</button>
+					</div>
+				</div>
+				<div className="lp-section-body project-tree-scroll" role="tree" aria-label={t("projects")}>
+					{projects.length === 0 && <div className="panel-empty">{t("noHistory")}</div>}
+					{projects.map((p) => {
+						const activeProject = currentCwd === p.path;
+						const expanded = expandedProjects.has(p.path);
+						const projectHistory = projectSessions[p.path] ?? (activeProject ? sessions : undefined);
+						return (
+							<div className="lp-tree-project" key={p.path}>
 								<div
-									className="lp-row"
-									key={p.path}
+									className="lp-row lp-tree-project-row"
 									onMouseLeave={() => setConfirmDel((k) => (k === `proj:${p.path}` ? null : k))}
 								>
 									<button
 										type="button"
-										className={`project-item ${active ? "active" : ""}`}
+										className={`project-item ${activeProject ? "active" : ""}`}
 										title={p.path}
-										onClick={() => {
-											if (!active) panelSend({ type: "set_cwd", path: p.path });
-										}}
+										onClick={() => openProject(p.path)}
 									>
 										<FiFolder className="project-icon" />
 										<span className="project-info">
 											<span className="project-name">{projectName(p.path)}</span>
-											<span className="project-path">{p.path}</span>
 										</span>
-										<span className="project-time">{formatModified(p.lastUsed)}</span>
 									</button>
+									<button
+										type="button"
+										className="lp-tree-toggle"
+										title={expanded ? t("collapseSection") : t("expandSection")}
+										aria-label={expanded ? t("collapseSection") : t("expandSection")}
+										aria-expanded={expanded}
+										onClick={() => toggleProject(p.path)}
+									>
+										{expanded ? <FiChevronDown /> : <FiChevronRight />}
+									</button>
+									{activeProject && (
+										<button
+											type="button"
+											className="lp-del lp-rename lp-project-new-chat"
+											title={t("newChatTip")}
+											aria-label={t("newChat")}
+											onClick={(e) => {
+												e.stopPropagation();
+												panelSend({ type: "new_chat" });
+												focusComposer();
+											}}
+										>
+											<FiPlus />
+										</button>
+									)}
 									{delButton(`proj:${p.path}`, t("deleteProject"), t("deleteProjectConfirm"), () =>
 										panelSend({ type: "remove_project", path: p.path }),
 									)}
 								</div>
-							);
-						})}
-					</div>
-				)}
-			</div>
-			{/* sash: projects ↔ 历史对话（「运行的对话」已挪到顶栏标签栏） */}
-			{projects.length > 0 && !collapseProjects && !collapseSessions && (
-				<div
-					className="lp-sash"
-					onPointerDown={createSashHandler("projects", "sessions")}
-					onDoubleClick={() => setWeights({ ...DEFAULT_LP_WEIGHTS })}
-					title={t("dragToResize")}
-				/>
-			)}
-
-			{/* History sessions — collapsible, flex share, takes remaining */}
-			<div
-				className={`lp-section lp-section-sessions panel-sessions ${collapseSessions ? "collapsed" : ""}`}
-				style={!collapseSessions ? { flex: `${effFlex("sessions")} 1 0px` } : undefined}
-			>
-				{sectionHeader(
-					t("historySessions"),
-					collapseSessions,
-					toggleSessions,
-					sessions.length,
-					<button
-						type="button"
-						className="lp-section-action lp-new-chat-action"
-						title={t("newChatTip")}
-						aria-label={t("newChat")}
-						onClick={() => {
-							panelSend({ type: "new_chat" });
-							focusComposer();
-						}}
-					>
-						<FiPlus />
-					</button>,
-				)}
-				{!collapseSessions && (
-					<div className="lp-section-body sessions-scroll">
-						{sessions.length === 0 && <div className="panel-empty">{t("noHistory")}</div>}
-						{sessions.map((s) => {
-							const active = currentFile === s.path;
-							return (
-								<div
-									className="lp-row"
-									key={s.path}
-									onMouseLeave={() => setConfirmDel((k) => (k === `sess:${s.path}` ? null : k))}
-									onContextMenu={(e) => openSessionMenu(e, { id: s.path, kind: "history", label: displayName(s) })}
-								>
-									<button
-										type="button"
-										className={`session-item ${active ? "active" : ""}`}
-										title={s.path}
-										onClick={() => {
-											if (renaming) return;
-											if (!active) panelSend({ type: "switch_session", path: s.path });
-										}}
-									>
-										<FiMessageSquare className="session-icon" />
-										<span className="session-info">
-											{renaming === s.path ? (
-												<input
-													autoFocus
-													className="session-rename-input"
-													value={renameDraft}
-													placeholder={t("renameSessionPlaceholder")}
-													onClick={(e) => e.stopPropagation()}
-													onChange={(e) => setRenameDraft(e.target.value)}
-													onKeyDown={(e) => {
-														e.stopPropagation();
-														if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-															const name = renameDraft.trim();
-															if (name) panelSend({ type: "rename_session", path: s.path, name });
-															setRenaming(null);
-														} else if (e.key === "Escape") {
-															setRenaming(null);
-														}
-													}}
-													onBlur={() => setRenaming(null)}
-												/>
-											) : (
-												<span className="session-title">{displayName(s)}</span>
-											)}
-											{renaming === s.path ? null : (
-												<span className="session-sub">
-													{active ? t("current") : t("messageCount", { n: s.messageCount })}
-													{s.source === "tui" && (
-														<span className="session-src" title={t("tuiTip")}>
-															TUI
-														</span>
-													)}
-												</span>
-											)}
-										</span>
-										<span className="session-time">{formatModified(s.modified)}</span>
-									</button>
-									<button
-										type="button"
-										className="lp-del lp-rename"
-										title={t("renameSession")}
-										onClick={(e) => {
-											e.stopPropagation();
-											setConfirmDel(null);
-											setRenameDraft(s.name ?? "");
-											setRenaming(s.path);
-										}}
-									>
-										<FiEdit2 />
-									</button>
-									{delButton(`sess:${s.path}`, t("deleteSession"), t("deleteSessionConfirm"), () =>
-										panelSend({ type: "delete_session", path: s.path }),
-									)}
-									{renderLeftSessions()}
-								</div>
-							);
-						})}
-					</div>
-				)}
+								{expanded && (
+									<div className="lp-tree-children" role="group">
+										{projectHistory === undefined ? (
+											<div className="panel-empty lp-tree-empty">{t("loading")}</div>
+										) : projectHistory.length === 0 ? (
+											<div className="panel-empty lp-tree-empty">{t("noHistory")}</div>
+										) : (
+											projectHistory.map(renderSessionRow)
+										)}
+									</div>
+								)}
+							</div>
+						);
+					})}
+				</div>
 			</div>
 			<ProjectPicker
 				open={projectPickerOpen}

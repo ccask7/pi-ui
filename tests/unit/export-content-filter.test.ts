@@ -20,6 +20,15 @@ describe("applyExportContentFilter", () => {
 		expect(root.querySelector(".msg-text")?.textContent).toBe("hello");
 	});
 
+	it("思考和工具都排除时移除空的工作记录外壳", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<div class="activity-group"><div class="thinking"></div><div class="toolcall"></div></div><div class="msg-text">answer</div>';
+		applyExportContentFilter(root, {});
+		expect(root.querySelector(".activity-group")).toBeNull();
+		expect(root.querySelector(".msg-text")?.textContent).toBe("answer");
+	});
+
 	it("打开开关则保留对应块", () => {
 		const both = sampleCard();
 		applyExportContentFilter(both, { includeThinking: true, includeTools: true });

@@ -160,6 +160,24 @@ async function run() {
 	const paths1 = (s1.sessions ?? []).map((x) => x.path);
 	check("list_sessions 命中两条种子会话", paths1.includes(sess1) && paths1.includes(sess2), paths1.join(","));
 
+	// 项目树：不切 cwd，直接读取 otherDir 的历史。
+	c.send({ type: "list_project_sessions", path: otherDir });
+	const otherList = await c.next(
+		(m) => m.type === "project_sessions" && m.path === otherDir,
+		"project_sessions（otherDir）",
+	);
+	const otherPaths = (otherList.sessions ?? []).map((x) => x.path);
+	check("list_project_sessions 返回指定项目历史", otherPaths.includes(sessOther), otherPaths.join(","));
+	check("指定项目历史不混入当前项目会话", !otherPaths.includes(sess2));
+	c.send({ type: "delete_session", path: sessOther });
+	const otherAfterDelete = await c.next(
+		(m) =>
+			m.type === "project_sessions" && m.path === otherDir && !(m.sessions ?? []).some((x) => x.path === sessOther),
+		"project_sessions（otherDir 删除后刷新）",
+	);
+	check("非当前项目删除后仍刷新其树节点", (otherAfterDelete.sessions ?? []).length === 0);
+	check("非当前项目会话文件已删除", !existsSync(sessOther));
+
 	// 2) delete_session 删除一条 → 磁盘消失 + 列表刷新只剩一条
 	// （attach 后有防抖的后台重复推送，必须等“确实不含被删项”的那一份）
 	c.send({ type: "delete_session", path: sess1 });
@@ -178,7 +196,17 @@ async function run() {
 	check("越界删除返回错误提示", typeof n1.text === "string" && n1.text.length > 0, n1.text);
 	check("越界文件未被删除", existsSync(join(workDir, "a.txt")));
 
-	// 4) remove_project：最近项目列表移除 otherDir
+	// 4) remove_project：先真正切换到 otherDir，让它进入最近项目；只读取项目树历史不应改最近列表。
+	c.send({ type: "set_cwd", path: otherDir });
+	await c.next(
+		(m) => (m.type === "snapshot" || m.type === "snapshot_delta") && m.state?.cwd === otherDir,
+		"cwd=otherDir",
+	);
+	c.send({ type: "set_cwd", path: workDir });
+	await c.next(
+		(m) => (m.type === "snapshot" || m.type === "snapshot_delta") && m.state?.cwd === workDir,
+		"cwd=workDir",
+	);
 	c.send({ type: "list_projects" });
 	const p1 = await c.next((m) => m.type === "projects", "projects #1");
 	const projPaths1 = (p1.projects ?? []).map((x) => x.path);

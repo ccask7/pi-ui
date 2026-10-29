@@ -92,14 +92,20 @@
 	--bg-image: none;
 	--bg-image-dim: 0.78;
 	--bg-image-blur: 0px;
+	--window-opacity: 100%;
 	--wallpaper-panel-alpha: 100%;
-	--topbar-bg: #181818;
-	--statusbar-bg: #181818;
-	--panel-bg: #181818;
-	--card-bg: #202020;
-	--chip-bg: #2b2b2b;
-	--msgs-bg: #1f1f1f;
-	--inputbox-bg: #313131;
+	--topbar-bg: color-mix(in srgb, #181818 var(--window-opacity, 100%), transparent);
+	--statusbar-bg: color-mix(in srgb, #181818 var(--window-opacity, 100%), transparent);
+	--panel-bg: color-mix(in srgb, #181818 var(--window-opacity, 100%), transparent);
+	--card-bg: color-mix(in srgb, #202020 var(--window-opacity, 100%), transparent);
+	--chip-bg: color-mix(in srgb, #2b2b2b var(--window-opacity, 100%), transparent);
+	--msgs-bg: color-mix(in srgb, #1f1f1f var(--window-opacity, 100%), transparent);
+	--inputbox-bg: color-mix(in srgb, #313131 var(--window-opacity, 100%), transparent);
+	--input-border: #3c3c3c;
+	--chat-tabs-bg: #181818;
+	--chat-tab-bg: #181818;
+	--chat-tab-active-bg: #1f1f1f;
+	--chat-tab-hover-bg: #1f1f1f;
 	--menu-bg: #1f1f1f;
 }
 

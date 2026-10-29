@@ -108,8 +108,10 @@ export interface ChatState {
 	/** PI_WEB_TABS on the server: the tabs this instance offers. Undefined
 	 *  means all of them, which is the default. */
 	tabs?: string[];
-	/** Persisted session list for the left panel. */
+	/** Persisted session list for the current project. */
 	sessions: SessionSummary[];
+	/** 项目树按需加载的历史会话，key 为项目绝对路径。 */
+	projectSessions: Record<string, SessionSummary[]>;
 	/** Open conversations (each runs its own session in parallel). */
 	conversations: ConversationSummary[];
 	/** issue #145：在其他客户端（标签页/设备）上正在跑的对话（只读感知，不可点）。 */
@@ -313,6 +315,7 @@ type Action =
 			tabs?: string[];
 	  }
 	| { type: "sessions"; sessions: SessionSummary[] }
+	| { type: "project_sessions"; path: string; sessions: SessionSummary[] }
 	| {
 			type: "conversations";
 			conversations: ConversationSummary[];
@@ -698,6 +701,11 @@ function reducer(state: ChatState, action: Action): ChatState {
 			};
 		case "sessions":
 			return { ...state, sessions: action.sessions };
+		case "project_sessions":
+			return {
+				...state,
+				projectSessions: { ...state.projectSessions, [action.path]: action.sessions },
+			};
 		case "conversations":
 			return {
 				...state,
@@ -926,6 +934,7 @@ export function useChat() {
 		toolStatuses: new Map(),
 		notices: [],
 		sessions: [],
+		projectSessions: {},
 		conversations: [],
 		elsewhere: [],
 		activeConversationId: "",
@@ -1234,6 +1243,9 @@ export function useChat() {
 				}
 				case "sessions":
 					dispatch({ type: "sessions", sessions: msg.sessions });
+					break;
+				case "project_sessions":
+					dispatch({ type: "project_sessions", path: msg.path, sessions: msg.sessions });
 					break;
 				case "conversations":
 					dispatch({

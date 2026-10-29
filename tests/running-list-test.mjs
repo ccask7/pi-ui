@@ -2,8 +2,8 @@
  * Running-conversation list semantics (issue #140) — zero token (mock model).
  *
  *   空白新对话不入列（保持不变）→ 一旦有内容，正在聊的那条**立刻**出现在
- *   「运行的对话」里（还在流式输出时也要有）→ 换走后仍是老的「后台运行」语义：
- *   空闲且没被保留就释放移出列表 → 列表里当前对话那一行的 ✕ 真的能移出。
+ *   「运行的对话」里（还在流式输出时也要有）→ 本次继续过的对话换走后保留标签，
+ *   只打开但未继续的会话与空白新对话自动清理 → 当前对话的 ✕ 真的能移出。
  *
  * 服务端零 token：本地起一个 OpenAI 兼容的 SSE mock，配到隔离的 agent 目录
  * （同 switch-session-background-test.mjs）。
@@ -287,6 +287,13 @@ try {
 		(message) => message.role === "assistant" && JSON.stringify(message.content).includes("thinking-done"),
 	);
 	check("switching back keeps the conversation in the list", Boolean(client.row(backgroundId)));
+
+	// 7. 只是切回看过、没有继续发问，再切走时自动关闭标签。
+	client.send({ type: "new_chat" });
+	await client.waitForState((state) => state.conversationId !== backgroundId);
+	await client.waitFor(() => !client.row(backgroundId), "uncontinued open tab to close after switching away");
+	check("uncontinued conversation closes after switching away without a new prompt", !client.row(backgroundId));
+	check("the new blank chat is still not listed", !client.row(client.state.conversationId));
 } catch (error) {
 	console.error(`✗ ${error.message}`);
 	process.exitCode = 1;

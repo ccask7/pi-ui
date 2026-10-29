@@ -91,27 +91,25 @@ for (let i = 0; i < 40 && !(await portUp(PORT)); i++) await sleep(250);
 const browser = await chromium.launch({ executablePath: HEADLESS });
 const page = await browser.newPage();
 await page.goto(URL);
-await page.waitForSelector(".panel-left .panel-sessions", { timeout: 15000 });
+await page.waitForSelector(".panel-left .project-tree-section", { timeout: 15000 });
 await sleep(800);
 
 // 1. Single conversation → history title exists, no convs section.
-const histTitles = await page.locator(".panel-sessions .panel-section-title").allTextContents();
+const histTitles = await page.locator(".project-tree-section .panel-section-title").allTextContents();
 check(
-	"history title present",
-	histTitles.some((t) => t.includes("历史对话")),
+	"project tree title present",
+	histTitles.some((t) => t.includes("项目")),
 );
 check("no convs section yet", (await page.locator(".panel-left .panel-convs").count()) === 0);
 
 // 2. Two more new chats (still never ran, never displaced while streaming):
 //    the running-conversations section must STAY hidden by design.
 await page.evaluate(() => {
-	const btn = [...document.querySelectorAll("button")].find((b) => b.textContent && b.textContent.includes("新对话"));
-	btn?.click();
+	document.querySelector(".lp-new-chat-action")?.click();
 });
 await sleep(900);
 await page.evaluate(() => {
-	const btn = [...document.querySelectorAll("button")].find((b) => b.textContent && b.textContent.includes("新对话"));
-	btn?.click();
+	document.querySelector(".lp-new-chat-action")?.click();
 });
 await sleep(900);
 
@@ -123,68 +121,45 @@ check(
 	convTitles.join("|"),
 );
 
-// 3. Structure: history title must be OUTSIDE the scroll container.
-const historyTitleInsideScroll = await page.locator(".panel-sessions .sessions-scroll .panel-section-title").count();
-check(
-	"history title NOT inside the scroll container",
-	historyTitleInsideScroll === 0,
-	`inside=${historyTitleInsideScroll}`,
-);
+// 3. Structure: the project title stays outside the single tree scroller.
+const historyTitleInsideScroll = await page.locator(".project-tree-scroll .panel-section-title").count();
+check("project title NOT inside the scroll container", historyTitleInsideScroll === 0);
 
-// 4. Scroll behavior: sessions-scroll is the scrolling area.
+// 4. Scroll behavior: project-tree-scroll is the only left-panel scrolling area.
 const styles = await page.evaluate(() => {
-	const ss = document.querySelector(".sessions-scroll");
-	const gs = getComputedStyle;
-	return {
-		sessionsScrollOverflow: ss ? gs(ss).overflowY : "missing",
-		sessionsFlex: document.querySelector(".panel-sessions")
-			? gs(document.querySelector(".panel-sessions")).flex
-			: "missing",
-	};
+	const sc = document.querySelector(".project-tree-scroll");
+	return { treeScrollOverflow: sc ? getComputedStyle(sc).overflowY : "missing" };
 });
-check("sessions-scroll is the scrolling area", styles.sessionsScrollOverflow === "auto");
+check("project-tree-scroll is the scrolling area", styles.treeScrollOverflow === "auto");
 
-// 5. Titles must not move when the sessions list scrolls.
+// 5. The title must not move when the project tree scrolls.
 const before = await page.evaluate(() => {
-	const t = document.querySelector(".panel-sessions .panel-section-title");
+	const t = document.querySelector(".project-tree-section .panel-section-title");
 	return t ? t.getBoundingClientRect().top : null;
 });
 const after = await page.evaluate(async () => {
-	const sc = document.querySelector(".sessions-scroll");
+	const sc = document.querySelector(".project-tree-scroll");
 	if (sc) sc.scrollTop = 300;
 	await new Promise((r) => setTimeout(r, 200));
-	const t = document.querySelector(".panel-sessions .panel-section-title");
+	const t = document.querySelector(".project-tree-section .panel-section-title");
 	return t ? t.getBoundingClientRect().top : null;
 });
-check("history title stays fixed after scroll", before !== null && before === after, `top=${before}→${after}`);
+check("project title stays fixed after scroll", before !== null && before === after, `top=${before}→${after}`);
 
 // 6. issue #140：当前对话一旦有内容就在「运行的对话」里（还在流式输出时也要有）
 //    —— 假模型不回包，所以只看到 streaming 那一帧就行。
 await page.locator("textarea").first().fill("SLOW 第一条消息");
 await page.keyboard.press("Enter");
 const convsAppeared = await page
-	.waitForSelector(".panel-left .panel-convs", { timeout: 20000 })
+	.waitForSelector(".chat-tabs .chat-tab", { timeout: 20000 })
 	.then(() => true)
 	.catch(() => false);
-check("running-conversations section appears for the active chat with content", convsAppeared);
-const titlesNow = await page.locator(".panel-left .panel-section-title").allTextContents();
+check("active chat appears in the top conversation tabs", convsAppeared);
 check(
-	"运行的对话 title is rendered now",
-	titlesNow.some((t) => t.includes("运行的对话")),
-	titlesNow.join("|"),
+	"the active tab shows a streaming indicator",
+	(await page.locator(".chat-tabs .chat-tab-dot.streaming").count()) === 1,
 );
-check(
-	"the row is the row of the chat we are looking at (当前)",
-	(await page.locator(".panel-convs .session-item .session-sub").allTextContents()).some((s) => s.includes("当前")),
-);
-check(
-	"the row shows the streaming indicator while the run is in flight",
-	(await page.locator(".panel-convs .conv-streaming").count()) === 1,
-);
-check(
-	"only that one row is listed (blank chats stay out)",
-	(await page.locator(".panel-convs .session-item").count()) === 1,
-);
+check("blank chats stay out of the top tabs", (await page.locator(".chat-tabs .chat-tab").count()) === 1);
 
 await browser.close();
 server.kill("SIGKILL");

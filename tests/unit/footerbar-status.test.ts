@@ -74,36 +74,38 @@ afterEach(() => {
 });
 
 describe("FooterBar 连接状态", () => {
-	it("status=open 且 ready=true 时渲染带有 status-conn 类的稳定包装节点并显示已连接", () => {
+	it("status=open 且 ready=true 时只渲染连接状态符号", () => {
 		setAppGlobals({ ready: true, status: "open" });
 		const chat = makeChatState({ ready: true, status: "open" });
 		const { container } = mountFooter(chat);
 		const connWrapper = container.querySelector(".status-conn");
 		expect(connWrapper).toBeTruthy();
-		expect(connWrapper?.textContent).toContain("已连接");
+		expect(connWrapper?.textContent).toBe("");
 		// 页面中只有一处连接包装节点
 		expect(container.querySelectorAll(".status-conn").length).toBe(1);
 	});
 
-	it("status=connecting 且 ready=false 时显示连接中…", () => {
+	it("status=connecting 且 ready=false 时使用 busy 状态符号", () => {
 		setAppGlobals({ ready: false, status: "connecting" });
 		const chat = makeChatState({ ready: false, status: "connecting" });
 		const { container } = mountFooter(chat);
 		const connWrapper = container.querySelector(".status-conn");
 		expect(connWrapper).toBeTruthy();
-		expect(connWrapper?.textContent).toContain("连接中…");
+		expect(connWrapper?.textContent).toBe("");
+		expect(connWrapper?.classList.contains("busy")).toBe(true);
 	});
 
-	it("status=closed 且 ready=false 时显示重连中…", () => {
+	it("status=closed 且 ready=false 时使用 error 状态符号", () => {
 		setAppGlobals({ ready: false, status: "closed" });
 		const chat = makeChatState({ ready: false, status: "closed" });
 		const { container } = mountFooter(chat);
 		const connWrapper = container.querySelector(".status-conn");
 		expect(connWrapper).toBeTruthy();
-		expect(connWrapper?.textContent).toContain("重连中…");
+		expect(connWrapper?.textContent).toBe("");
+		expect(connWrapper?.classList.contains("error")).toBe(true);
 	});
 
-	it("无 softCap 时底栏 Context 显示物理上限并按物理上限计算百分比", () => {
+	it("Context 按终端格式显示百分比与物理上下文窗口", () => {
 		const chat = makeChatState({
 			state: {
 				stats: {
@@ -118,12 +120,11 @@ describe("FooterBar 连接状态", () => {
 		const { container } = mountFooter(chat);
 		const ctxWrapper = container.querySelector(".status-ctx");
 		expect(ctxWrapper).toBeTruthy();
-		expect(ctxWrapper?.textContent).toContain("4K / 8K");
-		const fill = container.querySelector(".ctx-bar-fill") as HTMLElement;
-		expect(fill?.style.width).toBe("50%");
+		expect(ctxWrapper?.textContent).toBe("50.0%/8.0k");
+		expect(container.querySelector(".ctx-bar")).toBeNull();
 	});
 
-	it("存在有效 softCap 时底栏 Context 锚定到 softCap 为满格刻度", () => {
+	it("存在 softCap 时仍显示物理上下文窗口", () => {
 		const chat = makeChatState({
 			state: {
 				stats: {
@@ -144,13 +145,26 @@ describe("FooterBar 连接状态", () => {
 		const { container } = mountFooter(chat);
 		const ctxWrapper = container.querySelector(".status-ctx") as HTMLElement;
 		expect(ctxWrapper).toBeTruthy();
-		// 文本显示 150K / 300K 而非 150K / 1M
-		expect(ctxWrapper?.textContent).toContain("150K / 300K");
-		// 进度条填充度为 150000 / 300000 = 50%
-		const fill = container.querySelector(".ctx-bar-fill") as HTMLElement;
-		expect(fill?.style.width).toBe("50%");
-		// hover tooltip 包含软上限与物理上限提示
-		expect(ctxWrapper?.title).toContain("300K");
-		expect(ctxWrapper?.title).toContain("1000K");
+		expect(ctxWrapper?.textContent).toBe("15.0%/1.0M");
+		expect(ctxWrapper?.title).toBe("");
+	});
+
+	it("token 统计按终端字段显示，零值项不占位", () => {
+		const chat = makeChatState({
+			state: {
+				stats: {
+					tokens: { input: 1200, output: 4200, cacheRead: 9800, cacheWrite: 0, total: 15200 },
+					contextUsage: { tokens: 4000, contextWindow: 8000, percent: 50, estimated: false },
+					cost: 0.123,
+					totalMessages: 8,
+				},
+				queue: { steering: [], followUp: [] },
+			} as unknown as ChatState["state"],
+		});
+		const { container } = mountFooter(chat);
+		expect(container.querySelector(".status-token-stats")?.textContent).toBe("↑1.2k↓4.2kR9.8kCH89.1%");
+		expect(container.querySelector(".status-token-stats")?.textContent).not.toContain("W");
+		expect(container.querySelector(".status-host-metrics")).toBeNull();
+		expect(container.querySelector(".status-token-stats")?.getAttribute("title")).toBeNull();
 	});
 });

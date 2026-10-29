@@ -8054,9 +8054,9 @@ export class ClientSession {
 	 * - still streaming → it becomes a background run: ensure it is listed;
 	 * - idle + listed + continued → keep it (the user did continue it);
 	 * - any retained terminal state → keep it listed until the terminals are closed;
-	 * - idle + listed + opened-but-not-continued, or never listed at all → the
-	 *   caller must drop it (returns it so removal happens only after the
-	 *   active conversation has been switched away).
+	 * - any non-empty conversation stays as an open tab when switched away;
+	 * - only a blank conversation may be dropped automatically (returns it so
+	 *   removal happens only after the active conversation has been switched away).
 	 */
 	/** Write a pending-compaction marker into the session file. The SDK treats
 	 *  unknown custom entries as inert data, so a crash/restart-safe "we were
@@ -8287,7 +8287,11 @@ export class ClientSession {
 		// points at it: dropping an idle in-memory parent orphans the child row
 		// (the child vanishes from Running Chats with no result available).
 		const hasLiveChild = [...this.convs.values()].some((child) => child.parentId === conv.id);
+		// 标签只保留本次打开后真正继续过的对话；只是打开历史或空白新对话，
+		// 切走时自动关闭。运行中、子代理和终端等保护条件仍由下方统一判断。
+		const keepOpenTab = conv.promptedSinceActive;
 		const retained =
+			keepOpenTab ||
 			hasLiveChild ||
 			shouldRetainActive({
 				reviewing: conv.goal.reviewing,
@@ -8561,9 +8565,7 @@ export class ClientSession {
 	 *  shouldRetainActive / MAX_OPEN_CONVERSATIONS 那套「什么算运行中」的规则
 	 *  完全不变（换走时该释放的仍然释放，不会被这次展示口径改动永久钉在列表里）。
 	 *  Display-only: retention and disposal rules are deliberately untouched. */
-	private shownInRunningList(conv: Conversation): boolean {
-		if (conv.listed) return true;
-		if (conv.id !== this.activeId) return false;
+	private hasConversationContent(conv: Conversation): boolean {
 		// 首条提示词给对话命名 = 用户真的开始聊了（此刻消息可能还没落进会话统计）。
 		if (conv.title !== DEFAULT_CONV_TITLE) return true;
 		try {
@@ -8572,6 +8574,12 @@ export class ClientSession {
 			// 会话替换中 —— 先不列，下一次 emit 会补上
 			return false;
 		}
+	}
+
+	private shownInRunningList(conv: Conversation): boolean {
+		if (conv.listed) return true;
+		if (conv.id !== this.activeId) return false;
+		return this.hasConversationContent(conv);
 	}
 
 	/** Push every running conversation across ALL projects to the client. The
@@ -8683,14 +8691,14 @@ export class ClientSession {
 	private static readonly PROJECTS_CACHE_TTL = 15_000;
 	private projectsInFlight: Promise<ProjectSummary[] | null> | null = null;
 
-	private async loadSessionInfos(): Promise<SessionInfo[]> {
+	private async loadSessionInfos(cwd = this.cwd): Promise<SessionInfo[]> {
 		const now = Date.now();
 		const c = this.sessionInfosCache;
-		if (c && c.cwd === this.cwd && now - c.at < ClientSession.SESSION_INFO_CACHE_TTL) {
+		if (c && c.cwd === cwd && now - c.at < ClientSession.SESSION_INFO_CACHE_TTL) {
 			return c.infos;
 		}
-		const infos = await SessionManager.list(this.cwd, piSessionsRoot());
-		this.sessionInfosCache = { cwd: this.cwd, infos, at: now };
+		const infos = await SessionManager.list(cwd, piSessionsRoot());
+		this.sessionInfosCache = { cwd, infos, at: now };
 		return infos;
 	}
 
@@ -8708,6 +8716,27 @@ export class ClientSession {
 		await this.pushSessions();
 	}
 
+	/** 项目树展开的目录各自订阅历史列表；切换 cwd 不影响其他已展开项目。 */
+	private projectSessionsRequested = new Set<string>();
+
+	async refreshProjectSessions(path: string): Promise<void> {
+		if (!path) return;
+		this.projectSessionsRequested.add(path);
+		await this.pushProjectSessions(path);
+	}
+
+	private async refreshRequestedProjectSessions(): Promise<void> {
+		await Promise.all([...this.projectSessionsRequested].map((path) => this.pushProjectSessions(path)));
+	}
+
+	private async pushProjectSessions(path: string): Promise<void> {
+		try {
+			this.emit({ type: "project_sessions", path, sessions: await this.listSessions(path) });
+		} catch {
+			this.emit({ type: "project_sessions", path, sessions: [] });
+		}
+	}
+
 	/** 切项目时的会话列表刷新：历史面板没打开过就不扫盘（只清缓存），打开过
 	 *  才重推 —— 首访切项目的转录解析不在关键路径上。 */
 	private refreshSessionsOnSwitch(): void {
@@ -8715,47 +8744,50 @@ export class ClientSession {
 		if (this.sessionsRequested) void this.refreshSessions();
 	}
 
+	private async listSessions(cwd: string): Promise<SessionSummary[]> {
+		// Sessions live in the SDK default per-project dir
+		// (<agentDir>/sessions/--<cwd>--/), the same files the pi CLI/TUI use.
+		const infos = await this.loadSessionInfos(cwd);
+
+		// 隐藏「被 fork 掉的父会话」，历史列表只保留每条 fork 链最新的链尾会话
+		// （全文搜索 searchSessions 保留全部会话，不受此影响）。
+		const normSessionPath = (p: string) => String(p).replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
+		const forkedParentPaths = new Set<string>();
+		for (const info of infos) {
+			if (typeof info.parentSessionPath === "string" && info.parentSessionPath) {
+				forkedParentPaths.add(normSessionPath(info.parentSessionPath));
+			}
+		}
+		const visibleInfos =
+			forkedParentPaths.size > 0
+				? (() => {
+						const kept = infos.filter((info) => !forkedParentPaths.has(normSessionPath(info.path)));
+						return kept.length > 0 ? kept : infos;
+					})()
+				: infos;
+
+		const sessions = new Map<string, SessionSummary>();
+		for (const s of visibleInfos) {
+			sessions.set(s.path, {
+				path: s.path,
+				name: s.name,
+				firstMessage: s.firstMessage,
+				messageCount: s.messageCount,
+				modified: s.modified.getTime(),
+				source: "web",
+			});
+		}
+		return [...sessions.values()].sort((a, b) => b.modified - a.modified).slice(0, 200);
+	}
+
 	private async pushSessions(): Promise<void> {
 		if (!this.sessionsRequested) return;
 		try {
-			// Sessions live in the SDK default per-project dir
-			// (<agentDir>/sessions/--<cwd>--/), the same files the pi CLI/TUI
-			// use — one listing covers every conversation of the current folder.
-			const infos = await this.loadSessionInfos();
-
-			// 隐藏「被 fork 掉的父会话」，历史列表只保留每条 fork 链最新的链尾会话
-			// （全文搜索 searchSessions 保留全部会话，不受此影响）。
-			const normSessionPath = (p: string) => String(p).replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
-			const forkedParentPaths = new Set<string>();
-			for (const info of infos) {
-				if (typeof info.parentSessionPath === "string" && info.parentSessionPath) {
-					forkedParentPaths.add(normSessionPath(info.parentSessionPath));
-				}
-			}
-			const visibleInfos =
-				forkedParentPaths.size > 0
-					? (() => {
-							const kept = infos.filter((info) => !forkedParentPaths.has(normSessionPath(info.path)));
-							return kept.length > 0 ? kept : infos;
-						})()
-					: infos;
-
-			const sessions = new Map<string, SessionSummary>();
-			for (const s of visibleInfos) {
-				sessions.set(s.path, {
-					path: s.path,
-					name: s.name,
-					firstMessage: s.firstMessage,
-					messageCount: s.messageCount,
-					modified: s.modified.getTime(),
-					source: "web",
-				});
-			}
-			const sorted = [...sessions.values()].sort((a, b) => b.modified - a.modified).slice(0, 200); // newest first — the panel shows recent history
-			this.emit({ type: "sessions", sessions: sorted });
+			this.emit({ type: "sessions", sessions: await this.listSessions(this.cwd) });
 		} catch {
 			this.emit({ type: "sessions", sessions: [] });
 		}
+		await this.refreshRequestedProjectSessions();
 	}
 
 	/** Remove an entry from the client's recent-project list (UI state only). */
@@ -9536,9 +9568,8 @@ export class ClientSession {
 			}
 
 			const conv = this.makeConversation(openedRuntime, conversationId, openedTerminals);
-			// Deliberately resumed — must not be dismissed when the user later
-			// switches away without sending a new message.
-			conv.promptedSinceActive = true;
+			// 仅打开历史不算继续使用：若本次没有发送新消息，切走时自动关闭标签。
+			conv.promptedSinceActive = false;
 			this.noticeInterruptedCompaction(conv);
 			this.convs.set(conv.id, conv);
 			this.activeId = conv.id;
@@ -10364,12 +10395,6 @@ export class ClientSession {
 				throw new Error("路径不是目录");
 			}
 			if (abs === this.cwd) {
-				this.emit({
-					type: "notice",
-					level: "info",
-					text: `已在工作目录：${abs}`,
-					textEn: `Already in directory: ${abs}`,
-				});
 				this.flushSnapshot();
 				return;
 			}
@@ -10393,14 +10418,7 @@ export class ClientSession {
 				this.activeId = target.id;
 				if (displaced) this.removeConversation(displaced.id);
 			} else {
-				// 冷切换的 runtime 创建要 1~2s（扫技能/扩展）—— 先回一条 ack +
-				// 快照，点击看起来不再 frozen；落地后再推第二次全量。
-				this.emit({
-					type: "notice",
-					level: "info",
-					text: `正在切换到工作目录：${abs}`,
-					textEn: `Switching to directory: ${abs}`,
-				});
+				// 冷切换的 runtime 创建要 1~2s（扫技能/扩展）——先推快照，落地后再推全量。
 				this.flushSnapshot();
 				// First visit to this project: resume its most recent session —
 				// unless that transcript is still held on another client (#145):
@@ -10505,12 +10523,6 @@ export class ClientSession {
 			this.goalSvc.emitGoalStatus();
 			// Skills / prompt templates are project-bound — refresh the catalog.
 			void this.pushSlashCommands();
-			this.emit({
-				type: "notice",
-				level: "info",
-				text: `已切换到工作目录：${abs}`,
-				textEn: `Switched to directory: ${abs}`,
-			});
 			this.refreshSessionsOnSwitch();
 			void this.listFiles(undefined);
 			// Commands are per-project (.pi/commands.json in the current cwd).

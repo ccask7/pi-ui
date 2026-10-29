@@ -270,6 +270,7 @@ export interface ExportContentFilter {
 export function applyExportContentFilter(root: HTMLElement, opts: ExportContentFilter = {}): void {
 	if (!opts.includeThinking) root.querySelectorAll(".thinking").forEach((n) => n.remove());
 	if (!opts.includeTools) root.querySelectorAll(".toolcall").forEach((n) => n.remove());
+	if (!opts.includeThinking && !opts.includeTools) root.querySelectorAll(".activity-group").forEach((n) => n.remove());
 }
 
 export function snapshotMessageForExport(

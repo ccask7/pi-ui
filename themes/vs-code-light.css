@@ -7,7 +7,7 @@
 	--bg-elev: #f8f8f8;
 	--bg-elev2: #f2f2f2;
 	--border: #e5e5e5;
-	--border-soft: #ececec;
+	--border-soft: #e5e5e5;
 	--text: #3b3b3b;
 	--text-dim: #616161;
 	--text-faint: #767676;
@@ -15,8 +15,8 @@
 	--accent-soft: rgba(0, 95, 184, 0.12);
 	--green: #2ea043;
 	--green-soft: rgba(46, 160, 67, 0.12);
-	--red: #cd3131;
-	--red-soft: rgba(205, 49, 49, 0.1);
+	--red: #f85149;
+	--red-soft: rgba(248, 81, 73, 0.1);
 	--amber: #bf8803;
 	--blue: #0451a5;
 	--blue-soft: rgba(4, 81, 165, 0.12);
@@ -49,8 +49,8 @@
 	--code-border: var(--border-soft);
 	--code-pad: 8px 10px;
 	--card-body-pad: 4px 14px 12px;
-	--err-text: #cd3131;
-	--red-text: #cd3131;
+	--err-text: #f85149;
+	--red-text: #f85149;
 	--amber-text: #bf8803;
 	--info-blue: #005fb8;
 	--link: #005fb8;
@@ -88,18 +88,24 @@
 	--glow-38: rgba(0, 0, 0, 0.25);
 	--control-fg: #3b3b3b;
 	--control-bg: #f8f8f8;
-	--control-border: #e5e5e5;
+	--control-border: #cecece;
 	--bg-image: none;
 	--bg-image-dim: 0.78;
 	--bg-image-blur: 0px;
+	--window-opacity: 100%;
 	--wallpaper-panel-alpha: 100%;
-	--topbar-bg: #f8f8f8;
-	--statusbar-bg: #f8f8f8;
-	--panel-bg: #f8f8f8;
-	--card-bg: #f8f8f8;
-	--chip-bg: #f2f2f2;
-	--msgs-bg: #ffffff;
-	--inputbox-bg: #f3f3f3;
+	--topbar-bg: color-mix(in srgb, #f8f8f8 var(--window-opacity, 100%), transparent);
+	--statusbar-bg: color-mix(in srgb, #f8f8f8 var(--window-opacity, 100%), transparent);
+	--panel-bg: color-mix(in srgb, #f8f8f8 var(--window-opacity, 100%), transparent);
+	--card-bg: color-mix(in srgb, #f8f8f8 var(--window-opacity, 100%), transparent);
+	--chip-bg: color-mix(in srgb, #f2f2f2 var(--window-opacity, 100%), transparent);
+	--msgs-bg: color-mix(in srgb, #ffffff var(--window-opacity, 100%), transparent);
+	--inputbox-bg: color-mix(in srgb, #ffffff var(--window-opacity, 100%), transparent);
+	--input-border: #cecece;
+	--chat-tabs-bg: #f8f8f8;
+	--chat-tab-bg: #f8f8f8;
+	--chat-tab-active-bg: #ffffff;
+	--chat-tab-hover-bg: #ffffff;
 	--menu-bg: #ffffff;
 }
 

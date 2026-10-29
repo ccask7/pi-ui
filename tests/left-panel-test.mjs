@@ -92,7 +92,7 @@ check(
 );
 check("no divider without running list", (await page.locator(".panel-left .panel-section-divider").count()) === 0);
 
-// 3. Switch workspace to project B (footer cwd input) → file tree + notice.
+// 3. Switch workspace to project B (footer cwd input) → file tree, no success notice.
 await page.locator(".status-cwd").click();
 await page.locator(".status-cwd-input").fill(B);
 await page.keyboard.press("Enter");
@@ -108,8 +108,8 @@ const notices = await page
 	.allTextContents()
 	.catch(() => []);
 check(
-	"workspace-switch notice fired",
-	notices.some((n) => n.includes("已切换到工作目录") || n.includes(B)),
+	"workspace-switch success tip stays silent",
+	!notices.some((n) => n.includes("已切换到工作目录") || n.includes("正在切换到工作目录")),
 	notices.join(" | "),
 );
 

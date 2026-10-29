@@ -21,13 +21,11 @@ const MACHINE_ROOT = "@root";
  *  降级路径没有 slot 数据，分区只能按这张静态表（正常链路一律走 entry.align）。 */
 const FALLBACK_BOTTOMBAR: { id: string; align: "start" | "end" }[] = [
 	{ id: "host:conn", align: "start" },
-	{ id: "host:ctx", align: "start" },
-	{ id: "host:cost", align: "start" },
 	{ id: "host:cache", align: "start" },
-	{ id: "host:msg-count", align: "start" },
+	{ id: "host:cost", align: "start" },
+	{ id: "host:ctx", align: "start" },
 	{ id: "host:plugin-status", align: "start" },
 	{ id: "host:working", align: "start" },
-	{ id: "host:host-metrics", align: "end" },
 	{ id: "host:cwd", align: "end" },
 ];
 
@@ -128,23 +126,11 @@ export function FooterBar({ chat, bottombarItems, onUiAction }: FooterBarProps) 
 	const rate = streamingNow ? streamRate(samplesRef.current) : 0;
 
 	const connClass = chat.ready ? "ok" : chat.status === "closed" ? "error" : "busy";
-	const connLabel = chat.ready ? t("connected") : chat.status === "closed" ? t("reconnecting") : t("connecting");
 
 	const context = s.contextUsage;
-	// 压缩软上限（issue #229 / #245）：设置了有效软上限时，底栏进度条与数字显示以该上限为满格刻度
-	const cap = context.softCap ?? null;
-	const hasCap = cap !== null && cap > 0 && cap < context.contextWindow;
-	const effectiveMax = hasCap ? cap : context.contextWindow;
-
-	const ctxPercent =
-		context.tokens !== null && effectiveMax > 0
-			? Math.min(100, Math.round((context.tokens / effectiveMax) * 100))
-			: null;
-	const ctxText =
-		context.tokens !== null && ctxPercent !== null
-			? `${context.estimated ? "~" : ""}${formatTokens(context.tokens)} / ${formatTokens(effectiveMax)}`
-			: "—";
-	const ctxBarClass = ctxPercent === null ? "" : ctxPercent >= 80 ? "warn" : ctxPercent >= 50 ? "mid" : "ok";
+	const contextPercent = context.percent;
+	const ctxText = `${contextPercent === null ? "?" : `${contextPercent.toFixed(1)}%`}/${formatTokens(context.contextWindow)}`;
+	const ctxClass = contextPercent === null ? "" : contextPercent > 90 ? "warn" : contextPercent > 70 ? "mid" : "ok";
 
 	const queueTotal = state.queue.steering.length + state.queue.followUp.length;
 
@@ -210,58 +196,38 @@ export function FooterBar({ chat, bottombarItems, onUiAction }: FooterBarProps) 
 	 */
 	const hostNodes: Record<string, ReactNode> = {
 		"host:conn": (
-			<span className={`status-item status-conn ${connClass}`} title={connLabel}>
+			<span className={`status-item status-conn ${connClass}`}>
 				<span className={`status-dot ${connClass}`} />
-				<span className="status-conn-label">{connLabel}</span>
 			</span>
 		),
-		"host:ctx": (() => {
-			const ctxTitle = hasCap
-				? `${t("contextUsage")}: ${formatTokens(context.tokens ?? 0)} / ${formatTokens(cap)} (${t("softCapMarker")}, max ${formatTokens(context.contextWindow)})`
-				: cap !== null && cap > 0
-					? `${t("contextUsage")} · ${t("softCapMarker")}: ${formatTokens(cap)}`
-					: t("contextUsage");
+		"host:ctx": <span className={`status-item status-ctx ${ctxClass}`}>{ctxText}</span>,
+		"host:cost": <span className="status-item">${formatCost(s.cost)}</span>,
+		"host:cache": (() => {
+			const parts = [
+				s.tokens.input > 0 ? `↑${formatTokens(s.tokens.input)}` : null,
+				s.tokens.output > 0 ? `↓${formatTokens(s.tokens.output)}` : null,
+				cache.read > 0 ? `R${formatTokens(cache.read)}` : null,
+				cache.write > 0 ? `W${formatTokens(cache.write)}` : null,
+			].filter((part): part is string => part !== null);
+			const hasCacheActivity = cache.read > 0 || cache.write > 0;
+			if (parts.length === 0 && !hasCacheActivity) return null;
 			return (
-				<span className="status-item status-ctx" title={ctxTitle}>
-					{/* 只留进度条 + 数字：标签文字已去掉（宽度紧张，进度条+数值本身够读） */}
-					<span className={`ctx-bar ${ctxBarClass}`}>
-						{ctxPercent !== null && (
-							<span className="ctx-bar-fill" style={{ width: `${Math.min(ctxPercent, 100)}%` }} />
-						)}
-					</span>
-					{ctxText}
+				<span className="status-item status-token-stats">
+					{parts.map((part) => (
+						<span key={part}>{part}</span>
+					))}
+					{hasCacheActivity && <b className={`cache-pct ${hitClass}`}>CH{hitText}</b>}
 				</span>
 			);
 		})(),
-		"host:cost": (
-			<span className="status-item" title={t("cumulativeCost")}>
-				${formatCost(s.cost)}
-			</span>
-		),
-		"host:cache": (
-			<span
-				className="status-item status-cache"
-				title={t("cacheHitTip", {
-					read: formatTokens(cache.read),
-					write: formatTokens(cache.write),
-					miss: formatTokens(cache.miss),
-					input: formatTokens(cache.totalInput),
-				})}
-			>
-				{t("cacheHit")}
-				<b className={`cache-pct ${hitClass}`}>{hitText}</b>
-			</span>
-		),
 		"host:msg-count": (
-			<span className="status-item" title={t("sessionMessages")}>
+			<span className="status-item">
 				{t("messages")} {s.totalMessages}
 			</span>
 		),
 		"host:plugin-status":
 			chat.statuses.length > 0 ? (
-				<span className="status-item ext-status" title={t("pluginStatus")}>
-					{chat.statuses.map((st) => st.text).join(" · ")}
-				</span>
+				<span className="status-item ext-status">{chat.statuses.map((st) => st.text).join(" · ")}</span>
 			) : null,
 		"host:working": state.isStreaming ? (
 			<>
@@ -274,30 +240,13 @@ export function FooterBar({ chat, bottombarItems, onUiAction }: FooterBarProps) 
 						</span>
 					)}
 				</span>
-				<span className="status-item status-rate" title={t("rateTip")}>
+				<span className="status-item status-rate">
 					{/* 手机上「工作中」文案被隐藏，这里给个小转圈（仅窄屏显示） */}
 					<span className="working-spin rate-spin" />
 					{rate > 0 ? `${Math.round(rate)}${t("tps")}` : "…"}
 				</span>
 			</>
 		) : null,
-		"host:host-metrics": (() => {
-			const metrics = chat.hostMetrics;
-			if (!metrics) return null;
-			const cpu =
-				metrics.cpuPercent === null || !Number.isFinite(metrics.cpuPercent)
-					? "—"
-					: `${Math.round(metrics.cpuPercent)}%`;
-			const memory = Number.isFinite(metrics.memoryPercent) ? `${Math.round(metrics.memoryPercent)}%` : "—";
-			return (
-				<span
-					className="status-item status-host-metrics"
-					title={`${t("hostResourcesTip")}\n${t("hostProcessor")}: ${cpu} · ${t("hostMemory")}: ${memory}`}
-				>
-					{t("hostProcessor")} {cpu} · {t("hostMemory")} {memory}
-				</span>
-			);
-		})(),
 		"host:cwd": editing ? (
 			<>
 				{/* Click-away backdrop closes the picker. */}
@@ -553,8 +502,11 @@ export function FooterBar({ chat, bottombarItems, onUiAction }: FooterBarProps) 
 }
 
 function formatTokens(n: number): string {
-	if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
-	return String(n);
+	if (n < 1000) return String(n);
+	if (n < 10000) return `${(n / 1000).toFixed(1)}k`;
+	if (n < 1000000) return `${Math.round(n / 1000)}k`;
+	if (n < 10000000) return `${(n / 1000000).toFixed(1)}M`;
+	return `${Math.round(n / 1000000)}M`;
 }
 
 function formatCost(cost: number): string {
