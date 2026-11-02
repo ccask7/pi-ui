@@ -59,6 +59,10 @@ function mountLeftPanel(overrides: Record<string, unknown> = {}) {
 		},
 		projects: [{ path: "/test", lastUsed: Date.now() }],
 		activeConversationId: "",
+		onOpenPlugins: () => {},
+		onNewTask: () => {},
+		pluginsActive: false,
+		onOpenGlobalSearch: () => {},
 		panelSend,
 		pathCompletions: [
 			{ name: "sub1", path: "/test/sub1", type: "dir" as const },
@@ -106,18 +110,65 @@ describe("LeftPanel 标题栏操作与项目管理", () => {
 		expect(container.querySelector(".lp-sash")).toBeNull();
 	});
 
-	it("“项目”标题栏渲染新对话加号按钮，点击后发送 new_chat", () => {
+	it("项目上方提供品牌、搜索、新建任务与插件入口，项目标题不显示数量", () => {
 		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
-		const { container, sent } = mountLeftPanel();
-
-		const newChatBtn = container.querySelector<HTMLButtonElement>(".lp-new-chat-action");
-		expect(newChatBtn).toBeTruthy();
-		expect(newChatBtn?.title).toBeTruthy();
-		expect(newChatBtn?.getAttribute("aria-label")).toBeTruthy();
+		const onOpenPlugins = vi.fn();
+		const onNewTask = vi.fn();
+		const onOpenGlobalSearch = vi.fn();
+		const { container, sent } = mountLeftPanel({ onOpenPlugins, onNewTask, onOpenGlobalSearch });
+		const actions = container.querySelectorAll<HTMLButtonElement>(".lp-primary-action");
+		expect(actions).toHaveLength(2);
+		expect(actions[0].textContent).toContain("新建任务");
+		expect(container.querySelector(".lp-tree-heading")?.textContent).toBe("项目");
+		expect(container.querySelector(".lp-brand-name")?.textContent).toBe("Cc");
+		act(() => container.querySelector<HTMLButtonElement>(".lp-brand-search")!.click());
+		expect(onOpenGlobalSearch).toHaveBeenCalledOnce();
 
 		sent.length = 0;
-		act(() => newChatBtn!.click());
-		expect(sent).toEqual([{ type: "new_chat" }]);
+		act(() => actions[0].click());
+		expect(onNewTask).toHaveBeenCalledOnce();
+		expect(sent).toEqual([]);
+		act(() => actions[1].click());
+		expect(onOpenPlugins).toHaveBeenCalledOnce();
+	});
+
+	it("品牌行用侧栏图标收起面板，搜索按钮保持独立", () => {
+		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
+		const onToggleCollapse = vi.fn();
+		const { container } = mountLeftPanel({ collapsible: true, onToggleCollapse });
+		const toggle = container.querySelector<HTMLButtonElement>(".lp-brand-toggle");
+		expect(toggle).toBeTruthy();
+		expect(toggle?.getAttribute("aria-label")).toBe("收起面板");
+		expect(container.querySelector(".panel-collapse-btn")).toBeNull();
+		act(() => toggle!.click());
+		expect(onToggleCollapse).toHaveBeenCalledOnce();
+	});
+
+	it("目录默认显示最近 5 个会话，点击查看更多后显示全部", () => {
+		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
+		const history = Array.from({ length: 7 }, (_, index) => ({
+			path: `session-${index + 1}.jsonl`,
+			name: `Session ${index + 1}`,
+			firstMessage: "",
+			modified: 1000 - index,
+			messageCount: 1,
+		}));
+		const { container } = mountLeftPanel({ sessions: history, projectSessions: { "/test": history } });
+
+		expect(container.querySelectorAll(".lp-tree-session-row")).toHaveLength(5);
+		const more = container.querySelector<HTMLButtonElement>(".lp-tree-more");
+		expect(more?.textContent).toContain("查看更多(2)");
+		act(() => more!.click());
+		expect(container.querySelectorAll(".lp-tree-session-row")).toHaveLength(7);
+		expect(container.querySelector(".lp-tree-more")).toBeNull();
+
+		// 点击目录名称区域收起；重新展开后恢复最近 5 条与“查看更多”。
+		const project = container.querySelector<HTMLButtonElement>(".project-item");
+		act(() => project!.click());
+		expect(container.querySelectorAll(".lp-tree-session-row")).toHaveLength(0);
+		act(() => project!.click());
+		expect(container.querySelectorAll(".lp-tree-session-row")).toHaveLength(5);
+		expect(container.querySelector(".lp-tree-more")?.textContent).toContain("查看更多(2)");
 	});
 
 	it("当前项目默认展开；展开其他项目时按需请求该项目历史，不切换 cwd", () => {
@@ -136,6 +187,30 @@ describe("LeftPanel 标题栏操作与项目管理", () => {
 		expect(sent).toEqual([{ type: "list_project_sessions", path: "/other" }]);
 		expect(sent.some((msg: any) => msg.type === "set_cwd")).toBe(false);
 		expect(otherToggle.getAttribute("aria-expanded")).toBe("true");
+	});
+
+	it("目录收起后收到本次 cwd 切换结果，不会被自动重新展开", () => {
+		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
+		const { container } = mountLeftPanel({
+			projects: [
+				{ path: "/test", lastUsed: 2 },
+				{ path: "/other", lastUsed: 1 },
+			],
+		});
+		const otherProject = container.querySelectorAll<HTMLButtonElement>(".project-item")[1];
+		act(() => otherProject.click());
+		expect(container.querySelectorAll<HTMLButtonElement>(".lp-tree-toggle")[1].getAttribute("aria-expanded")).toBe(
+			"true",
+		);
+		act(() => otherProject.click());
+		expect(container.querySelectorAll<HTMLButtonElement>(".lp-tree-toggle")[1].getAttribute("aria-expanded")).toBe(
+			"false",
+		);
+
+		act(() => setAppGlobals({ cwd: "/other" }));
+		expect(container.querySelectorAll<HTMLButtonElement>(".lp-tree-toggle")[1].getAttribute("aria-expanded")).toBe(
+			"false",
+		);
 	});
 
 	it("标题行容器与折叠按钮不产生嵌套 button（无 button button）", () => {

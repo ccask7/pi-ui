@@ -1,7 +1,7 @@
 # electron-builder 配置（桌面版专用，网页版不受影响）
 # 移植自上游 pi-web-ui，差异：appId/productName 改为 pi-ccui 系；删除 publish 段与
-# mac/linux target（本 fork 已裁掉 electron-updater 自动更新，也没有自己的 release 通道——
-# publish 若指向上游 repo，更新检查会把 fork 覆盖成上游版本）。只出 Windows NSIS 安装包。
+# mac/linux target。更新由设置页手动触发，主进程直接读取本 fork 的 GitHub Release，
+# 不依赖 electron-updater / publish。只出 Windows NSIS 安装包。
 appId: com.ccask7.pi-ccui
 productName: pi-ccui
 directories:

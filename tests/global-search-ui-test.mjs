@@ -1,6 +1,6 @@
 /**
  * 全局搜索 UI 冒烟（真实 Chrome headless，零 token）：
- * 顶栏「搜索」按钮打开弹窗 → 输入关键词 → 文件分区出现命中；
+ * 左栏品牌行「搜索」按钮打开弹窗 → 输入关键词 → 文件分区出现命中；
  * Ctrl+K 可开关弹窗；模型下拉出现搜索框并可过滤。
  */
 import { chromium } from "playwright-core";
@@ -53,9 +53,10 @@ async function run() {
 	await page.goto(BASE);
 	await page.waitForSelector(".topbar", { timeout: 15000 });
 
-	// 1) 顶栏搜索按钮存在且点击打开弹窗
-	const searchBtn = page.locator(".topbar .chip", { hasText: "搜索" }).first();
-	check("顶栏有搜索按钮", (await searchBtn.count()) > 0);
+	// 1) 左栏搜索按钮存在且点击打开弹窗；顶栏不再重复提供入口
+	const searchBtn = page.locator(".lp-brand-search");
+	check("左栏有搜索按钮", (await searchBtn.count()) > 0);
+	check("顶栏无搜索入口", (await page.locator('.topbar [data-tip*="搜索"]').count()) === 0);
 	await searchBtn.click();
 	await page.waitForSelector(".gs-modal", { timeout: 5000 });
 	check("点击按钮打开全局搜索弹窗", true);

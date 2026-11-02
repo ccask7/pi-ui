@@ -7,10 +7,31 @@
  *
  * 参数注水（`win?`）是为了单测：浏览器里直接调 `isDesktopShell()` 读全局 window 即可。
  */
+export interface DesktopUpdateRelease {
+	version: string;
+	notes: string;
+	pageUrl: string;
+}
+
+export type DesktopUpdateCheckResult =
+	| { status: "unsupported" }
+	| { status: "latest" }
+	| { status: "available"; release: DesktopUpdateRelease }
+	| { status: "error"; message: string };
+
+export interface DesktopUpdater {
+	getInfo: () => Promise<{ supported: boolean; currentVersion: string }>;
+	check: () => Promise<DesktopUpdateCheckResult>;
+	download: () => Promise<{ status: "ready" | "cancelled" | "error"; message?: string }>;
+	cancel: () => Promise<void>;
+	install: () => Promise<string | null>;
+	onProgress: (listener: (percent: number | null) => void) => () => void;
+}
+
 export interface DesktopShellWindow {
 	piDesktop?: {
 		isDesktop?: unknown;
-		updater?: unknown;
+		updater?: DesktopUpdater;
 		setTitleBarOverlay?: (color: string, symbolColor: string, height?: number) => Promise<unknown>;
 		getWindowTransparent?: () => Promise<{ transparent: boolean }>;
 		setWindowTransparent?: (on: boolean) => Promise<{ transparent: boolean }>;

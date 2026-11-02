@@ -232,6 +232,7 @@ body {
    ============================================================ */
 
 .layout {
+	position: relative;
 	flex: 1;
 	display: flex;
 	min-height: 0;
@@ -266,6 +267,132 @@ body {
 	--chat-max: 860px;
 	--chat-rail: 0px;
 	--chat-inset: max(var(--chat-pad), (100% - var(--chat-max)) / 2, var(--chat-rail));
+}
+
+.conversation-content {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+}
+.conversation-content.hidden {
+	display: none;
+}
+.capabilities-panel {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+	padding: 18px var(--chat-pad) 24px;
+}
+.capabilities-tabs {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	width: min(100%, var(--chat-max));
+	margin: 0 auto 14px;
+	border-bottom: 1px solid var(--border-soft);
+}
+.capabilities-tabs button {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 8px 12px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: var(--text-dim);
+	cursor: pointer;
+}
+.capabilities-tabs button:hover,
+.capabilities-tabs button.active {
+	color: var(--text);
+}
+.capabilities-tabs button.active {
+	border-bottom-color: var(--accent);
+}
+.capabilities-mark {
+	margin-left: auto;
+	margin-right: 8px;
+	color: var(--text-faint);
+}
+.capabilities-body {
+	flex: 1 1 auto;
+	width: min(100%, var(--chat-max));
+	min-height: 0;
+	margin: 0 auto;
+	overflow: auto;
+}
+.capabilities-body .skills-panel {
+	margin: 0;
+}
+.capabilities-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	min-height: 220px;
+	color: var(--text-dim);
+	text-align: center;
+}
+.capabilities-empty code {
+	max-width: 100%;
+	color: var(--text-faint);
+	overflow-wrap: anywhere;
+}
+.mcp-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.mcp-server {
+	border: 1px solid var(--border-soft);
+	border-radius: 7px;
+	background: var(--card-bg);
+}
+.mcp-server summary {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 11px 12px;
+	cursor: pointer;
+}
+.mcp-server-name {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+}
+.mcp-status {
+	font-size: 11px;
+	color: var(--text-dim);
+}
+.mcp-status.running {
+	color: var(--green);
+}
+.mcp-status.error,
+.mcp-error {
+	color: var(--red);
+}
+.mcp-error {
+	margin: 0;
+	padding: 0 12px 12px;
+	font-size: 12px;
+	overflow-wrap: anywhere;
+}
+.mcp-tools {
+	padding: 0 12px 12px;
+}
+.mcp-tool {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 8px 0;
+	border-top: 1px solid var(--border-soft);
+}
+.mcp-tool span {
+	color: var(--text-dim);
+	font-size: 12px;
 }
 
 /* 提问导航条（qn-rail）钉在消息区右侧 14~38px：桌面（≥641px，rail 只在此时
@@ -360,92 +487,61 @@ body.panel-resizing {
 }
 
 /* ---- Panel chrome: collapse button / rail / header ---- */
-/* 收起按钮 resting 态即带底色 + 边框（与顶栏图标按钮同级），
-   前景用 --control-fg（默认正文次级色）而非 --text-faint，避免在部分主题下
-   因 --text-faint 与背景接近而看不见（issue #100）。 */
+/* 左右栏共用无框侧栏图标；右栏收起按钮留在内容区右上角。 */
 .panel-collapse-btn {
 	position: absolute;
-	top: 4px;
-	right: 4px;
+	top: 5px;
+	right: 7px;
 	z-index: 5;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 24px;
-	height: 24px;
-	border: 1px solid var(--control-border, var(--border));
-	border-radius: 6px;
-	background: var(--chip-bg, var(--control-bg, var(--bg-elev2)));
-	color: var(--control-fg, var(--text-dim));
-	font-size: 13px;
+	width: 29px;
+	height: 29px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--text-dim);
+	font-size: 15px;
 	cursor: pointer;
-	opacity: 1;
-	transition:
-		background 0.15s,
-		color 0.15s,
-		border-color 0.15s;
 }
-.panel-collapse-btn:hover {
+.panel-collapse-btn:hover,
+.panel-rail:hover {
+	background: var(--glow-05);
 	color: var(--text);
-	border-color: var(--accent);
 }
-.panel-collapse-btn:active {
-	transform: scale(0.92);
-}
-.panel-collapse-btn:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
+.panel-collapse-btn:focus-visible,
+.panel-rail:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
 }
 
-/* 展开条：加宽到 26px，图标套「药丸」底（底色 + 边框，与收起按钮同级），
-   第一眼就是可点击的按钮而非分割线（issue #100）。 */
+/* 收起后不再保留整列边框或中部点击区，只在左上/右上显示展开图标。 */
 .panel-rail {
-	flex-shrink: 0;
-	width: 26px;
-	padding: 0;
-	display: flex;
+	position: absolute;
+	top: 8px;
+	z-index: 20;
+	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	border: none;
-	background: var(--card-bg, var(--bg-elev));
-	color: var(--control-fg, var(--text-dim));
-	font-size: 14px;
+	width: 29px;
+	height: 29px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--text-dim);
+	font-size: 15px;
 	cursor: pointer;
-	position: relative;
-	z-index: 10;
-	transition:
-		background 0.15s,
-		color 0.15s;
-}
-.panel-rail svg {
-	flex-shrink: 0;
-	width: 24px;
-	height: 24px;
-	box-sizing: border-box;
-	padding: 5px;
-	border: 1px solid var(--control-border, var(--border));
-	border-radius: 8px;
-	background: var(--chip-bg, var(--control-bg, var(--bg-elev2)));
-	transition:
-		border-color 0.15s,
-		color 0.15s;
 }
 .panel-rail-left {
-	border-right: 1px solid var(--border);
+	top: 7px;
+	left: 8px;
 }
 .panel-rail-right {
-	border-left: 1px solid var(--border);
-}
-.panel-rail:hover {
-	background: var(--chip-bg, var(--bg-elev2));
-	color: var(--accent);
-}
-.panel-rail:hover svg {
-	border-color: var(--accent);
-}
-.panel-rail:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: -2px;
+	top: 5px;
+	right: 7px;
 }
 
 .panel-header {
@@ -1207,6 +1303,85 @@ button.session-item.elsewhere-item.confirm {
 .lp-tree-project + .lp-tree-project {
 	margin-top: 6px;
 }
+.lp-brand-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex: 0 0 auto;
+	min-height: 42px;
+	padding: 7px 9px 5px 12px;
+}
+.lp-brand-name {
+	color: var(--text);
+	font-size: 16px;
+	font-weight: 650;
+	letter-spacing: -0.02em;
+}
+.lp-brand-actions {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+}
+.lp-brand-search,
+.lp-brand-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 29px;
+	height: 29px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--text-dim);
+	font-size: 15px;
+	cursor: pointer;
+}
+.lp-brand-search:hover,
+.lp-brand-toggle:hover {
+	background: var(--glow-05);
+	color: var(--text);
+}
+.lp-brand-search:focus-visible,
+.lp-brand-toggle:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+.lp-primary-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 0 0 auto;
+	padding: 2px 8px 10px;
+	border-bottom: 1px solid var(--border-soft);
+}
+.lp-primary-action {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	width: 100%;
+	min-height: 32px;
+	padding: 6px 9px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--text-dim);
+	font-size: 12.5px;
+	text-align: left;
+	cursor: pointer;
+}
+.lp-primary-action:hover,
+.lp-primary-action.active {
+	background: var(--glow-05);
+	color: var(--text);
+}
+.lp-primary-action.active {
+	font-weight: 600;
+}
+.lp-primary-action:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
 .lp-tree-project-row {
 	min-height: 32px;
 }
@@ -1224,23 +1399,22 @@ button.session-item.elsewhere-item.confirm {
 	font-size: 11px;
 	cursor: pointer;
 }
-.lp-tree-toggle:hover {
-	color: var(--text);
-}
 .lp-tree-toggle:focus-visible {
 	outline: 1px solid var(--accent);
 	outline-offset: -2px;
 }
 .lp-row.lp-tree-project-row .project-item {
-	flex: 0 1 auto;
+	flex: 1 1 auto;
 	gap: 6px;
 	min-height: 30px;
 	margin-bottom: 0;
 	padding: 5px 2px;
 	border-radius: 4px;
 }
-.lp-tree-project-row .project-item:hover {
+.lp-row.lp-tree-project-row .project-item:hover,
+.lp-row.lp-tree-project-row .project-item.active:hover {
 	background: var(--glow-05);
+	color: var(--text);
 }
 .lp-row.lp-tree-project-row .project-item.active {
 	padding: 5px 2px;
@@ -1287,6 +1461,29 @@ button.session-item.elsewhere-item.confirm {
 }
 .lp-tree-session-row .session-time {
 	font-size: 10px;
+}
+.lp-tree-more {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	width: 100%;
+	min-height: 30px;
+	padding: 5px 7px;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-faint);
+	font-size: 11px;
+	text-align: left;
+	cursor: pointer;
+}
+.lp-tree-more:hover {
+	background: var(--glow-05);
+	color: var(--text);
+}
+.lp-tree-more:focus-visible {
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
 }
 .lp-tree-empty {
 	padding: 7px 7px 9px;
@@ -5608,6 +5805,35 @@ body:not(.has-wallpaper)::after {
 	scroll-margin-top: 84px;
 }
 
+/* 同一用户回合只显示一次 PI 消息头。阶段正文仍是独立消息，保留自己的
+ * data-msg-id、复制/搜索/导出行为，只用次级颜色和小圆点区别于最终回答。 */
+.msg-assistant.msg-turn-continuation {
+	padding-top: 0;
+	padding-bottom: 8px;
+}
+
+.msg-assistant.msg-stage .msg-body {
+	position: relative;
+	margin-left: 3px;
+	padding-left: 14px;
+	color: var(--text-dim);
+}
+
+.msg-assistant.msg-stage .msg-body::before {
+	content: "";
+	position: absolute;
+	top: 9px;
+	left: 1px;
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--text-faint);
+}
+
+.msg-assistant.msg-stage .msg-text {
+	color: var(--text-dim);
+}
+
 .msg-meta {
 	display: flex;
 	align-items: baseline;
@@ -8333,7 +8559,6 @@ div.chead[role="button"]:focus-visible,
    --chat-rail 统一处理（见文件顶部「中央列几何」）——列窄到会被 rail 压住时
    两侧一起缩同样的距离，消息列与输入框仍然等宽、左右边缘对齐。 */
 
-
 /* ------------------------------------------------------------- plan board */
 
 /* 任务执行看板（Plan Mode，PlanBoard.tsx）：渲染在 .main 里、输入框上方。
@@ -8772,6 +8997,94 @@ div.chead[role="button"]:focus-visible,
 	box-shadow:
 		inset 0 1px 0 var(--glow-05),
 		0 4px 18px rgba(0, 0, 0, 0.28);
+}
+.new-task-empty {
+	flex: 1;
+	min-height: 0;
+}
+.task-project-row {
+	position: relative;
+	display: flex;
+	align-items: center;
+	min-height: 24px;
+	margin: 0 2px 7px;
+}
+.task-project-selector {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 100%;
+	padding: 3px 5px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-dim);
+	font-size: 12px;
+}
+.task-project-selector span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.task-project-selector.editable:hover {
+	background: var(--glow-05);
+	color: var(--text);
+}
+.task-project-selector:focus-visible {
+	outline: 1px solid var(--accent);
+}
+.task-project-menu-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+}
+.task-project-menu {
+	position: absolute;
+	bottom: 30px;
+	left: 0;
+	z-index: 101;
+	width: min(420px, 90vw);
+	max-height: 320px;
+	overflow-y: auto;
+	padding: 5px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--menu-bg, var(--bg-elev));
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.task-project-menu > button {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 2px 8px;
+	width: 100%;
+	padding: 8px;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+}
+.task-project-menu > button:hover,
+.task-project-menu > button.selected {
+	background: var(--glow-05);
+}
+.task-project-option-name {
+	font-size: 12px;
+	font-weight: 600;
+}
+.task-project-option-path {
+	grid-column: 1;
+	overflow: hidden;
+	color: var(--text-faint);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.task-project-menu > button > svg {
+	grid-column: 2;
+	grid-row: 1 / 3;
+	align-self: center;
+	color: var(--accent);
 }
 /* 输入框顶部拖拽条：上下拖动直接固定输入区高度（40–720px，localStorage
  * 持久化，内容少也撑到这个高度）；双击恢复自适应高度。平时隐藏（hover
@@ -9266,7 +9579,6 @@ div.chead[role="button"]:focus-visible,
 ::-webkit-scrollbar-corner {
 	background: transparent;
 }
-
 
 /* ------------------------------------------------------ dialog inline panel */
 /* 扩展问卷（ui.select/confirm/input）：非模态内联面板，插在输入框上方，
@@ -12119,7 +12431,6 @@ button.source-default-toggle {
 	white-space: nowrap;
 }
 
-
 /* ------------------------------------------------------------ sound settings */
 
 .sound-menu {
@@ -13612,12 +13923,74 @@ html.desktop-shell .topbar .tb-spacer {
 	overflow-y: hidden;
 	scrollbar-width: thin;
 }
-/* 设置 → 通用 页底部版本号（原顶栏「版本」芯片） */
-.settings-version-note {
-	margin-top: 16px;
-	text-align: right;
-	font-size: 11px;
-	color: var(--text-faint);
+/* 设置 → 通用：手动检查更新；不产生启动或后台网络请求。 */
+.update-settings-row {
+	gap: 16px;
+}
+.update-settings-row > div {
+	min-width: 0;
+}
+.update-check-button {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.update-latest {
+	color: var(--green);
+}
+.update-error {
+	color: var(--red);
+	overflow-wrap: anywhere;
+}
+.update-overlay {
+	z-index: 302;
+}
+.update-modal {
+	max-width: 520px;
+	padding: 20px;
+}
+.update-version-line {
+	color: var(--text-dim);
+	font-size: 13px;
+}
+.update-release-notes {
+	max-height: 240px;
+	margin: 0;
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.6;
+	color: var(--text-dim);
+}
+.update-progress {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	color: var(--text-dim);
+	font-size: 12px;
+}
+.update-progress progress {
+	width: 100%;
+	height: 8px;
+	accent-color: var(--accent);
+}
+.update-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.update-actions a {
+	text-decoration: none;
+}
+.update-actions-spacer {
+	flex: 1;
+}
+.update-actions .primary {
+	background: var(--accent);
+	color: #fff;
 }
 
 /* ===== 手机端支持已移除 =====

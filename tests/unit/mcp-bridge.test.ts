@@ -201,6 +201,8 @@ describe("McpBridge 聚合适配", () => {
 		});
 		await bridge.load();
 		expect(bridge.getTools().length).toBe(0);
+		expect(bridge.getServerSnapshots()).toMatchObject([{ name: "bad", status: "error", tools: [] }]);
+		expect(bridge.getServerSnapshots()[0].error).toBeTruthy();
 		bridge.dispose();
 	});
 });
@@ -277,6 +279,8 @@ describe("McpBridge.reload（mcp.json 热替换）", () => {
 
 		const summary = await b.reload();
 		expect(summary).toEqual({ kept: 1, started: 0, stopped: 0, failed: 0, servers: 1, tools: 10 });
+		expect(b.getServerSnapshots()).toMatchObject([{ name: "srv", status: "running" }]);
+		expect(b.getServerSnapshots()[0].tools).toHaveLength(10);
 		// 同一个子进程还在服务（没有偷偷重启）
 		expect(await callBridge(b, "pid")).toBe(pid);
 		expect(JSON.parse(await callBridge(b, "add", { a: 20, b: 22 }))).toBe(42);

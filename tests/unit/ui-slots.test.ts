@@ -112,11 +112,11 @@ describe("BUILTIN_UI_ITEMS（宿主默认）", () => {
 
 	it("覆盖宿主既有入口（顶栏/底栏/右键菜单），且没有把 settings.pages 列成内置", () => {
 		const bySlot = (slot: UiSlotId) => BUILTIN_UI_ITEMS.filter((i) => i.slot === slot).map((i) => i.id);
-		// 顶栏：视图三连 + 搜索/后台任务/设置
+		// 顶栏：视图三连 + 后台任务/设置；全局搜索已移到左栏品牌行
 		// （声音/语言 → 设置→通用，主题 → 界面设置，浏览器操作 → 插件页，版本号 → 通用页底部；
 		//   插件菜单、「新对话」与「⋯」溢出菜单已删）
 		expect(bySlot("topbar.primary")).toEqual(
-			expect.arrayContaining(["host:chat", "host:terminal", "host:git", "host:search", "host:tasks", "host:settings"]),
+			expect.arrayContaining(["host:chat", "host:terminal", "host:git", "host:tasks", "host:settings"]),
 		);
 		for (const gone of [
 			"host:sound",
@@ -151,7 +151,6 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:chat",
 			"host:terminal",
 			"host:git",
-			"host:search",
 			"host:tasks",
 			"host:settings",
 			"host:new-ephemeral-chat",
@@ -194,12 +193,12 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 
 	/** 这条断言是「顶栏默认长什么样」的唯一入口 —— 想改默认口径就改这里与 BUILTIN_UI_ITEMS。
 	 *  「⋯」溢出菜单删除后不再有「缺省收进菜单」的条目：默认全常驻，放不下就横向滚动。 */
-	it("默认没有隐藏条目，常驻 9 条", () => {
+	it("默认没有隐藏条目，常驻 8 条", () => {
 		const slots = build([]);
 		const top = slots["topbar.primary"];
 		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual([]);
 		// 常驻 = 「切视图（chat/terminal/git） / 起新活（new-ephemeral-chat） /
-		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目、搜索
+		// 看运行态（tasks） / 进设置（settings）」四类，加品牌、项目
 		// （面板开关 ☰/📁 已从顶栏删除，侧栏入口改由面板边缘展开条承担）
 		expect(top.filter((e) => !e.hidden).map((e) => e.id)).toEqual([
 			"host:brand",
@@ -207,7 +206,6 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:chat",
 			"host:terminal",
 			"host:git",
-			"host:search",
 			"host:tasks",
 			"host:settings",
 			"host:new-ephemeral-chat",
@@ -499,7 +497,7 @@ describe("顶栏插件视图区段", () => {
 		const ids = slots["topbar.primary"].filter((entry) => !entry.hidden).map((entry) => entry.id);
 		expect(ids.indexOf("host:git")).toBeLessThan(ids.indexOf("run-trace:__view"));
 		// 插件视图区段插在视图三连之后（原「插件」菜单条目已删，锚点只剩 git/terminal/chat）
-		expect(ids.indexOf("run-trace:__view")).toBeLessThan(ids.indexOf("host:search"));
+		expect(ids.indexOf("run-trace:__view")).toBeLessThan(ids.indexOf("host:tasks"));
 		expect(ids.indexOf("run-trace:__view")).toBeLessThan(ids.indexOf("editor:__view"));
 	});
 });

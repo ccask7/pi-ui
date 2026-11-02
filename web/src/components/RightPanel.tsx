@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
 	FiCheck,
 	FiChevronRight,
-	FiChevronsRight,
 	FiClipboard,
 	FiCopy,
 	FiDownload,
@@ -10,6 +9,7 @@ import {
 	FiFolder,
 	FiLink,
 	FiMaximize2,
+	FiSidebar,
 	FiX,
 } from "react-icons/fi";
 import type { ClientMessage, FileListing, UiPluginInfo } from "../types";
@@ -896,8 +896,14 @@ export const RightPanel = memo(function RightPanel({
 	return (
 		<aside className="panel panel-right" ref={panelRef}>
 			{collapsible && onToggleCollapse && (
-				<button type="button" className="panel-collapse-btn" title={t("collapsePanel")} onClick={onToggleCollapse}>
-					<FiChevronsRight />
+				<button
+					type="button"
+					className="panel-collapse-btn"
+					title={t("collapsePanel")}
+					aria-label={t("collapsePanel")}
+					onClick={onToggleCollapse}
+				>
+					<FiSidebar />
 				</button>
 			)}
 			{/* tab 容器：SlotTabs 自带 flex:1（styles.css 的 .slot-tabs），这层 div 只把

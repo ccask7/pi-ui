@@ -1,6 +1,25 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { FiList, FiSquare, FiPaperclip, FiArrowUp, FiGrid, FiMic, FiCamera } from "react-icons/fi";
-import type { FileSearchResult, ModelInfo, ProviderKeyInfo, SlashCommandInfo, UiMessage, UiState } from "../types";
+import {
+	FiList,
+	FiSquare,
+	FiPaperclip,
+	FiArrowUp,
+	FiGrid,
+	FiMic,
+	FiCamera,
+	FiFolder,
+	FiChevronDown,
+	FiCheck,
+} from "react-icons/fi";
+import type {
+	FileSearchResult,
+	ModelInfo,
+	ProjectSummary,
+	ProviderKeyInfo,
+	SlashCommandInfo,
+	UiMessage,
+	UiState,
+} from "../types";
 import { useT, useI18n } from "../i18n";
 import { appSend, useAppField } from "../app-globals";
 import { mergeRecalledDraft, selectDraftToRestore } from "../composer-draft";
@@ -135,6 +154,11 @@ interface ChatInputProps {
 	sessionDraft?: { text: string; ts: number } | null;
 	/** 当前会话的 sessionId（草稿跨重启的稳定 key；空 = 未就绪，不存不取）。 */
 	sessionId?: string;
+	/** 新建任务草稿可编辑项目；正式会话中同一位置只读显示归属项目。 */
+	newTaskDraft?: boolean;
+	projectCwd?: string;
+	projects?: ProjectSummary[];
+	onProjectChange?: (cwd: string) => void;
 }
 
 export const ChatInput = memo(function ChatInput({
@@ -172,6 +196,10 @@ export const ChatInput = memo(function ChatInput({
 	conversationId,
 	sessionDraft,
 	sessionId,
+	newTaskDraft = false,
+	projectCwd = "",
+	projects = [],
+	onProjectChange = () => {},
 }: ChatInputProps) {
 	const t = useT();
 	/** 连接/会话就绪：走全局（web/src/app-globals.ts），不再从 App 传。 */
@@ -215,6 +243,15 @@ export const ChatInput = memo(function ChatInput({
 	const menuTextRef = useRef("");
 	/** /help modal — shows the full command catalog. */
 	const [showHelp, setShowHelp] = useState(false);
+	const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+	useEffect(() => {
+		if (!newTaskDraft) setProjectMenuOpen(false);
+	}, [newTaskDraft]);
+	const projectOptions = useMemo(() => {
+		if (!projectCwd || projects.some((p) => p.path === projectCwd)) return projects;
+		return [{ path: projectCwd, lastUsed: 0 }, ...projects];
+	}, [projectCwd, projects]);
+	const projectLabel = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() || path;
 	/** Width captured from the input box when /help opens — the modal overlays
 	 *  the whole viewport, so it must measure the chat column to match. */
 	const [helpWidth, setHelpWidth] = useState<number | undefined>(undefined);
@@ -972,14 +1009,14 @@ export const ChatInput = memo(function ChatInput({
 		// in agent-service.ts. 运行中发送位那颗「对半胶囊」的右半（插队）走这条；
 		// 左半（排队）传 queue=true，服务端改走 followUp —— 整轮跑完才发
 		// ("AI 生成结束才发送")。
-		if (
-			appSend({
-				type: "prompt",
-				text: trimmed,
-				queue,
-				attachments: buildPromptAttachments(),
-			})
-		) {
+		if (newTaskDraft && !projectCwd) {
+			onNotice("warning", t("taskProjectRequired"));
+			return;
+		}
+		const accepted = newTaskDraft
+			? appSend({ type: "new_task", cwd: projectCwd, text: trimmed, attachments: buildPromptAttachments() })
+			: appSend({ type: "prompt", text: trimmed, queue, attachments: buildPromptAttachments() });
+		if (accepted) {
 			// 入全局历史（连续重复不重复入队，已在 pushPromptHistory 内去重）——仅提交成功才记。
 			if (trimmed) pushPromptHistory(trimmed);
 			// 退出历史导航状态，下次 Up 从最新开始。
@@ -1027,7 +1064,14 @@ export const ChatInput = memo(function ChatInput({
 			onNotice("error", t("netDisconnected"));
 			return;
 		}
-		if (appSend({ type: "prompt", text: trimmed, queue, attachments: buildPromptAttachments() })) {
+		if (newTaskDraft && !projectCwd) {
+			onNotice("warning", t("taskProjectRequired"));
+			return;
+		}
+		const accepted = newTaskDraft
+			? appSend({ type: "new_task", cwd: projectCwd, text: trimmed, attachments: buildPromptAttachments() })
+			: appSend({ type: "prompt", text: trimmed, queue, attachments: buildPromptAttachments() });
+		if (accepted) {
 			if (trimmed) pushPromptHistory(trimmed);
 			historyIndexRef.current = -1;
 			draftRef.current = "";
@@ -1545,6 +1589,45 @@ export const ChatInput = memo(function ChatInput({
 							{p}
 						</button>
 					))}
+				</div>
+			)}
+			{newTaskDraft && (
+				<div className="task-project-row">
+					<button
+						type="button"
+						className="task-project-selector editable"
+						title={projectCwd || t("taskProjectRequired")}
+						aria-label={t("taskProject")}
+						aria-expanded={projectMenuOpen}
+						onClick={() => setProjectMenuOpen((open) => !open)}
+					>
+						<FiFolder />
+						<span>{projectCwd ? projectLabel(projectCwd) : t("taskProjectRequired")}</span>
+						<FiChevronDown />
+					</button>
+					{projectMenuOpen && (
+						<>
+							<div className="task-project-menu-backdrop" onClick={() => setProjectMenuOpen(false)} />
+							<div className="task-project-menu" role="menu" aria-label={t("taskProject")}>
+								{projectOptions.map((project) => (
+									<button
+										type="button"
+										role="menuitem"
+										key={project.path}
+										className={project.path === projectCwd ? "selected" : ""}
+										onClick={() => {
+											onProjectChange(project.path);
+											setProjectMenuOpen(false);
+										}}
+									>
+										<span className="task-project-option-name">{projectLabel(project.path)}</span>
+										<span className="task-project-option-path">{project.path}</span>
+										{project.path === projectCwd && <FiCheck />}
+									</button>
+								))}
+							</div>
+						</>
+					)}
 				</div>
 			)}
 			<div className="inputbox" data-pi-anchor="composer">

@@ -54,7 +54,7 @@ import {
 import {
 	DANGLING_TOOL_RESULT_TEXT,
 	DANGLING_TOOL_RESULT_TEXT_EN,
-	findDanglingToolCalls,
+	findTrailingDanglingToolCalls,
 	healDanglingToolCallFile,
 } from "./dangling-tools.js";
 import { removeQueuedByIndexOrText } from "./queue-utils.js";
@@ -1075,7 +1075,7 @@ function makeMarkersListTool(
 		description:
 			"Read-only query of inline marker state. All WRITE operations must use inline markers ([[todo:new:...]] etc.) in the reply body — never use this tool for writes.\n只读查询内联标记状态。状态【写】操作请一律用内联标记（[[todo:new:...]] 等）写在回答正文里，不要调用本工具做写操作。",
 		parameters: Type.Object({
-			action: Type.Unsafe<string>({ enum: ["list"] }),
+			action: Type.Literal("list"),
 			tool: Type.Optional(Type.Literal("todo")),
 			includeDeleted: Type.Optional(
 				Type.Boolean({
@@ -7102,7 +7102,7 @@ export class ClientSession {
 			if (!s.isStreaming) {
 				try {
 					const live = s.agent.state.messages as unknown[];
-					const dangling = Array.isArray(live) ? findDanglingToolCalls(live) : [];
+					const dangling = Array.isArray(live) ? findTrailingDanglingToolCalls(live) : [];
 					if (dangling.length > 0) {
 						let healed = 0;
 						try {
@@ -7869,7 +7869,7 @@ export class ClientSession {
 			// （文件被删/只读等），此时响亮拒绝后续 prompt 而不是静默黑洞。
 			try {
 				const msgs = conv.session.agent.state.messages as unknown[];
-				const still = Array.isArray(msgs) ? findDanglingToolCalls(msgs) : [];
+				const still = Array.isArray(msgs) ? findTrailingDanglingToolCalls(msgs) : [];
 				if (still.length > 0) conv.transcriptBlocked = true;
 				else conv.transcriptBlocked = false;
 			} catch {
@@ -7898,6 +7898,17 @@ export class ClientSession {
 	 *  空白新对话」——/new <prompt> 只在 true 时投递首条提示；false 表示没能进入
 	 *  新对话（准入关闭 / 同项目对话数达上限 / runtime 创建失败），此时照发会把
 	 *  首条提示投进用户原本正在用的那个对话里。 */
+	/** 新建任务草稿的唯一提交入口：目录切换、新会话与首条提示在同一服务端队列中依次完成。 */
+	async promptNewTask(cwd: string, text: string, attachments?: Parameters<ClientSession["prompt"]>[1]): Promise<void> {
+		const { resolve, sep } = await import("node:path");
+		const trimmed = cwd.trim();
+		const target =
+			process.platform === "win32" && /^[A-Za-z]:$/.test(trimmed) ? `${trimmed.toUpperCase()}${sep}` : resolve(trimmed);
+		if (this.cwd !== target) await this.setCwd(target);
+		if (this.cwd !== target || !(await this.newChat())) return;
+		await this.prompt(text, attachments);
+	}
+
 	async newChat(_preset?: string, ephemeral?: boolean): Promise<boolean> {
 		if (this.quiesceBlocked()) return false;
 		// Reuse an already-open blank conversation instead of piling up new ones
@@ -8507,7 +8518,8 @@ export class ClientSession {
 		// would keep showing the OLD project while the chat shows the new one.
 		const cwdChanged = newCwd !== this.cwd;
 		if (displaced) this.removeConversation(displaced.id);
-		this.conv.promptedSinceActive = false;
+		// promptedSinceActive 表示“本次 ccui 打开期间是否对话过”，不是“本次激活期间”。
+		// 顶部标签反复切换不能清除该标记，否则曾经对话过的会话第二次切走会被误关闭。
 		this.conv.lastActiveAt = Date.now();
 		this.webUi.refresh();
 		this.emitConversations();
@@ -10038,6 +10050,7 @@ export class ClientSession {
 		const run: Promise<ProjectSummary[] | null> = (async () => {
 			try {
 				const saved = this.stateStore.get(this.clientId);
+				const savedOrder = new Map(saved.projects.map((p, index) => [p.path, index]));
 				const removedProjects = new Set(this.stateStore.getRemovedProjects(this.clientId));
 				const map = new Map<string, number>();
 				for (const p of saved.projects) map.set(p.path, p.lastUsed);
@@ -10055,7 +10068,15 @@ export class ClientSession {
 				const projects: ProjectSummary[] = [...map.entries()]
 					.filter(([path]) => !removedProjects.has(path) && existsSync(path))
 					.map(([path, lastUsed]) => ({ path, lastUsed }))
-					.sort((a, b) => b.lastUsed - a.lastUsed)
+					.sort((a, b) => {
+						const aSaved = savedOrder.get(a.path);
+						const bSaved = savedOrder.get(b.path);
+						// 缓存重建也保持已有目录顺序；只有首次发现的项目按时间排序并补入。
+						if (aSaved !== undefined && bSaved !== undefined) return aSaved - bSaved;
+						if (aSaved !== undefined) return -1;
+						if (bSaved !== undefined) return 1;
+						return b.lastUsed - a.lastUsed;
+					})
 					.slice(0, 20);
 				this.projectsCache = { at: Date.now(), projects };
 				this.emit({ type: "projects", projects });
@@ -10071,14 +10092,10 @@ export class ClientSession {
 		await run;
 	}
 
-	/** 缓存命中时把当前 cwd 并进去：命中则刷新 lastUsed 重排，未命中则补到首位
-	 *  （remember 刚写入的新项目在 TTL 窗口内也可见，不必等下一次扫盘）。 */
+	/** 缓存命中时把当前 cwd 并进去：已有项目保持原顺序，选中目录或会话不再置顶；
+	 *  仅新目录补到首位，保证 remember 刚写入的项目在 TTL 窗口内立即可见。 */
 	private withCurrentCwd(projects: ProjectSummary[], now: number): ProjectSummary[] {
-		if (projects.some((p) => p.path === this.cwd)) {
-			return projects
-				.map((p) => (p.path === this.cwd && p.lastUsed < now ? { ...p, lastUsed: now } : p))
-				.sort((a, b) => b.lastUsed - a.lastUsed);
-		}
+		if (projects.some((p) => p.path === this.cwd)) return projects;
 		return [{ path: this.cwd, lastUsed: now }, ...projects].slice(0, 20);
 	}
 

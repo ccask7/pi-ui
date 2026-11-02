@@ -3,11 +3,13 @@ import {
 	FiCheck,
 	FiChevronDown,
 	FiChevronRight,
-	FiChevronsLeft,
 	FiEdit2,
 	FiFolder,
 	FiFolderPlus,
+	FiPackage,
 	FiPlus,
+	FiSearch,
+	FiSidebar,
 	FiTrash2,
 } from "react-icons/fi";
 import type { ConversationSummary, ProjectSummary, SessionSummary } from "../types";
@@ -60,6 +62,11 @@ interface LeftPanelProps {
 	collapsible?: boolean;
 	/** Fired when the user clicks the collapse button. */
 	onToggleCollapse?: () => void;
+	/** Show skills/MCP in the existing conversation area. */
+	onOpenPlugins: () => void;
+	onNewTask: () => void;
+	pluginsActive: boolean;
+	onOpenGlobalSearch: () => void;
 
 	// ---- 宿主 UI 扩展点（issue #146）：由 App 用 buildUiSlots() 算好后传进来 ----
 	/** `contextmenu.session` 槽位的最终条目（host 内置 + 插件贡献）。左栏只负责**打开**
@@ -96,6 +103,7 @@ function isEditableTarget(el: EventTarget | null): boolean {
 }
 
 const LS_EXPANDED_PROJECTS = "ccui:lp-expanded-projects";
+const DEFAULT_VISIBLE_SESSIONS = 5;
 
 function loadExpandedProjects(currentCwd: string): Set<string> {
 	try {
@@ -119,6 +127,10 @@ export const LeftPanel = memo(function LeftPanel({
 	active,
 	collapsible,
 	onToggleCollapse,
+	onOpenPlugins,
+	onNewTask,
+	pluginsActive,
+	onOpenGlobalSearch,
 	pathCompletions,
 	uiContextSession,
 	uiLeftSessions,
@@ -144,7 +156,10 @@ export const LeftPanel = memo(function LeftPanel({
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 	const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => loadExpandedProjects(currentCwd));
+	const [showAllProjectSessions, setShowAllProjectSessions] = useState<Set<string>>(() => new Set());
 	const previousCwdRef = useRef(currentCwd);
+	/** 目录行主动切换 cwd 时，以本次展开/收起操作为准，不被随后的 cwd 监听反向展开。 */
+	const treeDrivenCwdRef = useRef<string | null>(null);
 	const requestedProjectSessionsRef = useRef(new Set<string>());
 	/** 会话右键菜单（`contextmenu.session` 槽位）：见下面的 showSessionMenu / openSessionMenu /
 	 *  dispatchHostSessionEntry。宿主自己的两条（关闭已结束子代理 / 强行关闭对话）也在这个槽位里，
@@ -469,6 +484,10 @@ export const LeftPanel = memo(function LeftPanel({
 		if (previousCwdRef.current === currentCwd) return;
 		previousCwdRef.current = currentCwd;
 		if (!currentCwd) return;
+		if (treeDrivenCwdRef.current === currentCwd) {
+			treeDrivenCwdRef.current = null;
+			return;
+		}
 		setExpandedProjects((prev) => new Set(prev).add(currentCwd));
 	}, [currentCwd]);
 
@@ -493,17 +512,31 @@ export const LeftPanel = memo(function LeftPanel({
 	}, [active, ready, status, expandedProjects, panelSend]);
 
 	const toggleProject = (path: string) => {
+		const collapsing = expandedProjects.has(path);
 		setExpandedProjects((prev) => {
 			const next = new Set(prev);
 			if (next.has(path)) next.delete(path);
 			else next.add(path);
 			return next;
 		});
+		// 收起目录同时重置“查看更多”，下次展开仍从最近 5 个会话开始。
+		if (collapsing) {
+			setShowAllProjectSessions((prev) => {
+				if (!prev.has(path)) return prev;
+				const next = new Set(prev);
+				next.delete(path);
+				return next;
+			});
+		}
 	};
 
 	const openProject = (path: string) => {
-		setExpandedProjects((prev) => new Set(prev).add(path));
-		if (currentCwd !== path) panelSend({ type: "set_cwd", path });
+		// 文件夹图标与目录名称整片区域都可展开/收起，不必瞄准右侧小箭头。
+		toggleProject(path);
+		if (currentCwd !== path) {
+			treeDrivenCwdRef.current = path;
+			panelSend({ type: "set_cwd", path });
+		}
 	};
 
 	const displayName = (s: SessionSummary): string => {
@@ -603,17 +636,57 @@ export const LeftPanel = memo(function LeftPanel({
 
 	return (
 		<aside className="panel panel-left lp-panel">
-			{collapsible && onToggleCollapse && (
-				<button type="button" className="panel-collapse-btn" title={t("collapsePanel")} onClick={onToggleCollapse}>
-					<FiChevronsLeft />
+			<div className="lp-brand-row">
+				<span className="lp-brand-name">Cc</span>
+				<div className="lp-brand-actions">
+					{collapsible && onToggleCollapse && (
+						<button
+							type="button"
+							className="lp-brand-toggle"
+							title={t("collapsePanel")}
+							aria-label={t("collapsePanel")}
+							onClick={onToggleCollapse}
+						>
+							<FiSidebar />
+						</button>
+					)}
+					<button
+						type="button"
+						className="lp-brand-search"
+						title={t("searchGlobalTip")}
+						aria-label={t("searchGlobal")}
+						onClick={onOpenGlobalSearch}
+					>
+						<FiSearch />
+					</button>
+				</div>
+			</div>
+			<nav className="lp-primary-nav" aria-label={t("pluginEntry")}>
+				<button
+					type="button"
+					className="lp-primary-action"
+					onClick={() => {
+						onNewTask();
+						focusComposer();
+					}}
+				>
+					<FiPlus />
+					<span>{t("newTask")}</span>
 				</button>
-			)}
+				<button
+					type="button"
+					className={`lp-primary-action${pluginsActive ? " active" : ""}`}
+					aria-pressed={pluginsActive}
+					onClick={onOpenPlugins}
+				>
+					<FiPackage />
+					<span>{t("pluginEntry")}</span>
+				</button>
+			</nav>
 			<div className="lp-section project-tree-section panel-projects">
 				<div className="lp-section-header">
 					<div className="lp-section-title panel-section-title lp-tree-heading">
-						<span className="lp-section-title-text">
-							{t("projects")} ({projects.length})
-						</span>
+						<span className="lp-section-title-text">{t("projects")}</span>
 					</div>
 					<div className="lp-section-actions">
 						<button
@@ -625,18 +698,6 @@ export const LeftPanel = memo(function LeftPanel({
 						>
 							<FiFolderPlus />
 						</button>
-						<button
-							type="button"
-							className="lp-section-action lp-new-chat-action"
-							title={t("newChatTip")}
-							aria-label={t("newChat")}
-							onClick={() => {
-								panelSend({ type: "new_chat" });
-								focusComposer();
-							}}
-						>
-							<FiPlus />
-						</button>
 					</div>
 				</div>
 				<div className="lp-section-body project-tree-scroll" role="tree" aria-label={t("projects")}>
@@ -645,6 +706,7 @@ export const LeftPanel = memo(function LeftPanel({
 						const activeProject = currentCwd === p.path;
 						const expanded = expandedProjects.has(p.path);
 						const projectHistory = projectSessions[p.path] ?? (activeProject ? sessions : undefined);
+						const showAllSessions = showAllProjectSessions.has(p.path);
 						return (
 							<div className="lp-tree-project" key={p.path}>
 								<div
@@ -655,22 +717,24 @@ export const LeftPanel = memo(function LeftPanel({
 										type="button"
 										className={`project-item ${activeProject ? "active" : ""}`}
 										title={p.path}
+										aria-expanded={expanded}
 										onClick={() => openProject(p.path)}
 									>
 										<FiFolder className="project-icon" />
 										<span className="project-info">
 											<span className="project-name">{projectName(p.path)}</span>
 										</span>
-									</button>
-									<button
-										type="button"
-										className="lp-tree-toggle"
-										title={expanded ? t("collapseSection") : t("expandSection")}
-										aria-label={expanded ? t("collapseSection") : t("expandSection")}
-										aria-expanded={expanded}
-										onClick={() => toggleProject(p.path)}
-									>
-										{expanded ? <FiChevronDown /> : <FiChevronRight />}
+										<span
+											className="lp-tree-toggle"
+											title={expanded ? t("collapseSection") : t("expandSection")}
+											aria-expanded={expanded}
+											onClick={(e) => {
+												e.stopPropagation();
+												toggleProject(p.path);
+											}}
+										>
+											{expanded ? <FiChevronDown /> : <FiChevronRight />}
+										</span>
 									</button>
 									{activeProject && (
 										<button
@@ -698,7 +762,25 @@ export const LeftPanel = memo(function LeftPanel({
 										) : projectHistory.length === 0 ? (
 											<div className="panel-empty lp-tree-empty">{t("noHistory")}</div>
 										) : (
-											projectHistory.map(renderSessionRow)
+											<>
+												{(showAllSessions ? projectHistory : projectHistory.slice(0, DEFAULT_VISIBLE_SESSIONS)).map(
+													renderSessionRow,
+												)}
+												{!showAllSessions && projectHistory.length > DEFAULT_VISIBLE_SESSIONS && (
+													<button
+														type="button"
+														className="lp-tree-more"
+														onClick={() => setShowAllProjectSessions((prev) => new Set(prev).add(p.path))}
+													>
+														<FiChevronDown />
+														<span>
+															{t("showMoreSessions", {
+																n: projectHistory.length - DEFAULT_VISIBLE_SESSIONS,
+															})}
+														</span>
+													</button>
+												)}
+											</>
 										)}
 									</div>
 								)}

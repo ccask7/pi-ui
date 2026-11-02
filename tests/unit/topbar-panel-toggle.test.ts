@@ -207,7 +207,7 @@ describe("TopBar 是单一扁直流（无按种类包裹的容器、无贴边例
 			view: "plugin:demo",
 		};
 		const { container } = mount("chat", [
-			hostEntry("host:search"),
+			hostEntry("host:tasks"),
 			hostEntry("host:chat"),
 			hostEntry("host:terminal"),
 			pluginAction,
@@ -309,7 +309,6 @@ describe("TopBar「打开项目」入口（host:open-project）", () => {
 		});
 		expect(document.querySelector(".project-picker")).toBeNull();
 	});
-
 });
 
 describe("TopBar 连接状态", () => {

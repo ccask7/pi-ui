@@ -533,13 +533,15 @@ export class ClientStateStore {
 		return this.load()[clientId] ?? { projects: [] };
 	}
 
-	/** Remember which workspace a client last used; bumps its project entry. */
+	/** Remember which workspace a client last used. Existing projects keep their list position. */
 	remember(clientId: string, cwd: string): void {
 		const all = this.load();
 		const state = (all[clientId] ??= { projects: [] });
 		state.lastCwd = cwd;
 		const now = Date.now();
-		state.projects = [{ path: cwd, lastUsed: now }, ...state.projects.filter((p) => p.path !== cwd)].slice(0, 30);
+		state.projects = state.projects.some((p) => p.path === cwd)
+			? state.projects.map((p) => (p.path === cwd ? { ...p, lastUsed: now } : p))
+			: [{ path: cwd, lastUsed: now }, ...state.projects].slice(0, 30);
 		// Opening the workspace again clears its removal tombstone across all clients and global settings.
 		for (const cState of Object.values(all)) {
 			if (cState.removedProjects?.length) {

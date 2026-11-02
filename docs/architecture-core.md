@@ -31,16 +31,22 @@
 
 新增/修改任何消息：只改 `protocol.ts`，然后在 `server/index.ts` 的 `dispatch` switch 和 `web/src/use-chat.ts` 的 `onmessage` switch 各加一个分支。注意 protocol.ts 必须保持**纯类型导出**（不能加 const/function 等运行时代码，否则破坏 type-only 前提）；`npm run check:protocol` 守护这两个不变量。
 
+左栏「插件」通过 `App` 的 `pluginsOpen` 在现有对话区内切换技能/MCP 面板，不注册顶栏或右栏条目；对话组件仅隐藏、不卸载。技能 UI 由设置页与该面板共享 `SkillsPanel`。MCP 使用只读 `list_mcp_servers` / `mcp_servers`（协议 v20），仅发送服务器状态与工具说明，不下发环境变量；`mcp.json` 热加载后广播刷新。
+
+左栏「新建任务」先进入前端草稿，不立即创建会话或顶部标签；输入卡片外上方显示可编辑的项目选择器，正式会话不显示。首条消息通过 `new_task`（协议 v21）交由服务端依次完成目录切换、空白会话创建与 prompt 投递，失败时不回退到旧会话。
+
+Windows 桌面安装版的「设置 → 通用 → 检查更新」通过 Electron IPC 手动查询 `ccask7/pi-ui` 最新稳定 Release；无启动、定时或后台请求。检查和下载分离，主进程缓存已验证的本仓库安装包信息，渲染进程不能传入下载 URL 或执行路径；下载完成后由用户再次确认启动 NSIS 安装器。
+
 ## 全局运行态（app-globals.ts：不逐层传 props）
 
 `web/src/app-globals.ts` 是模块级单例 store，放「**整棵树都要知道**」的少量运行态：服务端身份/能力（整个连接内只变一次）+ 连接态与当前工作目录（低频变化，靠单字段订阅隔离）：
 
-| 字段                            | 来源                                              | 谁在用                                                                                                             |
-| ------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `tabs`（`PI_WEB_TABS`）         | `ready.tabs`                                      | 顶栏视图 tab 白名单（undefined = 全部）                                                                            |
-| `appVersion` / `serverVersion`  | `ready`                                           | TopBar 版本号                                                                                                      |
-| `status` / `ready`              | useChat 的 reducer（`status` 动作 / hello+快照）  | 左栏（能不能拉清单）、ChatInput（输入框能不能用）、TopBar / FooterBar 的连接点                                     |
-| `cwd`（当前对话的工作目录）     | `chat.state?.cwd`                                 | 左栏分组与「当前」标记、右栏路径拼接、全局搜索的当前项目标记、底栏目录选择器                                       |
+| 字段                           | 来源                                             | 谁在用                                                                         |
+| ------------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `tabs`（`PI_WEB_TABS`）        | `ready.tabs`                                     | 顶栏视图 tab 白名单（undefined = 全部）                                        |
+| `appVersion` / `serverVersion` | `ready`                                          | TopBar 版本号                                                                  |
+| `status` / `ready`             | useChat 的 reducer（`status` 动作 / hello+快照） | 左栏（能不能拉清单）、ChatInput（输入框能不能用）、TopBar / FooterBar 的连接点 |
+| `cwd`（当前对话的工作目录）    | `chat.state?.cwd`                                | 左栏分组与「当前」标记、右栏路径拼接、全局搜索的当前项目标记、底栏目录选择器   |
 
 写入点两处，都是单一来源、只镜像不复制：`use-chat.ts` 收到 `ready` 时写身份/能力（**在 dispatch 之前**同步落地，不闪一帧 `pi`）；另一个 effect 把 `ready` / `status` / `cwd` 镜像过来（值就是 reducer 里的真值，最多晚一帧 —— 对应默认值只会是「未就绪 / 未连接 / 空目录」，看不出来）。非 React 代码用 `getAppGlobals()` / `subscribeAppGlobals()`。
 
@@ -81,7 +87,7 @@
 - **机制**：`web/src/styles.css` 是**共享基线**（默认深色主题 + 全局布局，抽离出来只为方便复用，不是对主题的限制）；主题文件是**完整样式表**，可覆盖任何东西（`:root` 变量、任意选择器、布局改动、自带新 token 皆可——主题 link 后加载，在层叠中胜出）。选主题时前端注入 `<link id="theme-stylesheet" href="/themes/<id>.css">`（`web/src/theme.ts` 的 `applyTheme`，localStorage 键 `ccui:theme`，`main.tsx` 首帧前应用防闪烁）。唯一硬性要求：`var()` 引用的 token 必须在某处有定义（主题自带定义也算，见下“变量必须先有定义”）。
 - **服务端**：`GET /api/themes` 列主题（`server/themes.ts` 的 `listThemes`），`GET /themes/:id.css` 发文件（`resolveThemeFile`，用户目录优先）。id 必须匹配 `ID_RE`（`^[A-Za-z0-9_-]+$`）防路径穿越。两个路由在 `server/index.ts` 注册于 SPA catch-all 之前（否则被吞返回 index.html）。dev 模式 Vite 需在 `web/vite.config.ts` 代理 `/themes`（已加）。
 - **主题来源**：内置 `<pkgRoot>/themes/*.css`（随 npm 包分发，`package.json` files 白名单含 `themes/`）；用户自定义直接往 `<dataDir>/themes/` 丢 CSS 文件即可（id 冲突时用户覆盖内置）。`pkgRoot` 经 `resolvePkgRoot()` 向上找含 package.json 的祖先解析，dev(server/) 与 prod(dist/server/) 均正确。
-- **浅色主题**：`themes/white.css`（显示名「白色」：纯白底 + GitHub 蓝强调）与 `themes/paper.css`（显示名「暖纸」：暖纸米黄底 + 赭石强调，护眼）与 `themes/mist.css`（显示名「雾蓝灰」：雾蓝灰底 + 天青蓝强调，冷淡风）与 `themes/sakura.css`（显示名「樱粉」：粉白底 + 樱粉强调，柔和风）与 `themes/md-preview.css`（显示名「紫晕」）+ `themes/cyberpunk.css`（赛博朋克）+ `themes/dazzle.css`（炫彩）均由根目录脚本 `make-light-theme.mjs` 从 `styles.css` 的 `:root` 变量清单生成**纯调色板文件**（生成器读 styles.css 解析全部变量名，主题只覆盖差异值，输出完整 `:root` + 可选非布局 tail：white/paper/mist/sakura 带 `.hljs` 浅色高亮覆盖、md-preview 带 body 渐变 + chrome 透明）。styles.css 新增变量后重跑 `node make-light-theme.mjs` 即自动同步进所有内置主题（新变量默认用深色值）。
+- **浅色主题**：`themes/white.css`（显示名「白色」：纯白底 + GitHub 蓝强调）与 `themes/paper.css`（显示名「暖纸」：暖纸米黄底 + 赭石强调，护眼）与 `themes/mist.css`（显示名「雾蓝灰」：雾蓝灰底 + 天青蓝强调，冷淡风）与 `themes/sakura.css`（显示名「樱粉」：粉白底 + 樱粉强调，柔和风）与 `themes/md-preview.css`（显示名「紫晕」）+ `themes/cyberpunk.css`（赛博朋克）+ `themes/dazzle.css`（炫彩）+ `themes/vs-code-dark.css`（显示名「VS Code 黑」：VS Code Dark Modern 的 #1F1F1F / #181818 / #0078D4）+ `themes/vs-code-light.css`（显示名「VS Code 白」：VS Code Light Modern 的 #FFFFFF / #F8F8F8 / #005FB8）均由根目录脚本 `make-light-theme.mjs` 从 `styles.css` 的 `:root` 变量清单生成**纯调色板文件**（生成器读 styles.css 解析全部变量名，主题只覆盖差异值，输出完整 `:root` + 可选非布局 tail：white/paper/mist/sakura 带 `.hljs` 浅色高亮覆盖、md-preview 带 body 渐变 + chrome 透明、vs-code 黑/白带各自的高亮配色）。styles.css 新增变量后重跑 `node make-light-theme.mjs` 即自动同步进所有内置主题（新变量默认用深色值）。
 - **主题显示名**：css 首行 `/* theme-name: 中文名 */` 即为下拉里的显示名（`listThemes` 读文件头 300 字节解析），缺省回退文件 id——文件名必须是 ASCII（id 校验 `ID_RE`），中文靠这个标记。第二行可选 `/* theme-name-en: English Name */`（英文 UI 用，无则回退中文名）；两行都由 `make-light-theme.mjs` 生成，手改主题文件头会被下次重跑覆盖——改英文名要改生成器。
 - **面板收起/展开按钮对照色（issue #100）**：`.panel-collapse-btn` resting 态即带底色 + 边框（与窄屏顶栏 `.panel-toggle` 同级），前景/底/边框走专用 `--control-fg/--control-bg/--control-border`（默认取正文次级色而非 `--text-faint`），展开条 `.panel-rail` 加宽到 26px、图标套「药丸」底——在浅色/自定义主题下也不再隐形。主题可独立覆盖这三个变量；浅色默认值在生成器的 `LIGHT_DERIVED` 里。
 - **聊天背景图/壁纸（issue #100）**：`--bg-image: none`（主题可写成 `url(...)` 自带一张）+ `--bg-image-dim`（`--bg` 压暗不透明度，默认 0.78）+ `--bg-image-blur`。`body.has-wallpaper` 时 body 全屏铺两层 fixed 壁纸：`body::before` 放图（cover 居中 + 模糊）/`body::after` 压暗；`.app` 抬 z-index 1 到壁纸之上，消息区/输入区透明直接见壁纸。**容器背景优先**：顶栏/底栏/左右面板背景是独立变量 `--topbar-bg`/`--statusbar-bg`/`--panel-bg`（默认 `color-mix` 半透明 → 壁纸从两侧与顶/底栏下透出），主题把某变量覆盖回实色（如 `var(--bg-elev)`）即关闭该区壁纸、设 `transparent` 即完全透图；统一透图率调 `--wallpaper-panel-alpha`（默认 62%，越小透图越多）。同层还有两类组件底板：卡片级 `--card-bg`（工具调用卡 `.toolcall`、快捷短语 `.quick-chip`、新对话提示词模板卡 `.empty-template`、展开条 `.panel-rail`、全部消息气泡 `.thinking`/`.bashblock`/`.skillcard`/`.attachcard`/`.queued-bubble`/`.retry-notice`）与控件级 `--chip-bg`（顶栏 `.chip`/`.tb-tab`/下拉菜单 `.dd-menu`、goalbar 收起态提示 `.goalbar-hint`、折叠钮 `.panel-collapse-btn`、代码面 `.codeblock pre`/`.termline`/`.toolcall-output pre`、工具参数块 `.toolcall-args pre`），默认同样半透明、共用 `--wallpaper-panel-alpha`，主题可单独覆盖回实色；整块聊天面板（`.main`：消息区 + goalbar / 问卷面板占的那一段 + 输入区）共用 `--msgs-bg`（同式半透明，气泡立在统一玻璃面上略实一层形成层次，覆盖回 `transparent` 恢复全透）。**只涂在容器上**：消息区 / 输入区 / goalbar / 问卷面板再各自上色的话，元素之间的间隙与列外区域会露裸背景 —— 浅色与壁纸主题下就是一条横跨整个面板、比聊天区差一档的带子（goalbar 一出现特别明显），所以 goalbar 与问卷面板不带自己的底色（只留边框与投影）；无壁纸时两层 `display:none`，且背景变量默认半透明叠在纯色上色差极小。输入框盒子 `--inputbox-bg` 默认与 `--chip-bg` 同式跟随 `--wallpaper-panel-alpha`。下拉弹窗（声音/语言/主题/模型/思考强度等 `.dd-menu`）背景走 `--menu-bg`：默认跟随 `--chip-bg` 半透，两个透明主题覆盖回 `var(--bg-elev2)` 实色保密集列表可读。终端视图读 `--term-bg`（xterm canvas + 容器）：默认实色不参与（终端可读性优先），半透明主题可覆盖成 `color-mix` 半透明随整体透图。内置「半透明」主题（`themes/translucent.css`）专配壁纸：`--wallpaper-panel-alpha: 45%` 整体统一容器色（顶栏/底栏/面板/卡片/控件/输入框全部联动）+ `--term-bg: color-mix(#0b0d12 45%, transparent)` 终端也透 + `--bg-image-dim: 0.72`，不配壁纸时观感偏暗属预期。「全透明」主题（`themes/transparent.css`）是极致版：`--wallpaper-panel-alpha: 0%`（全部 color-mix 表面 = transparent，含 `--term-bg`），只留边框与文字；文字靠压暗加重（`--bg-image-dim: 0.85`），尾段把实色 hover/浮动反馈（菜单项、折叠摘要、展开条、折叠键、复制键、滚到底按钮）统一改 25% 半透底保可用性，并再减一层代码面噪音：`--code-border: transparent` / `--code-pad: 0`（工具参数块 `.toolcall-args pre`、工具输出块 `.toolcall-output pre`、终端行 `.termline` 的边框与内边距）＋隐藏与卡头重复的终端图标 `.termline-icon`。代码面边框/内边距走 `--code-border`/`--code-pad`（默认 `var(--border-soft)`/`8px 10px`），卡片正文内边距 `--card-body-pad`（思考块 `.thinking-body` 与工具卡 `.toolcall-body` 共用 `4px 14px 12px`，保证同一条消息里两种卡片文字左缘对齐）。用户自定义地址存浏览器 localStorage（`ccui:wallpaper`，`web/src/wallpaper.ts`：URL 白名单 http(s)/blob/data:image/站内相对路径，内联变量覆盖主题，`useWallpaperEffect` 在 App 顶层应用并监听主题切换重算）， UI 在设置 → 消息显示（地址框失焦/回车提交，压暗/模糊滑杆即时预览；也可点「上传图片」选本地文件——复用粘贴图片管线等比缩 ≤1568px + 重编码为 data: URL 存 localStorage，上传失败/过大时行内提示；data: 图不回填输入框，下方缩略图即表示生效中，清除按钮同时清掉地址与预览）。
@@ -132,7 +138,9 @@
 人机协同审批（`tool_approval_pending`）原先只有「批准 / 拒绝 / 修改并放行」三个单次选项，同一类高危操作反复出现时每次都要点。现在的审批系统分为**规则评估引擎**与**放行策略**两个层次：
 
 #### 1. 自定义规则库与匹配引擎（`<dataDir>/approval-rules.json`）
+
 规则由 `server/approval-rules.ts` 的 `ApprovalRulesStore` 持久化，所有客户端全局共享。规则在设置面板「审批规则」页可视化编辑与排序，按列表顺序自顶向下匹配，首个命中生效：
+
 - **适用工具**（tools）：支持单工具（如 `bash`）、多工具组合（如 `["write", "edit", "edit_soft"]`）或通配 `*`；
 - **检查字段**（field）：`command`（命令字符串）、`path`（目标文件路径）、`params`（完整参数 JSON 字符串）；
 - **匹配模式**（match）：
@@ -148,7 +156,9 @@
 - **内置规则转化**：原硬编码的 10 项内置高危检测（`rm -rf`、Windows `del /s /q`、磁盘格式化、破坏性 Git、危险 `chmod`、系统目录重定向、敏感配置 `.env`/SSH/Shell 以及越界写入）全部转换为默认内置规则（`builtin: true`），用户可自由停用、调整动作或一键恢复默认。
 
 #### 2. 三档放行策略（运行时快速免问）
+
 门禁统一在 `ClientSession.askApproval` 入口（纯函数 `approvalSuppressionReason(policy, enabled, categoryId)`，`server/tool-approval.ts`，单测 `tests/unit/tool-approval.test.ts`）：
+
 1. **全局关**：设置 →「工具」页的「工具执行审批」总开关（`ClientSettings.toolApprovalEnabled`，默认开，纯运行开关不进预设）。关掉后一切审批都不弹——内置高危检测直接放行、插件 pre guard 的 `ask` 也按放行处理（`withToolGuard` 的 `ask` 分支只改 `needApproval`，最终都经 `askApproval` 定夺）；开关被关掉的那一刻，挂着的待审批项由 `autoApprovePendingApprovals` 全部按批准放行（不让人对着弹窗干等）。
 2. **本对话全部允许**（弹窗按钮，`tool_approval_response.scope = "all"`）：该对话后续任何高危操作都不再询问。
 3. **本对话允许同类**（弹窗按钮，`scope = "category"`，仅在本次命中规则档位时出现）：只放行同一档位。档位 = `UiApprovalCategory{ id, label, labelEn }`，id 稳定不许改名：`bash.rm-rf` / `bash.win-del` / `bash.disk` / `bash.git-destructive` / `bash.chmod` / `bash.system-redirect` / `file.sensitive.env` / `file.sensitive.ssh` / `file.sensitive.shell` / `file.outside-workspace` / `plugin:<pluginId>`（插件 pre guard 的 `ask` 按插件分档）。无档位的拦截（自定义 reason）只受前两档影响。

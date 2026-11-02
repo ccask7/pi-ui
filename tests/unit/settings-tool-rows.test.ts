@@ -1,9 +1,9 @@
 /**
  * 设置「工具」页覆盖率守卫（静态源码检查，不渲染 React）。
  *
- * 机制（2026-09，claim_files 补目录时收敛）：设置页不再手写 ToggleRow——终端组与
- * 子代理组按名单循环，「其他」组按 OTHER_AGENT_TOOLS（= 目录过滤）循环，文案走
- * 目录项的 descKey/offHintKey。目录里加一行，页面自动多一行。
+ * 机制（2026-09，claim_files 补目录时收敛）：终端组按名单循环，子代理组收敛为
+ * 一个总开关，「其他」组按 OTHER_AGENT_TOOLS（= 目录过滤）循环，文案走目录项的
+ * descKey/offHintKey。目录里加一行，页面自动多一行。
  *
  * 唯一例外：todo_list 的行固定在 markers 分区（OTHER_AGENT_TOOLS 跳过它），本文件
  * 把这个例外锁死——多了第二个例外、或例外丢了行，都算红。
@@ -12,18 +12,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as toolManager from "../../server/tool-manager.js";
-import {
-	AGENT_TOOL_CATALOG,
-	MARKERS_LIST_TOOL_NAME,
-	SUBAGENT_TOOL_NAMES,
-	TERMINAL_TOOL_NAMES,
-} from "../../server/tool-manager.js";
+import { AGENT_TOOL_CATALOG, MARKERS_LIST_TOOL_NAME, TERMINAL_TOOL_NAMES } from "../../server/tool-manager.js";
 import { zh } from "../../web/src/i18n.js";
 
 const SETTINGS_SRC = readFileSync(join(__dirname, "..", "..", "web", "src", "components", "SettingsModal.tsx"), "utf8");
 
-/** 循环渲染的两组（设置页只写名单，不逐个写行）。 */
-const LOOP_RENDERED = new Set<string>([...TERMINAL_TOOL_NAMES, ...SUBAGENT_TOOL_NAMES]);
+/** 循环渲染的终端组；子代理组由一个总开关统一控制。 */
+const LOOP_RENDERED = new Set<string>(TERMINAL_TOOL_NAMES);
 
 /** 「其他」组循环的唯一例外（行在 markers 分区，不在「其他」组）。 */
 const OTHER_LOOP_SKIP = new Set([MARKERS_LIST_TOOL_NAME]);
@@ -74,5 +69,12 @@ describe("设置「工具」页覆盖率", () => {
 		const known = new Set(AGENT_TOOL_CATALOG.map((t) => t.name));
 		const extra = [...LOOP_RENDERED].filter((n) => !known.has(n));
 		expect(extra).toEqual([]);
+	});
+
+	it("子代理组只渲染一个总开关，并一次切换整组工具", () => {
+		expect(SETTINGS_SRC).toContain("const toggleSubagentTools = () =>");
+		expect(SETTINGS_SRC).toContain("for (const name of SUBAGENT_TOOL_NAMES)");
+		expect(SETTINGS_SRC).toContain("onToggle={toggleSubagentTools}");
+		expect(SETTINGS_SRC).not.toContain("SUBAGENT_TOOL_NAMES.map");
 	});
 });

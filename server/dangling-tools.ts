@@ -108,6 +108,32 @@ export function findDanglingToolCalls(messagesOrEntries: unknown[]): DanglingToo
 }
 
 /**
+ * 只找当前消息尾可以安全补结果的悬空调用。
+ *
+ * 工具结果必须紧跟携带对应 toolCall 的 assistant 消息（同一组可有多条结果）。
+ * 历史深处或 abandoned branch 的悬空调用不能追加到当前文件尾修复：中间隔着
+ * user/assistant 消息时，合成结果自身就会变成 orphan toolResult，被 OpenAI
+ * 兼容端点以 400 拒绝。遇到这种情况保持原样，让上层走转录修复/新建对话。
+ */
+export function findTrailingDanglingToolCalls(messagesOrEntries: unknown[]): DanglingToolCall[] {
+	const messages = messagesOfEntries(messagesOrEntries);
+	let i = messages.length - 1;
+	// 跳过文件尾的会话元数据，但不能越过任何其他角色的消息。
+	while (i >= 0) {
+		const role = (messages[i] as { role?: unknown })?.role;
+		if (typeof role === "string") break;
+		i--;
+	}
+	const resultIds = new Set<string>();
+	while (i >= 0 && (messages[i] as { role?: unknown })?.role === "toolResult") {
+		for (const id of toolResultIdsOfMessage(messages[i])) resultIds.add(id);
+		i--;
+	}
+	if (i < 0 || (messages[i] as { role?: unknown })?.role !== "assistant") return [];
+	return toolCallsOfMessage(messages[i]).filter((call) => !resultIds.has(call.toolCallId));
+}
+
+/**
  * 落盘修复：向会话文件尾追加合成 toolResult（每条悬空调用一条），
  * parentId 链式接在当前尾行之后。append-only——历史字节不动，无需备份。
  * 返回追加条数（0 = 健康，无需处理；-1 = 文件不可读/不可写）。
@@ -135,7 +161,7 @@ export function healDanglingToolCallFile(filePath: string): number {
 		}
 	}
 	if (entries.length === 0) return 0;
-	const dangling = findDanglingToolCalls(entries);
+	const dangling = findTrailingDanglingToolCalls(entries);
 	if (dangling.length === 0) return 0;
 	try {
 		let parentId = lastId;

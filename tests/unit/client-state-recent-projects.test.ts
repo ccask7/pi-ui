@@ -40,6 +40,20 @@ describe("ClientStateStore 最近项目删除全局持久化", () => {
 		expect(store.get("clientB").projects.map((p) => p.path)).not.toContain("/path/to/project1");
 	});
 
+	it("重新打开已有项目只更新使用时间，不改变列表顺序", () => {
+		store.remember("clientA", "/first");
+		store.remember("clientA", "/second");
+		store.remember("clientA", "/third");
+		expect(store.get("clientA").projects.map((p) => p.path)).toEqual(["/third", "/second", "/first"]);
+
+		store.remember("clientA", "/second");
+		expect(store.get("clientA").projects.map((p) => p.path)).toEqual(["/third", "/second", "/first"]);
+		expect(store.get("clientA").lastCwd).toBe("/second");
+
+		store.remember("clientA", "/new");
+		expect(store.get("clientA").projects.map((p) => p.path)).toEqual(["/new", "/third", "/second", "/first"]);
+	});
+
 	it("服务重启（新 ClientStateStore 实例）后 tombstone 依然有效", () => {
 		store.remember("clientA", "/path/to/project1");
 		store.removeProject("clientA", "/path/to/project1");

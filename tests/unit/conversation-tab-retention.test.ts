@@ -31,6 +31,31 @@ function displace(conversation: ReturnType<typeof makeConversation>) {
 	return Reflect.apply(ClientSession.prototype["displaceActive"], context, []);
 }
 
+async function switchConversation(
+	active: ReturnType<typeof makeConversation>,
+	target: ReturnType<typeof makeConversation>,
+): Promise<void> {
+	const convs = new Map([
+		[active.id, active],
+		[target.id, target],
+	]);
+	const context = {
+		convs,
+		activeId: active.id,
+		cwd: "/project",
+		displaceActive: () => null,
+		webUi: { refresh: () => {} },
+		emitConversations: () => {},
+		goalSvc: { emitGoalStatus: () => {} },
+		pushTerminals: () => {},
+		pushSlashCommands: async () => {},
+		notifyConversationChanged: () => {},
+		flushSnapshot: () => {},
+	};
+	Object.defineProperty(context, "conv", { get: () => convs.get(context.activeId) });
+	await Reflect.apply(ClientSession.prototype["switchConversation"], context, [target.id]);
+}
+
 describe("会话标签切换保留", () => {
 	it("只打开历史但本次没有新发言，切走后自动关闭", () => {
 		const conversation = makeConversation(2);
@@ -42,6 +67,14 @@ describe("会话标签切换保留", () => {
 		const conversation = { ...makeConversation(2), promptedSinceActive: true };
 		expect(displace(conversation)).toBeNull();
 		expect(conversation.listed).toBe(true);
+	});
+
+	it("切回已经对话过的标签不会清除保留标记", async () => {
+		const active = { ...makeConversation(2), id: "conv-active", cwd: "/project" };
+		const used = { ...makeConversation(2), id: "conv-used", cwd: "/project", promptedSinceActive: true };
+		await switchConversation(active, used);
+		expect(used.promptedSinceActive).toBe(true);
+		expect(displace(used)).toBeNull();
 	});
 
 	it("空白新会话仍可自动清理，避免堆出空标签", () => {

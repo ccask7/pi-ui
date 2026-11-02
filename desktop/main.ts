@@ -8,8 +8,8 @@
  * protocol.ts 零改动——和浏览器访问远端 server 是同一条路。
  *
  * 与上游的差异（fork 决策）：
- *   - 裁掉了 electron-updater 自动更新（本 fork 已删自更新功能，也没有
- *     自己的 release 通道；publish 配置若指向上游 repo 会把 fork 覆盖成上游版本）。
+ *   - 使用本仓库 GitHub Releases 的手动更新通道；不启用 electron-updater，
+ *     不做启动或后台检查，只在设置页点击后查询、确认后下载。
  *   - productName / appId 改为 pi-ccui 系（见 electron-builder.yml）。
  *
  * 运行前先 `npm run build`（需要 dist/server + web/dist）。
@@ -23,6 +23,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isAllowedExternalUrl } from "./external-url.js";
+import { checkForUpdate, downloadReleaseAsset, type UpdateRelease } from "./update-service.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** 开发：dist/desktop → dist/server；打包后：asar 关闭，app 目录即根布局（dist/server + web/dist + themes）。 */
@@ -381,8 +382,7 @@ ipcMain.handle("desktop:titlebar-overlay", (_e, color: unknown, symbolColor: unk
 	if (typeof color !== "string" || typeof symbolColor !== "string") return;
 	// 颜色：hex6（实色）或 hex8（#RRGGBBAA —— 透明窗口下渲染端发 00 alpha，让按钮条
 	// 区域跟页面一起透出桌面，否则右上角会留一块实色矩形）。
-	if (!/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color) || !/^#[0-9a-fA-F]{6}$/.test(symbolColor))
-		return;
+	if (!/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color) || !/^#[0-9a-fA-F]{6}$/.test(symbolColor)) return;
 	const h =
 		typeof height === "number" && Number.isFinite(height) && height >= 20 && height <= 120
 			? Math.round(height)
@@ -436,6 +436,69 @@ ipcMain.handle("desktop:start", async (_e, cwd: unknown) => {
 	} catch (err) {
 		return (err as Error).message;
 	}
+});
+
+/** 手动更新：仅在设置页点击后访问 GitHub；下载地址与安装路径不交给渲染进程。 */
+let availableUpdate: UpdateRelease | null = null;
+let downloadedInstaller: string | null = null;
+let updateDownloadController: AbortController | null = null;
+
+ipcMain.handle("desktop:update-info", () => ({
+	supported: app.isPackaged && process.platform === "win32",
+	currentVersion: app.getVersion(),
+}));
+
+ipcMain.handle("desktop:update-check", async () => {
+	if (!app.isPackaged || process.platform !== "win32") return { status: "unsupported" };
+	try {
+		availableUpdate = await checkForUpdate(app.getVersion());
+		downloadedInstaller = null;
+		return {
+			status: availableUpdate ? "available" : "latest",
+			release: availableUpdate
+				? { version: availableUpdate.version, notes: availableUpdate.notes, pageUrl: availableUpdate.pageUrl }
+				: null,
+		};
+	} catch (error) {
+		return { status: "error", message: (error as Error).message };
+	}
+});
+
+ipcMain.handle("desktop:update-download", async () => {
+	if (!availableUpdate) return { status: "error", message: "No checked update is available" };
+	if (updateDownloadController) return { status: "error", message: "An update is already downloading" };
+	const controller = new AbortController();
+	updateDownloadController = controller;
+	const destination = join(app.getPath("temp"), "ccui-updates", availableUpdate.assetName);
+	try {
+		await downloadReleaseAsset(
+			availableUpdate,
+			destination,
+			(percent) => {
+				if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("desktop:update-progress", percent);
+			},
+			controller.signal,
+		);
+		downloadedInstaller = destination;
+		return { status: "ready" };
+	} catch (error) {
+		if (controller.signal.aborted) return { status: "cancelled" };
+		return { status: "error", message: (error as Error).message };
+	} finally {
+		updateDownloadController = null;
+	}
+});
+
+ipcMain.handle("desktop:update-cancel", () => {
+	updateDownloadController?.abort();
+});
+
+ipcMain.handle("desktop:update-install", async () => {
+	if (!downloadedInstaller || !existsSync(downloadedInstaller)) return "更新安装包不存在，请重新下载";
+	const error = await shell.openPath(downloadedInstaller);
+	if (error) return error;
+	app.quit();
+	return null;
 });
 
 // 单实例：第二个实例聚焦已有窗口（和网页版多标签页各走独立 clientId 不冲突）。

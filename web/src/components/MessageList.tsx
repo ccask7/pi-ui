@@ -29,6 +29,7 @@ import { renderSlotToolbar } from "../slot-toolbar";
 import { useT } from "../i18n";
 import { isExportableMessage, setExportMessageCatalog, useExportImage } from "../export-image-state";
 import { SaveImageDialog } from "./SaveImageDialog";
+import { collectTurnActivities } from "../activity-turns";
 
 /** Stable shared empty map — passing this (instead of a fresh Map) lets
  *  React.memo skip messages that have no live tool output to show. */
@@ -228,7 +229,15 @@ export function MessageList({
 	/** 会话内搜索栏（Ctrl+F / Cmd+F）。 */
 	const [searchOpen, setSearchOpen] = useState(false);
 	/** Persisted messages + the live in-progress assistant message (if any). */
-	const messages = state.streamingMessage ? [...state.messages, state.streamingMessage] : state.messages;
+	const messages = useMemo(
+		() => (state.streamingMessage ? [...state.messages, state.streamingMessage] : state.messages),
+		[state.messages, state.streamingMessage],
+	);
+	/** 后端一轮任务可能包含多条 assistant 消息；UI 按最近一次用户提问聚合。 */
+	const turnActivities = useMemo(
+		() => collectTurnActivities(messages, state.isStreaming),
+		[messages, state.isStreaming],
+	);
 	/**
 	 * toolResult lookup, memoized on the messages array. The server keeps the
 	 * array reference stable while the message set is unchanged, so this Map is
@@ -254,6 +263,16 @@ export function MessageList({
 	// Only the last KEEP_RECENT persisted messages are fully rendered; older
 	// ones collapse to summary rows (unless the user expanded them).
 	const recentStart = state.messages.length > COLLAPSE_MIN ? Math.max(0, state.messages.length - KEEP_RECENT) : 0;
+	/** 最近回合可能始于折叠分界线之前：整回合保持展开，避免阶段说明或唯一工作记录被旧消息摘要吞掉。 */
+	const visibleTurnMessageIds = useMemo(() => {
+		const ids = new Set<string>();
+		for (const message of messages.slice(recentStart)) {
+			const turn = turnActivities.get(message.id);
+			if (!turn) continue;
+			for (const id of turn.messageIds) ids.add(id);
+		}
+		return ids;
+	}, [messages, recentStart, turnActivities]);
 
 	/** 当前渲染为折叠摘要行的消息 id（SearchBar 的折叠层搜索索引用它；
 	 *  toolResult 无独立折叠行——其结果文本已并入宿主 toolCall 卡）。
@@ -262,11 +281,11 @@ export function MessageList({
 		const s = new Set<string>();
 		for (let i = 0; i < recentStart; i++) {
 			const m = state.messages[i];
-			if (m.role === "toolResult") continue;
+			if (m.role === "toolResult" || visibleTurnMessageIds.has(m.id)) continue;
 			if (!expanded.has(m.id)) s.add(m.id);
 		}
 		return s;
-	}, [state.messages, recentStart, expanded]);
+	}, [state.messages, recentStart, expanded, visibleTurnMessageIds]);
 
 	// ---- 惰性窗口化（lazy windowing，纯函数见 lazy-window.ts）----------------
 	// 视口缓冲带之外的重型消息替换为等高占位 div；滚动临近时换回真实内容并
@@ -463,9 +482,18 @@ export function MessageList({
 		updateActiveFromScroll();
 	}, [questions, updateActiveFromScroll]);
 
-	const expand = useCallback((id: string) => {
-		setExpanded((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-	}, []);
+	const expand = useCallback(
+		(id: string) => {
+			const ids = turnActivities.get(id)?.messageIds ?? [id];
+			setExpanded((prev) => {
+				if (ids.every((messageId) => prev.has(messageId))) return prev;
+				const next = new Set(prev);
+				for (const messageId of ids) next.add(messageId);
+				return next;
+			});
+		},
+		[turnActivities],
+	);
 
 	useLayoutEffect(() => {
 		setExportMessageCatalog(
@@ -501,14 +529,18 @@ export function MessageList({
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 	}, []);
-	const collapse = useCallback((id: string) => {
-		setExpanded((prev) => {
-			if (!prev.has(id)) return prev;
-			const next = new Set(prev);
-			next.delete(id);
-			return next;
-		});
-	}, []);
+	const collapse = useCallback(
+		(id: string) => {
+			const ids = turnActivities.get(id)?.messageIds ?? [id];
+			setExpanded((prev) => {
+				if (!ids.some((messageId) => prev.has(messageId))) return prev;
+				const next = new Set(prev);
+				for (const messageId of ids) next.delete(messageId);
+				return next;
+			});
+		},
+		[turnActivities],
+	);
 
 	/** Scroll the conversation to a question; expand it first if it's collapsed. */
 	const jumpTo = useCallback(
@@ -827,13 +859,26 @@ export function MessageList({
 				{state.messages.map((m, i) => {
 					// system 不占位——旧快照残留的空 SYSTEM 气泡直接丢掉，不进折叠行也不进 LazyMount。
 					if (m.role === "system") return null;
-					const isOld = i < recentStart;
-					const isExpandedOld = isOld && expanded.has(m.id);
+					const turn = turnActivities.get(m.id);
+					const isOld = i < recentStart && !visibleTurnMessageIds.has(m.id);
+					const isExpandedOld = isOld && (turn ? turn.messageIds.some((id) => expanded.has(id)) : expanded.has(m.id));
 					if (isOld && !isExpandedOld) {
 						// toolResult content lives inside its toolCall card — nothing to
 						// show in the collapsed row either.
 						if (m.role === "toolResult") return null;
-						return <CollapsedMessage key={m.id} message={m} onExpand={expand} />;
+						// 一个历史回合只显示一条 PI 摘要，而不是每条 assistant 一行。
+						if (turn && turn.headerId !== m.id) return null;
+						return <CollapsedMessage key={m.id} message={turn?.summary ?? m} onExpand={expand} />;
+					}
+					// 非过程宿主的纯思考/工具消息已并入唯一工作记录，不留下空白消息行。
+					if (
+						m.role === "assistant" &&
+						turn &&
+						turn.ownerId !== m.id &&
+						!m.errorMessage &&
+						!m.content.some((block) => !!asText(block)?.text.trim())
+					) {
+						return null;
 					}
 					const qIdx = m.role === "user" ? qnIndex.get(m.id) : undefined;
 					const show = !virtualOn || alwaysSet.has(m.id) || pinned.has(m.id) || !hidden.has(m.id);
@@ -859,11 +904,12 @@ export function MessageList({
 								onUiAction={onUiAction}
 								key={m.id}
 								message={m}
+								turnActivity={turnActivities.get(m.id)}
 								qnIndex={qIdx}
 								qnActive={qIdx !== undefined ? qIdx === activeIdx : undefined}
 								onJump={jumpTo}
 								toolResults={toolResults}
-								liveOutputs={hasToolCall(m) ? liveOutputs : EMPTY_LIVE}
+								liveOutputs={hasToolCall(m) || turnActivities.get(m.id)?.ownerId === m.id ? liveOutputs : EMPTY_LIVE}
 								toolStatuses={toolStatuses}
 								streaming={state.isStreaming}
 								onKillBash={onKillBash}
@@ -874,7 +920,7 @@ export function MessageList({
 								isLast={m.id === lastId}
 								onEdit={onEdit}
 								questionAttachments={questionAttachments.get(m.id)}
-								onCollapse={isExpandedOld ? collapse : undefined}
+								onCollapse={isExpandedOld && (!turn || turn.headerId === m.id) ? collapse : undefined}
 								searchActive={searchOpen}
 								autoExpand={m.id === freshCompactionId}
 							/>
@@ -889,8 +935,14 @@ export function MessageList({
 						onUiAction={onUiAction}
 						key={state.streamingMessage.id}
 						message={state.streamingMessage}
+						turnActivity={turnActivities.get(state.streamingMessage.id)}
 						toolResults={toolResults}
-						liveOutputs={hasToolCall(state.streamingMessage) ? liveOutputs : EMPTY_LIVE}
+						liveOutputs={
+							hasToolCall(state.streamingMessage) ||
+							turnActivities.get(state.streamingMessage.id)?.ownerId === state.streamingMessage.id
+								? liveOutputs
+								: EMPTY_LIVE
+						}
 						toolStatuses={toolStatuses}
 						streaming
 						isLast

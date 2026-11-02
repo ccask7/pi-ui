@@ -67,28 +67,16 @@ describe("appendHistory", () => {
 
 describe("normalizePromptHistorySettings", () => {
 	it("非对象返回默认值", () => {
-		expect(normalizePromptHistorySettings(null)).toEqual({
-			maxEntries: 100,
-			charLimitEnabled: false,
-			charLimit: 2000,
-		});
+		expect(normalizePromptHistorySettings(null)).toEqual({ maxEntries: 100 });
 	});
-	it("范围规整：条数 1-500、字数 100-20000", () => {
+	it("条数限制在 1-500，忽略已移除的字数设置", () => {
 		expect(
 			normalizePromptHistorySettings({
 				maxEntries: 9999,
 				charLimit: 1,
 				charLimitEnabled: true,
 			}),
-		).toEqual({
-			maxEntries: 500,
-			charLimitEnabled: true,
-			charLimit: 100,
-		});
-		expect(normalizePromptHistorySettings({ maxEntries: 0, charLimit: 50000 })).toEqual({
-			maxEntries: 1,
-			charLimitEnabled: false,
-			charLimit: 20000,
-		});
+		).toEqual({ maxEntries: 500 });
+		expect(normalizePromptHistorySettings({ maxEntries: 0, charLimit: 50000 })).toEqual({ maxEntries: 1 });
 	});
 });

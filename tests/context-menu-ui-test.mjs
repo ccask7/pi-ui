@@ -399,37 +399,6 @@ async function main() {
 		250,
 	);
 
-	// ---- 界面布局的不变量：隐藏内置「文件」tab → 右栏真的空了（设置与界面一致） ----
-	// 这是 #146 的核心不变量（设置面板里看到的 == 界面上生效的）：文件 tab 也**不能**
-	// 免疫用户偏好，否则布局页那个勾选框就是个摆设。
-	await tap(
-		page,
-		page
-			.locator(
-				'button.chip[data-tip*="设置"], button.chip[data-tip*="Settings"], button[title*="设置"], button[title*="Settings"]',
-			)
-			.first(),
-	);
-	const modalOpen = await until(async () => (await page.locator(".settings-modal").count()) > 0, 30, 250);
-	check("设置面板打开", modalOpen);
-	if (modalOpen) {
-		await tap(page, page.locator(".settings-tab", { hasText: /界面布局|UI layout/ }).first());
-		const panelsSlot = page.locator(".set-ui-slot", { hasText: /右侧面板|Right panel/ }).first();
-		const filesRow = panelsSlot.locator(".set-row", { hasText: /文件列表|Files/ }).first();
-		const listed = await until(async () => (await filesRow.count()) > 0, 30, 250);
-		check("布局页列出了右栏的「文件列表」条目", listed);
-		if (listed) {
-			await tap(page, filesRow.locator('input[type="checkbox"]').first());
-			const hidden = await until(async () => (await page.locator(".panel-right .panel-body").count()) === 0, 30, 250);
-			check("取消勾选后右栏的文件树消失（用户偏好对内置 tab 同样生效）", hidden);
-			await tap(page, filesRow.locator('input[type="checkbox"]').first());
-			const back = await until(async () => (await page.locator(".panel-right .panel-body").count()) > 0, 30, 250);
-			check("勾回去后文件树回来", back);
-		}
-		await tap(page, page.locator(".settings-modal .modal-close").first());
-		await until(async () => (await page.locator(".settings-modal").count()) === 0, 20, 200);
-	}
-
 	check("页面没有 JS 报错", errors.filter((e) => !/favicon|net::ERR/.test(e)).length === 0);
 	if (errors.length)
 		console.log(

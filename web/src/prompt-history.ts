@@ -16,16 +16,10 @@ export const PROMPT_HISTORY_SETTINGS_KEY = "ccui:prompt-history-settings";
 export interface PromptHistorySettings {
 	/** 最大保留条数（1–500） */
 	maxEntries: number;
-	/** 是否限制单条字数 */
-	charLimitEnabled: boolean;
-	/** 单条最大字数（启用时生效） */
-	charLimit: number;
 }
 
 export const DEFAULT_PROMPT_HISTORY_SETTINGS: PromptHistorySettings = {
 	maxEntries: 100,
-	charLimitEnabled: false,
-	charLimit: 2000,
 };
 
 /** 规整设置值，超出范围回退默认值。 */
@@ -36,11 +30,7 @@ export function normalizePromptHistorySettings(raw: unknown): PromptHistorySetti
 	let maxEntries = typeof o.maxEntries === "number" ? Math.floor(o.maxEntries) : def.maxEntries;
 	if (!Number.isFinite(maxEntries) || maxEntries < 1) maxEntries = 1;
 	if (maxEntries > 500) maxEntries = 500;
-	let charLimit = typeof o.charLimit === "number" ? Math.floor(o.charLimit) : def.charLimit;
-	if (!Number.isFinite(charLimit) || charLimit < 100) charLimit = 100;
-	if (charLimit > 20000) charLimit = 20000;
-	const charLimitEnabled = typeof o.charLimitEnabled === "boolean" ? o.charLimitEnabled : def.charLimitEnabled;
-	return { maxEntries, charLimitEnabled, charLimit };
+	return { maxEntries };
 }
 
 export function loadPromptHistorySettings(): PromptHistorySettings {
@@ -60,12 +50,9 @@ export function savePromptHistorySettings(s: PromptHistorySettings): void {
 	} catch {
 		/* ignore */
 	}
-	// 同步裁剪已有历史以符合新设置（条数 / 字数限制）
+	// 同步裁剪已有历史以符合条数上限。
 	try {
 		let history = loadPromptHistory();
-		if (norm.charLimitEnabled) {
-			history = history.map((v) => (v.length > norm.charLimit ? v.slice(0, norm.charLimit) : v));
-		}
 		if (history.length > norm.maxEntries) history = history.slice(history.length - norm.maxEntries);
 		persist(history);
 	} catch {
@@ -131,7 +118,6 @@ export function pushPromptHistory(text: string): void {
 	let t = text.trim();
 	if (!t) return;
 	const settings = loadPromptHistorySettings();
-	if (settings.charLimitEnabled && t.length > settings.charLimit) t = t.slice(0, settings.charLimit);
 	const cur = loadPromptHistory();
 	const next = appendHistory(cur, t, settings.maxEntries);
 	if (next === cur) return;

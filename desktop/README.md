@@ -12,9 +12,10 @@ Electron 主进程 (desktop/main.ts)
 
 ## 与上游的差异（本 fork）
 
-- **裁掉了 electron-updater 自动更新**：本 fork 已删自更新功能，也没有自己的 release 通道
-  （`electron-builder.yml` 不设 `publish`——指向上游 repo 会把 fork 覆盖成上游版本）。
-  preload 暴露 `window.piDesktop = { isDesktop, versions, pickDirectory, start }`
+- **手动 GitHub Release 更新**：设置 → 通用 → 检查更新，只在点击后访问固定仓库；
+  用户确认后才下载 NSIS 安装包，下载完成后再次确认重启安装。不使用 electron-updater，
+  `electron-builder.yml` 也不设 `publish`，不会启动或后台检查。
+  preload 暴露 `window.piDesktop = { isDesktop, versions, pickDirectory, start, updater }`
   ——后两个是欢迎页（welcome.html）的 IPC 控制面，server 未起之前选目录/启动只能走壳。
   注意 preload 必须是 CJS（源码为 `preload.cts`）：sandbox 渲染进程不载 ESM preload，
   静默失败表现为 `window.piDesktop` undefined。

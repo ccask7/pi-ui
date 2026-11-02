@@ -449,6 +449,8 @@ export interface McpReloadSummary {
 export class McpBridge {
 	private clients: McpClient[] = [];
 	private tools: PluginAgentTool[] = [];
+	/** 启动失败也保留在只读目录里，避免配置存在但页面静默消失。 */
+	private failures = new Map<string, string>();
 
 	constructor(
 		private dataDir: string,
@@ -474,9 +476,12 @@ export class McpBridge {
 		try {
 			const client = new McpClient(name, spec, this.log);
 			await client.start();
+			this.failures.delete(name);
 			return client;
 		} catch (err) {
-			this.log(`[mcp] 服务器「${name}」启动失败：`, err instanceof Error ? err.message : err);
+			const error = err instanceof Error ? err.message : String(err);
+			this.failures.set(name, error);
+			this.log(`[mcp] 服务器「${name}」启动失败：`, error);
 			return null;
 		}
 	}
@@ -523,6 +528,9 @@ export class McpBridge {
 		);
 		const stale = this.clients.filter((c) => next.get(c.name) !== c);
 		this.clients = [...next.values()];
+		for (const name of this.failures.keys()) {
+			if (!(name in cfg.servers)) this.failures.delete(name);
+		}
 		this.tools = [];
 		for (const c of this.clients) for (const t of c.getTools()) this.tools.push(adaptMcpTool(c.name, t, c));
 		for (const c of stale) c.close();
@@ -538,6 +546,24 @@ export class McpBridge {
 
 	getTools(): PluginAgentTool[] {
 		return this.tools;
+	}
+
+	/** 页面只读快照：服务器、错误与工具说明，不包含 env / 进程句柄。 */
+	getServerSnapshots() {
+		const names = new Set([...this.clients.map((c) => c.name), ...this.failures.keys()]);
+		return [...names].sort().map((name) => {
+			const client = this.clients.find((c) => c.name === name);
+			const error = this.failures.get(name);
+			return {
+				name,
+				status: error || !client ? ("error" as const) : ("running" as const),
+				...(error ? { error } : {}),
+				tools: (client?.getTools() ?? []).map((tool) => ({
+					name: tool.name,
+					description: tool.description ?? "",
+				})),
+			};
+		});
 	}
 
 	hasServers(): boolean {

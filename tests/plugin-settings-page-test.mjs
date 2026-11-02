@@ -3,9 +3,8 @@
  * 覆盖（零 token，本地假插件，不联网）：
  *   - manifest 的 `ui.settings` 条目变成设置面板左侧导航的一项（插件页）
  *   - 点开后由 PluginPage 挂载插件自己的 client bundle，画到 `.plugin-page-host` 里
- *   - `hidden: true` 的页面不出现在导航里（用户可在「界面布局」页放出来）
+ *   - `hidden: true` 的页面不出现在导航里
  *   - 离开该页时插件被**卸载**（mount() 返回的 cleanup 被调用；再点回来是第二次 mount）
- *   - 在「界面布局」里取消勾选该页 → 导航项消失、当前分区回落到默认页（不留白屏）
  *   - 页面无 JS 报错
  *
  * 缺 Chrome 自动 SKIP（与 fence-render-test / plugin-topbar-ui-test 同约定）。运行：
@@ -223,27 +222,6 @@ async function main() {
 	await tap(page, railTab(page, "Set Test"));
 	const remounted = await until(async () => (await page.evaluate(() => globalThis.__setPageMounts || 0)) >= 2, 40, 150);
 	check("再点回来是重新挂载（不是一直留在 DOM 里）", remounted);
-
-	// ---- 布局页里把该页取消勾选：导航项消失 + 分区回落 --------------------
-	// 「界面布局」是**独立页签**（SettingsModal 的 { id: "layout" }），不再挂在「界面插件」下面。
-	await tap(page, page.locator(".settings-tab", { hasText: /界面布局|UI layout/ }).first());
-	const slotRow = page.locator(".set-ui-slot", { hasText: /设置页|Settings pages/ }).first();
-	const pageRow = slotRow.locator(".set-row", { hasText: "Set Test" }).first();
-	const listed = await until(async () => (await pageRow.count()) > 0, 30, 200);
-	check("界面布局页列出了这个插件页（可隐藏/排序）", listed);
-	if (listed) {
-		await tap(page, pageRow.locator('input[type="checkbox"]').first());
-		await until(async () => (await railTab(page, "Set Test").count()) === 0, 20, 200);
-	}
-	check("取消勾选后导航项消失", (await railTab(page, "Set Test").count()) === 0);
-	const activeLabel =
-		(await page
-			.locator(".settings-tab.active")
-			.first()
-			.textContent()
-			.catch(() => "")) ?? "";
-	check("当前分区回落到默认页（不留空白正文）", !activeLabel.includes("Set Test") && activeLabel.trim().length > 0);
-	check("回落后不再挂着插件画布", (await page.locator(".plugin-page-host").count()) === 0);
 
 	check("页面没有 JS 报错", errors.filter((e) => !/favicon|net::ERR/.test(e)).length === 0);
 	if (errors.length)

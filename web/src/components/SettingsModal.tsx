@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import {
-	FiAlertTriangle,
 	FiArchive,
 	FiBox,
 	FiChevronDown,
@@ -48,8 +47,6 @@ import type {
 	UiAgentPreset,
 	UiApprovalRule,
 	UiExtensionInfo,
-	UiLayoutPrefs,
-	UiSlotId,
 	UiPluginInfo,
 	UiSettingsState,
 	UiSkillInfo,
@@ -58,9 +55,12 @@ import type {
 import { SchedulerPanel } from "./SchedulerPanel";
 import { SoundSettingsPanel } from "./SoundSettings";
 import { NotifyToggle } from "./NotifyToggle";
+import { ToggleRow } from "./SettingsControls";
+import { SkillsPanel } from "./SkillsPanel";
 import { LanguageSettings } from "./LanguageSettings";
+import { UpdateSettings } from "./UpdateSettings";
 import { BrowserControlSettings } from "./BrowserControl";
-import type { SoundKind, SoundSettings } from "../sounds";
+import type { SoundSettings } from "../sounds";
 import type { ThemeInfo } from "../theme";
 import {
 	clearPromptHistory,
@@ -75,32 +75,11 @@ import { useWideChat, saveChatWidthSettings } from "../chat-width-settings";
 import { usePresentAutoOpen, savePresentAutoOpen } from "../present-settings";
 import { useProjectTitle, saveTitleSettings } from "../title-settings";
 import { sanitizeWallpaperUrl, fileToWallpaperUrl, saveWallpaperSettings, useWallpaperSettings } from "../wallpaper";
-import {
-	saveWindowOpacity,
-	saveWindowTransparent,
-	useWindowOpacity,
-	useWindowTransparent,
-} from "../window-opacity";
+import { saveWindowOpacity, saveWindowTransparent, useWindowOpacity, useWindowTransparent } from "../window-opacity";
 import { useT, useI18n } from "../i18n";
-import {
-	buildUiSlots,
-	REQUIRED_TOPBAR_ITEM_IDS,
-	restoreAllUi,
-	restoreUiItem,
-	withPluginViewItems,
-	type UiDiagnostic,
-	type UiSlotEntry,
-} from "../ui-slots";
+import { buildUiSlots, withPluginViewItems, type UiSlotEntry } from "../ui-slots";
 import { appSend, useAppGlobals } from "../app-globals";
 import { countPluginPhases, pluginPhase, type PluginPhase } from "../plugin-phase";
-import {
-	PLUGIN_LOG_LEVELS,
-	getPluginLogs,
-	pluginLogsClearRequest,
-	pluginLogsFetch,
-	subscribePluginLogs,
-	type PluginLogLevel,
-} from "../plugin-logs";
 import { QUICK_PHRASE_DEFAULTS } from "../quick-phrases";
 import { DEFAULT_PROMPT_TEMPLATE, PROMPT_TOKENS, isReadonlyPromptSource } from "../../../server/prompt-composer.js";
 import {
@@ -184,10 +163,9 @@ interface SettingsModalProps {
 		schedulerTasks: SchedulerTaskView[];
 	};
 	terminal: SettingsTerminalBridge;
-	/** 声音提示（通用页：总开关/音量/试听）——状态与播放都在 App 里。 */
+	/** 声音提示（通用页：总开关/音量）——状态与播放都在 App 里。 */
 	sound: SoundSettings;
 	onSoundChange: (settings: SoundSettings) => void;
-	onSoundPreview: (kind: SoundKind) => void;
 	/** 主题（界面设置页）：列表 + 当前选择 + 切换。 */
 	themes: ThemeInfo[];
 	theme: string | null;
@@ -200,58 +178,10 @@ interface SettingsModalProps {
 	onClose: () => void;
 }
 
-/** A row with an enable/disable switch (skill / extension). */
-
 /** 各来源排序权重：append 置顶（最常用），可编辑居中，只读沉底（纯预览）。 */
 function rankPromptToken(tk: string): number {
 	if (tk === "append") return 0;
 	return isReadonlyPromptSource(tk) ? 2 : 1;
-}
-
-function ToggleRow({
-	title,
-	subtitle,
-	tip,
-	enabled,
-	onToggle,
-	action,
-	disabled,
-}: {
-	title: React.ReactNode;
-	subtitle?: string;
-	/** 长解释走「？」悬浮提示，不再平铺（subtitle 与 tip 二选一）。 */
-	tip?: string;
-	enabled: boolean;
-	onToggle: () => void;
-	/** Optional extra control rendered left of the switch (e.g. uninstall). */
-	action?: React.ReactNode;
-	/** 被默认预设过滤时禁用开关（展示实效 off，底层禁用名单原样保留）。 */
-	disabled?: boolean;
-}) {
-	const t = useT();
-	return (
-		<div className="set-row">
-			<div className="set-row-info">
-				<div className="set-row-name">
-					{title}
-					{tip && <HintTip text={tip} />}
-				</div>
-				{subtitle && <div className="set-row-desc">{subtitle}</div>}
-			</div>
-			{action}
-			<button
-				type="button"
-				className={`set-switch ${enabled ? "on" : ""}`}
-				role="switch"
-				aria-checked={enabled}
-				disabled={disabled}
-				title={enabled ? t("settingsEnabled") : t("settingsDisabled")}
-				onClick={disabled ? undefined : onToggle}
-			>
-				<span className="set-switch-knob" />
-			</button>
-		</div>
-	);
 }
 
 /** 相位 → 文案 key（tt 绕行字面量约束，见文件顶部 tt 定义）。 */
@@ -312,53 +242,6 @@ function FieldRow({
 	);
 }
 
-/** 某插件的运行时日志面板（host.log 环形缓冲：级别过滤 + 清空；数据来自 plugin-logs store）。 */
-function PluginLogView({ pluginId }: { pluginId: string }) {
-	const t = useT();
-	const [level, setLevel] = useState<"all" | PluginLogLevel>("all");
-	const all = getPluginLogs(pluginId);
-	const shown = level === "all" ? all : all.filter((e) => e.level === level);
-	return (
-		<>
-			<div className="set-log-filter">
-				<span className="set-log-filter-label">{t("pluginLogLevel")}</span>
-				{(["all", ...PLUGIN_LOG_LEVELS] as const).map((lv) => (
-					<button
-						key={lv}
-						type="button"
-						className={`set-log-filter-btn${level === lv ? " on" : ""}`}
-						onClick={() => setLevel(lv)}
-					>
-						{lv === "all" ? t("pluginLogAll") : lv.toUpperCase()}
-					</button>
-				))}
-				<button
-					type="button"
-					className="set-log-clear"
-					title={t("pluginLogClear")}
-					onClick={() => appSend(pluginLogsClearRequest(pluginId))}
-				>
-					<FiTrash2 />
-					{t("pluginLogClear")}
-				</button>
-			</div>
-			{shown.length === 0 ? (
-				<p className="set-empty">{t("pluginLogEmpty")}</p>
-			) : (
-				<ul className="set-diag-list set-log-list">
-					{shown.map((e, i) => (
-						<li key={`${pluginId}-${e.ts}-${i}`}>
-							<span className="set-log-time">{new Date(e.ts).toLocaleTimeString()}</span>{" "}
-							<span className={`set-log-level lv-${e.level}`}>{e.level.toUpperCase()}</span>{" "}
-							<span className="set-log-text">{e.text}</span>
-						</li>
-					))}
-				</ul>
-			)}
-		</>
-	);
-}
-
 /** 设置弹窗的左侧分组导航（一次只显示一个区块，消灭长滚动）。
  *  插件自定义页（`settings.pages`）复用同一套导航：id 形如 `plugin-page:<条目全局 id>`
  *  —— 条目全局 id 本身是 `<pluginId>:<itemId>`，所以整串是 `plugin-page:<pluginId>:<itemId>`；
@@ -378,7 +261,6 @@ type SettingsTab =
 	| "skills"
 	| "extensions"
 	| "plugins"
-	| "layout"
 	| "review"
 	| "vision"
 	| "presets"
@@ -391,7 +273,6 @@ export function SettingsModal({
 	initialSection,
 	sound,
 	onSoundChange,
-	onSoundPreview,
 	themes,
 	theme,
 	onThemeChange,
@@ -402,7 +283,7 @@ export function SettingsModal({
 }: SettingsModalProps) {
 	const t = useT();
 	const { locale } = useI18n();
-	// 设置 → 通用 页底部显示版本号（原顶栏「版本」芯片，随溢出菜单一起删掉）。
+	// 设置 → 通用：手动更新区域显示桌面壳版本；网页版保留服务端版本。
 	const { appVersion } = useAppGlobals();
 	// {{token}} 元数据文案键是动态的（promptTok_<token>[,_desc]），用 tt 跳过字面量类型。
 	const tt = (k: string) => t(k as Parameters<typeof t>[0]);
@@ -461,28 +342,20 @@ export function SettingsModal({
 	const [confirmRuleReset, setConfirmRuleReset] = useState<string | null>(null);
 	// Read-only viewer for the FULL system prompt actually in effect.
 	const [showFullPrompt, setShowFullPrompt] = useState(false);
-	const [showToolsSchema, setShowToolsSchema] = useState(false);
 	// 宽屏聊天列开关（纯前端 localStorage，见 chat-width-settings.ts）。
 	const wideChat = useWideChat();
 	// present_files 卡片：AI 标了「先看这个」时要不要自动弹预览窗（纯前端偏好，localStorage）。
 	const presentAutoOpen = usePresentAutoOpen();
 	const projectTitle = useProjectTitle();
-	// 聊天背景图（纯前端 localStorage，见 wallpaper.ts）：地址输入框用本地草稿，
-	// 失焦/回车才提交（避免边输边校验）；压暗/模糊滑杆直接提交即时预览。
+	// 聊天背景图（纯前端 localStorage，见 wallpaper.ts）：本地上传；压暗/模糊滑杆即时预览。
 	const wallpaper = useWallpaperSettings();
 	// 整体不透明度（纯前端 localStorage，见 window-opacity.ts）：窗口级透明，
 	// 对齐 Windows Terminal 的 opacity；「窗口透明」是它的兜底开关。
 	const windowOpacity = useWindowOpacity();
 	const windowTransparent = useWindowTransparent();
-	const [wallpaperDraft, setWallpaperDraft] = useState(wallpaper.url);
-	const wallpaperFocus = useRef(false);
 	const wallpaperFileRef = useRef<HTMLInputElement>(null);
 	const [wallpaperUploading, setWallpaperUploading] = useState(false);
 	const [wallpaperUploadError, setWallpaperUploadError] = useState(false);
-	useEffect(() => {
-		// data: 图不回填输入框（太长），下方缩略预览即表示生效中。
-		if (!wallpaperFocus.current) setWallpaperDraft(wallpaper.url.startsWith("data:") ? "" : wallpaper.url);
-	}, [wallpaper.url]);
 	const onPickWallpaperFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
 		e.target.value = "";
@@ -496,7 +369,6 @@ export function SettingsModal({
 				setWallpaperUploadError(true);
 				return;
 			}
-			setWallpaperDraft("");
 			saveWallpaperSettings({ ...wallpaper, url: clean });
 		} finally {
 			setWallpaperUploading(false);
@@ -529,15 +401,8 @@ export function SettingsModal({
 	}, [phClearConfirm]);
 	// Two-step uninstall confirm: which extension id is awaiting confirmation.
 	const [confirmUninstall, setConfirmUninstall] = useState<string | null>(null);
-	/** 界面插件诊断展开态（插件 id → 展开；一次只展开一行）。 */
-	const [diagOpen, setDiagOpen] = useState<string | null>(null);
-	/** 界面插件运行日志展开态（插件 id → 展开；一次只展开一行，点开即按需拉取）。 */
-	const [logOpen, setLogOpen] = useState<string | null>(null);
 	/** 界面插件配置展开态（插件 id → 展开；默认折叠）。 */
 	const [settingsOpen, setSettingsOpen] = useState<Record<string, boolean>>({});
-	/** 日志 store 变化即重渲（拉取/清空回包到达时刷新列表与条数）。 */
-	const [, bumpLogSeq] = useState(0);
-	useEffect(() => subscribePluginLogs(() => bumpLogSeq((n) => n + 1)), []);
 	// 快捷短语新增输入框草稿（Enter / 添加按钮提交）。
 	const [quickNew, setQuickNew] = useState("");
 	// 快捷短语行内编辑（null = 未在编辑；输入框受控于 value，回显不打断输入）。
@@ -600,24 +465,17 @@ export function SettingsModal({
 			settings?.softCapTokens && settings.softCapTokens > 0 ? formatTokenDraft(settings.softCapTokens) : "",
 		);
 	}, [settings?.softCapTokens]);
-	// 按模型覆盖的新增行草稿。
-	const [newCapModel, setNewCapModel] = useState<string>("");
-	const [newCapTokens, setNewCapTokens] = useState<string>("");
 
 	/** 宿主 UI 布局（issue #146 完整版）：所有挂载点的最终条目 = 内置 + 插件贡献 +
-	 *  插件 arrange + 用户偏好。设置面板与 TopBar 用同一份计算，看到的顺序永远一致。
+	 *  插件 arrange + 既有用户偏好。
 	 *  刻意放在 tabs 之前（也就跑在上面的 `if (!settings) return null` 之前）：插件自定义页
 	 *  （settings.pages）也是导航的一项，得先算出来；而引用它的回落 effect 是 hook，
 	 *  不能写在条件 return 之后。 */
-	// 合并诊断（P0-1）：未知 slot / 未知 kind / arrange 目标不存在 / 插件被禁用或激活
-	// 失败都产出一条带归因的记录，布局页顶部横幅展示（按 pluginId 分组，可折叠）。
-	const uiDiagnostics: UiDiagnostic[] = [];
 	const uiSlots = buildUiSlots(withPluginViewItems(chat.plugins), {
 		locale,
 		t: (key: string) => t(key as Parameters<typeof t>[0]),
 		disabledPlugins: chat.settings?.disabledPlugins ?? [],
 		layout: chat.settings?.uiLayout,
-		diagnostics: uiDiagnostics,
 	});
 
 	/** `settings.pages` 里可渲染的插件页（导航一项 = 一页）。跳过：宿主条目（该槽位按契约是
@@ -637,7 +495,7 @@ export function SettingsModal({
 	/** 导航 id ↔ 插件页的换算只写这一处（tab 状态、回落 effect、渲染块共用）。 */
 	const pluginPageTabId = (entryId: string): SettingsTab => `plugin-page:${entryId}`;
 
-	/** 正在看的插件页消失了（插件被卸载/禁用，或布局页把这条隐藏了）→ 回落到默认分区。
+	/** 正在看的插件页消失了（插件被卸载/禁用，或既有布局偏好隐藏了它）→ 回落到默认分区。
 	 *  留着指向不存在的 tab，正文会空白一片，而导航里那项也没了——用户不知道该点哪。
 	 *  用 effect 而不是渲染期纠正：纠正要改 state，渲染期不能改。 */
 	useEffect(() => {
@@ -667,6 +525,8 @@ export function SettingsModal({
 		: new Set(AGENT_TOOL_CATALOG.map((e) => e.name));
 	const piPresetName = chat.agentPresets?.presets.find((pp) => pp.id === piPresetId)?.name ?? piPresetId ?? "";
 	const isBlockedByPreset = (name: string) => piPresetFiltering && !piPresetAllowed.has(name);
+	const subagentToolsBlocked = SUBAGENT_TOOL_NAMES.some(isBlockedByPreset);
+	const subagentToolsEnabled = !subagentToolsBlocked && SUBAGENT_TOOL_NAMES.every((name) => !disabledTools.has(name));
 	const blockedPresetCount = piPresetFiltering
 		? AGENT_TOOL_CATALOG.filter((e) => !piPresetAllowed.has(e.name)).length
 		: 0;
@@ -723,7 +583,6 @@ export function SettingsModal({
 		{ id: "skills", icon: <FiCpu />, label: t("settingsSkills"), count: settings.skills.length },
 		{ id: "extensions", icon: <FiPackage />, label: t("settingsExtensions"), count: settings.extensions.length },
 		{ id: "plugins", icon: <FiBox />, label: t("settingsUiPlugins"), count: chat.plugins.length },
-		{ id: "layout", icon: <FiSliders />, label: t("uiLayoutTitle") },
 		{ id: "review", icon: <FiZap />, label: t("settingsReview"), count: settings.reviewSkills.length },
 		{ id: "vision" as const, icon: <FiEye />, label: t("settingsVisionBridge") },
 		{ id: "presets", icon: <FiSliders />, label: t("settingsPresets"), count: settings.presets.length },
@@ -758,7 +617,6 @@ export function SettingsModal({
 		? (pluginPages.find((p) => pluginPageTabId(p.entry.id) === tab) ?? null)
 		: null;
 
-	const disabledSkills = new Set(settings.disabledSkills);
 	const disabledExts = new Set(settings.disabledExtensions);
 
 	const setPartial = (patch: {
@@ -769,8 +627,6 @@ export function SettingsModal({
 		disabledSkills?: string[];
 		disabledExtensions?: string[];
 		disabledPlugins?: string[];
-		/** 宿主 UI 布局偏好（插件 UI 贡献 + 内置条目的隐藏/排序/分组；纯 UI，per-client）。 */
-		uiLayout?: UiLayoutPrefs;
 		/** 统一工具禁用名单（工具 tab 逐工具开关；遗留单开关仍可用，会折回此名单）。 */
 		disabledAgentTools?: string[];
 		/** 插件 AI 工具禁用名单（工具名；live 生效无需 reload）。 */
@@ -791,8 +647,6 @@ export function SettingsModal({
 		thinkingWrap?: boolean;
 		toolsWrap?: boolean;
 		toolImagesEnabled?: boolean;
-		devNoCache?: boolean;
-		autoReload?: boolean;
 		skillsFullText?: string[];
 		quickPhrases?: string[];
 		quickPhrasesEnabled?: boolean;
@@ -805,7 +659,6 @@ export function SettingsModal({
 		subagentDefaultModel?: string | null;
 		retryMaxAttempts?: number;
 		softCapTokens?: number;
-		softCapByModel?: Record<string, number>;
 		reviewPrompt?: string;
 		reviewDisabledSkills?: string[];
 		markersEnabled?: boolean;
@@ -824,22 +677,6 @@ export function SettingsModal({
 		setPartial({ quickPhrases: next });
 	};
 
-	const toggleSkill = (s: UiSkillInfo) => {
-		const next = new Set(disabledSkills);
-		if (next.has(s.name)) next.delete(s.name);
-		else next.add(s.name);
-		setPartial({ disabledSkills: [...next] });
-	};
-
-	// skill 全文注入名单：按技能单独勾选（空 = 名录模式）。
-	const fullTextSkills = new Set(settings.skillsFullText ?? []);
-	const toggleSkillFullText = (name: string) => {
-		const next = new Set(fullTextSkills);
-		if (next.has(name)) next.delete(name);
-		else next.add(name);
-		setPartial({ skillsFullText: [...next] });
-	};
-
 	const disabledPlugins = new Set(settings.disabledPlugins ?? []);
 	const togglePlugin = (p: UiPluginInfo) => {
 		const next = new Set(disabledPlugins);
@@ -855,15 +692,14 @@ export function SettingsModal({
 		setPartial({ disabledExtensions: [...next] });
 	};
 
-	// 子代理各工具的「?」说明（key 与 tool-manager.ts 的 SUBAGENT_TOOL_NAMES 对齐）。
-	const SUBAGENT_TOOL_TIPS: Record<string, string> = {
-		subagent_spawn: t("toolDescSubagentSpawn"),
-		subagent_get_result: t("toolDescSubagentGetResult"),
-		subagent_steer: t("toolDescSubagentSteer"),
-		subagent_list: t("toolDescSubagentList"),
-		subagent_stop: t("toolDescSubagentStop"),
-		subagent_wait_all: t("toolDescSubagentWaitAll"),
-		subagent_templates: t("toolDescSubagentTemplates"),
+	// 子代理是一套能力：一个开关同时控制创建、管理和交接工具。
+	const toggleSubagentTools = () => {
+		const next = new Set(disabledTools);
+		for (const name of SUBAGENT_TOOL_NAMES) {
+			if (subagentToolsEnabled) next.add(name);
+			else next.delete(name);
+		}
+		setPartial({ disabledAgentTools: [...next] });
 	};
 	// 统一工具开关（工具 tab 逐工具；与 toggleSkill 同模式）。
 	const toggleAgentTool = (name: string) => {
@@ -943,102 +779,6 @@ export function SettingsModal({
 		setConfirmUninstall(null);
 		runTerminalCommand(`${t("uninstallTitle")} ${pkgName}`, `pi remove npm:${pkgName}`);
 	};
-
-	/** 布局页按界面位置分组的挂载点（22 个全量：与 ui-slots.ts 的 SLOT_IDS 同顺序，
-	 *  严格按实际界面的 DOM/视觉顺序：顶栏 → 通知 → 左栏 → 主列（头部/空态/消息/目标条/
-	 *  输入框） → 右栏 → 终端/Git 视图 → 底栏 → 悬浮层 → 右键菜单 → 设置页 → 对话框）。 */
-	const uiLayoutSections: { slot: UiSlotId; labelKey: string }[] = [
-		{ slot: "topbar.primary", labelKey: "uiLayoutTopbar" },
-		{ slot: "topbar.overflow", labelKey: "uiLayoutTopbarOverflow" },
-		{ slot: "notice.actions", labelKey: "uiLayoutNotice" },
-		{ slot: "leftpanel.sessions", labelKey: "uiLayoutLeftSessions" },
-		{ slot: "chat.header", labelKey: "uiLayoutChatHeader" },
-		{ slot: "chat.empty", labelKey: "uiLayoutChatEmpty" },
-		{ slot: "message.actions", labelKey: "uiLayoutMessage" },
-		{ slot: "goalbar.actions", labelKey: "uiLayoutGoalbar" },
-		{ slot: "composer.leading", labelKey: "uiLayoutComposerLeading" },
-		{ slot: "composer.actions", labelKey: "uiLayoutComposer" },
-		{ slot: "rightpanel.tabs", labelKey: "uiLayoutRightPanel" },
-		{ slot: "terminal.toolbar", labelKey: "uiLayoutTerminal" },
-		{ slot: "scm.toolbar", labelKey: "uiLayoutScm" },
-		{ slot: "bottombar", labelKey: "uiLayoutBottombar" },
-		{ slot: "file.preview.toolbar", labelKey: "uiLayoutFilePreview" },
-		{ slot: "contextmenu.topbar", labelKey: "uiLayoutContextTopbar" },
-		{ slot: "contextmenu.message", labelKey: "uiLayoutContextMessage" },
-		{ slot: "contextmenu.session", labelKey: "uiLayoutContextSession" },
-		{ slot: "contextmenu.file", labelKey: "uiLayoutContextFile" },
-		{ slot: "contextmenu.toolcall", labelKey: "uiLayoutContextToolcall" },
-		{ slot: "settings.pages", labelKey: "uiLayoutSettingsPages" },
-		{ slot: "modal.dialog", labelKey: "uiLayoutModal" },
-	];
-	/** 渲染层真正按 align 分区的槽位（其余槽位的 align 存了也无处生效，布局页就不提供了）。
-	 *  顶栏与底栏/输入框动作区同口径：顶栏现在**每个**条目的 align 都生效（贴边例外已取消，
-	 *  ☰/📁 也是普通条目：顺序、对齐、显隐全部可改，手机上它们默认就是最左/最右）。 */
-	const uiAlignSlots: UiSlotId[] = ["bottombar", "composer.actions", "topbar.primary"];
-	const [uiLayoutFilter, setUiLayoutFilter] = useState("");
-	/** 槽位 id → 布局页分区标题（movedFrom「移自哪」的显示用）。 */
-	const uiSlotTitle = (slot: UiSlotId): string => {
-		const found = uiLayoutSections.find((s) => s.slot === slot);
-		return found ? t(found.labelKey as Parameters<typeof t>[0]) : slot;
-	};
-	const layout = chat.settings?.uiLayout;
-	const setLayout = (patch: UiLayoutPrefs) => setPartial({ uiLayout: { ...layout, ...patch } });
-	/** 取消勾选＝用户隐藏；勾回＝用户显式显示（覆盖插件声明的 hidden / arrange 的 hide）。 */
-	const toggleUiHidden = (entry: UiSlotEntry) => {
-		const hidden = new Set(layout?.hidden ?? []);
-		const shown = new Set(layout?.shown ?? []);
-		if (entry.hidden) {
-			hidden.delete(entry.id);
-			shown.add(entry.id);
-		} else {
-			hidden.add(entry.id);
-			shown.delete(entry.id);
-		}
-		setLayout({ hidden: [...hidden], shown: [...shown] });
-	};
-	/** ↑/↓：把顺序写进全局 order，同时保留其他槽位已有的自定义顺序。
-	 *  layout.order 是跨槽位共享的一维数组（合并引擎按槽位内相对次序用），直接用本槽位
-	 *  的全量 id 覆盖它会把其他槽位的调序洗掉 —— 所以先摘掉本槽位的旧痕迹，再把新顺序
-	 *  接在其他槽位顺序之后（跨槽位的前后关系不影响渲染，只影响同槽位内的相对次序）。
-	 *  顶栏/底栏/输入框动作区在界面上按对齐段分组渲染（左 start → 中 center → 右 end，
-	 *  见 TopBar 的 segStart/segCenter/segEnd、FooterBar 的左右分区、ChatInput 的
-	 *  composerGroups），布局页同口径按段展示、↑↓ 只在段内移动：调用方传全槽位
-	 *  allEntries 与当前段 rowItems，段内新顺序就地写回全槽位顺序（段外条目原位不动 ——
-	 *  跨段的前后本来就不影响渲染，换段走对齐下拉）。其余槽位整槽一段，与旧行为一致。 */
-	const moveUiEntry = (allEntries: UiSlotEntry[], rowItems: UiSlotEntry[], id: string, delta: number) => {
-		const groupKeys = rowItems.map((e) => e.id);
-		const idx = groupKeys.indexOf(id);
-		const target = idx + delta;
-		if (idx < 0 || target < 0 || target >= groupKeys.length) return;
-		const nextGroup = [...groupKeys];
-		const [moved] = nextGroup.splice(idx, 1);
-		if (moved === undefined) return;
-		nextGroup.splice(target, 0, moved);
-		// 段内新顺序就地写回全槽位顺序：属于本段的位置按新顺序依次填入，段外条目不动。
-		const groupSet = new Set(groupKeys);
-		const queue = [...nextGroup];
-		const next = allEntries.map((e) => (groupSet.has(e.id) ? (queue.shift() as string) : e.id));
-		const inSlot = new Set(allEntries.map((e) => e.id));
-		const others = (layout?.order ?? []).filter((x) => !inSlot.has(x));
-		setLayout({ order: [...others, ...next] });
-	};
-	/** 对齐：只给渲染层真分区的槽位提供（start/center/end，脏值由合并引擎兜底）。 */
-	const setUiAlign = (id: string, align: string) => {
-		if (align !== "start" && align !== "center" && align !== "end") return;
-		setLayout({ align: { ...layout?.align, [id]: align } });
-	};
-	/** 改名：空串 = 清掉用户文案、回到合并文案（60 字截断与协议同口径）。 */
-	const setUiLabel = (id: string, label: string) => {
-		const labels = { ...layout?.labels };
-		const name = label.trim().slice(0, 60);
-		if (!name) delete labels[id];
-		else labels[id] = name;
-		setLayout({ labels });
-	};
-	/** 恢复单条：清掉该条目上的全部用户覆盖（隐藏/显示/顺序/分组/文案）。 */
-	const restoreUi = (id: string) => setPartial({ uiLayout: restoreUiItem(layout, id) });
-	/** 一键恢复：插件 arrange 与用户偏好全部作废，回到宿主默认布局。 */
-	const restoreUiAll = () => setPartial({ uiLayout: restoreAllUi() });
 
 	const toggleReviewSkill = (s: UiSkillInfo) => {
 		const disabled = new Set(settings.reviewSkills.filter((x) => !x.enabled).map((x) => x.name));
@@ -1132,7 +872,7 @@ export function SettingsModal({
 										<FiVolume2 className="set-section-icon" />
 										{t("sound")}
 									</div>
-									<SoundSettingsPanel settings={sound} onChange={onSoundChange} onPreview={onSoundPreview} />
+									<SoundSettingsPanel settings={sound} onChange={onSoundChange} />
 									<NotifyToggle />
 								</div>
 								<div className="set-section">
@@ -1142,7 +882,7 @@ export function SettingsModal({
 									</div>
 									<LanguageSettings />
 								</div>
-								<div className="set-note settings-version-note">ccui v{appVersion ?? "…"}</div>
+								<UpdateSettings appVersion={appVersion} />
 							</>
 						)}
 
@@ -1418,30 +1158,6 @@ export function SettingsModal({
 										)}
 									</div>
 								)}
-								<button
-									type="button"
-									className="set-view-prompt-btn"
-									aria-expanded={showToolsSchema}
-									onClick={() => setShowToolsSchema((v) => !v)}
-								>
-									{t("settingsViewToolsSchema")} {showToolsSchema ? "▴" : "▾"}
-								</button>
-								{showToolsSchema && (
-									<div className="set-prompt-view">
-										<div className="set-prompt-tools">
-											<div className="set-prompt-view-head">
-												<span>{t("settingsViewToolsSchema")}</span>
-												<HintTip text={t("settingsViewToolsSchemaHint")} />
-												<CopyButton text={settings.toolsSchema} />
-											</div>
-											{settings.toolsSchema ? (
-												<pre className="set-prompt-view-text">{settings.toolsSchema}</pre>
-											) : (
-												<p className="set-empty">{t("settingsViewToolsSchemaEmpty")}</p>
-											)}
-										</div>
-									</div>
-								)}
 							</div>
 						)}
 
@@ -1539,44 +1255,6 @@ export function SettingsModal({
 										}}
 									/>
 								</FieldRow>
-								<ToggleRow
-									title={t("promptHistoryCharLimit")}
-									tip={t("promptHistoryCharLimitHint")}
-									enabled={phSettings.charLimitEnabled}
-									onToggle={() => {
-										const next = { ...phSettings, charLimitEnabled: !phSettings.charLimitEnabled };
-										setPhSettings(next);
-										savePromptHistorySettings(next);
-										refreshPhCount();
-									}}
-								/>
-								{phSettings.charLimitEnabled && (
-									<FieldRow label={t("promptHistoryCharLimit")} htmlFor="ph-char-limit">
-										<input
-											id="ph-char-limit"
-											className="set-input"
-											type="number"
-											min={100}
-											max={20000}
-											step={100}
-											placeholder={t("promptHistoryCharLimitPlaceholder")}
-											value={String(phSettings.charLimit)}
-											onChange={(e) => {
-												const v = Math.floor(Number(e.target.value) || 0);
-												setPhSettings({ ...phSettings, charLimit: v });
-											}}
-											onBlur={() => {
-												let v = Math.floor(Number(phSettings.charLimit) || 0);
-												if (!Number.isFinite(v) || v < 100) v = 100;
-												if (v > 20000) v = 20000;
-												const norm = { ...phSettings, charLimit: v };
-												setPhSettings(norm);
-												savePromptHistorySettings(norm);
-												refreshPhCount();
-											}}
-										/>
-									</FieldRow>
-								)}
 								<div className="set-field" style={{ marginTop: 12 }}>
 									<button
 										type="button"
@@ -1782,23 +1460,14 @@ export function SettingsModal({
 										</FieldRow>
 									</>
 								)}
-								<div className="set-field-label">
-									{t("toolsSectionSubagent")} <HintTip text={t("toolsSubagentDepHint")} />
-								</div>
-								{SUBAGENT_TOOL_NAMES.map((n) => {
-									const blocked = isBlockedByPreset(n);
-									return (
-										<ToggleRow
-											key={n}
-											title={n}
-											tip={SUBAGENT_TOOL_TIPS[n]}
-											subtitle={blocked ? t("toolsBlockedByPreset", { name: piPresetName }) : undefined}
-											enabled={!blocked && !disabledTools.has(n)}
-											disabled={blocked}
-											onToggle={() => toggleAgentTool(n)}
-										/>
-									);
-								})}
+								<ToggleRow
+									title={t("toolsSectionSubagent")}
+									tip={t("toolsSubagentDepHint")}
+									subtitle={subagentToolsBlocked ? t("toolsBlockedByPreset", { name: piPresetName }) : undefined}
+									enabled={subagentToolsEnabled}
+									disabled={subagentToolsBlocked}
+									onToggle={toggleSubagentTools}
+								/>
 								<div className="set-field-label">
 									{t("settingsMarkers")}
 									<HintTip text={`${t("settingsMarkersDesc")}\n${t("markerRenameTip")}`} />
@@ -1934,91 +1603,6 @@ export function SettingsModal({
 										}}
 									/>
 								</FieldRow>
-								{/* 按模型覆盖：key = provider/id，优先于全局（issue #229）。 */}
-								<div className="set-section-title">
-									{t("softCapByModel")}
-									<HintTip text={t("softCapByModelHint")} />
-								</div>
-								<div className="set-preset-save">
-									<input
-										className="set-input"
-										placeholder={t("softCapModelId")}
-										value={newCapModel}
-										maxLength={200}
-										onChange={(e) => setNewCapModel(e.target.value)}
-									/>
-									<input
-										className="set-input"
-										type="text"
-										placeholder={t("softCapTokens")}
-										value={newCapTokens}
-										onChange={(e) => setNewCapTokens(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter" && newCapModel.trim() && parseTokenInput(newCapTokens) > 0) {
-												const n = parseTokenInput(newCapTokens);
-												setPartial({
-													softCapByModel: {
-														...settings.softCapByModel,
-														[newCapModel.trim()]: n,
-													},
-												});
-												setNewCapModel("");
-												setNewCapTokens("");
-											}
-										}}
-									/>
-									<button
-										type="button"
-										className="set-save-btn"
-										disabled={!newCapModel.trim() || parseTokenInput(newCapTokens) <= 0}
-										onClick={() => {
-											const id = newCapModel.trim();
-											const n = parseTokenInput(newCapTokens);
-											if (!id || n <= 0) return;
-											setPartial({ softCapByModel: { ...settings.softCapByModel, [id]: n } });
-											setNewCapModel("");
-											setNewCapTokens("");
-										}}
-									>
-										<FiPlus /> {t("softCapAdd")}
-									</button>
-								</div>
-								<div className="set-list">
-									{Object.entries(settings.softCapByModel).map(([model, cap]) => (
-										<div className="set-row" key={model}>
-											<span className="set-row-name">{model}</span>
-											<input
-												className="set-input"
-												type="text"
-												defaultValue={formatTokenDraft(cap)}
-												key={`${model}:${cap}`}
-												onBlur={(e) => {
-													const n = parseTokenInput(e.target.value);
-													e.target.value = formatTokenDraft(n);
-													const next = { ...settings.softCapByModel };
-													if (n > 0) next[model] = n;
-													else delete next[model];
-													setPartial({ softCapByModel: next });
-												}}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-												}}
-											/>
-											<button
-												type="button"
-												className="chip"
-												title={t("softCapRemove")}
-												onClick={() => {
-													const next = { ...settings.softCapByModel };
-													delete next[model];
-													setPartial({ softCapByModel: next });
-												}}
-											>
-												<FiX /> {t("softCapRemove")}
-											</button>
-										</div>
-									))}
-								</div>
 								<FieldRow label={t("modelRetryAttempts")} tip={t("modelRetryHint")} htmlFor="model-retry-max">
 									<input
 										id="model-retry-max"
@@ -2070,18 +1654,6 @@ export function SettingsModal({
 									tip={`${t("parallelReminderEnabledDesc")}\n${t("parallelReminderOffHint")}`}
 									enabled={settings.parallelReminderEnabled ?? true}
 									onToggle={() => setPartial({ parallelReminderEnabled: !(settings.parallelReminderEnabled ?? true) })}
-								/>
-								<ToggleRow
-									title={t("devNoCache")}
-									tip={t("devNoCacheDesc")}
-									enabled={settings.devNoCache ?? true}
-									onToggle={() => setPartial({ devNoCache: !(settings.devNoCache ?? true) })}
-								/>
-								<ToggleRow
-									title={t("autoReload")}
-									tip={t("autoReloadDesc")}
-									enabled={settings.autoReload ?? true}
-									onToggle={() => setPartial({ autoReload: !(settings.autoReload ?? true) })}
 								/>
 								<hr className="set-sep" />
 								<ToggleRow
@@ -2142,36 +1714,7 @@ export function SettingsModal({
 											{t("wallpaperTitle")}
 											<HintTip text={t("wallpaperDesc")} />
 										</div>
-										<div className="wallpaper-url-row">
-											<input
-												className="set-input wallpaper-url"
-												placeholder={t("wallpaperUrlPh")}
-												value={wallpaperDraft}
-												maxLength={2000}
-												spellCheck={false}
-												onFocus={() => {
-													wallpaperFocus.current = true;
-												}}
-												onChange={(e) => setWallpaperDraft(e.target.value)}
-												onBlur={() => {
-													wallpaperFocus.current = false;
-													// 已上传的 data: 图不占输入框：空输入 = 未改动，不断然清空。
-													if (!wallpaperDraft.trim() && wallpaper.url.startsWith("data:")) {
-														setWallpaperDraft("");
-														return;
-													}
-													const url = sanitizeWallpaperUrl(wallpaperDraft);
-													setWallpaperDraft(url);
-													if (url !== wallpaper.url) saveWallpaperSettings({ ...wallpaper, url });
-												}}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-													else if (e.key === "Escape") {
-														setWallpaperDraft(wallpaper.url.startsWith("data:") ? "" : wallpaper.url);
-														(e.target as HTMLInputElement).blur();
-													}
-												}}
-											/>
+										<div className="compose-toolbar">
 											<button
 												type="button"
 												className="set-save-btn"
@@ -2223,7 +1766,6 @@ export function SettingsModal({
 												type="button"
 												className="wallpaper-clear"
 												onClick={() => {
-													setWallpaperDraft("");
 													saveWallpaperSettings({ ...wallpaper, url: "" });
 												}}
 											>
@@ -2411,42 +1953,15 @@ export function SettingsModal({
 
 						{/* ---- skills --------------------------------------------------- */}
 						{tab === "skills" && (
-							<div className="set-section">
-								<div className="set-section-title">
-									<FiCpu className="set-section-icon" />
-									{t("settingsSkills")}
-									<HintTip text={`${t("skillFullTextLabel")}：${t("skillFullTextDesc")}`} />
-									<span className="set-count">{settings.skills.length}</span>
-								</div>
-								{piPresetFiltering && !presetShowsSkillCatalog(piPresetId ?? undefined) && (
-									<p className="set-catalog-hint warn">{t("skillsHiddenByPreset", { name: piPresetName })}</p>
-								)}
-								{settings.skills.length === 0 ? (
-									<p className="set-empty">{t("noSkills")}</p>
-								) : (
-									<div className="set-list">
-										{settings.skills.map((s) => (
-											<ToggleRow
-												key={s.name}
-												title={s.name}
-												subtitle={s.description}
-												enabled={s.enabled}
-												onToggle={() => toggleSkill(s)}
-												action={
-													<button
-														type="button"
-														className={`tpl-chip${fullTextSkills.has(s.name) ? " on" : ""}`}
-														title={t("skillFullTextDesc")}
-														onClick={() => toggleSkillFullText(s.name)}
-													>
-														{t("skillFullTextShort")}
-													</button>
-												}
-											/>
-										))}
-									</div>
-								)}
-							</div>
+							<SkillsPanel
+								settings={settings}
+								onPatch={setPartial}
+								presetWarning={
+									piPresetFiltering && !presetShowsSkillCatalog(piPresetId ?? undefined)
+										? t("skillsHiddenByPreset", { name: piPresetName })
+										: undefined
+								}
+							/>
 						)}
 
 						{/* ---- extensions ------------------------------------------------ */}
@@ -2502,171 +2017,6 @@ export function SettingsModal({
 							</div>
 						)}
 
-						{tab === "layout" && (
-							<div className="set-section">
-								<div className="set-section-title">
-									<FiSliders className="set-section-icon" />
-									{t("uiLayoutTitle")}
-									<button type="button" className="set-uninstall" onClick={restoreUiAll}>
-										{t("uiLayoutRestoreAll")}
-									</button>
-								</div>
-								<div className="set-note">{t("uiLayoutHint")}</div>
-								{uiDiagnostics.length > 0 && (
-									<details className="set-ui-diag" open={uiDiagnostics.some((d) => d.level === "error")}>
-										<summary>⚠ {t("uiLayoutDiagTitle", { n: uiDiagnostics.length })}</summary>
-										<ul className="set-ui-diag-list">
-											{uiDiagnostics.map((d, i) => (
-												<li key={`${d.pluginId ?? "host"}:${d.entryId ?? i}`} className={`set-ui-diag-item ${d.level}`}>
-													{d.pluginId ? <code>{d.pluginId}</code> : null}
-													{d.entryId ? <code>{d.entryId}</code> : null}
-													<span>{d.message}</span>
-												</li>
-											))}
-										</ul>
-										<div className="set-ui-diag-hint">{t("uiLayoutDiagHint")}</div>
-									</details>
-								)}
-								<input
-									className="set-ui-filter"
-									value={uiLayoutFilter}
-									placeholder={t("uiLayoutSearch")}
-									aria-label={t("uiLayoutSearch")}
-									onChange={(e) => setUiLayoutFilter(e.target.value)}
-								/>
-								{uiLayoutSections.map(({ slot, labelKey }) => {
-									const entries = uiSlots[slot] ?? [];
-									const q = uiLayoutFilter.trim().toLowerCase();
-									// 按实际界面分组展示：顶栏/底栏/输入框动作区在界面上按对齐段
-									// （左 start → 中 center → 右 end）分段渲染，布局页同口径按段
-									// 列出（段头即界面上的段），↑↓ 只在段内移动；搜索时展平
-									// （看到的是子集，此时 ↑↓ 禁用，免得挪了看不见的邻居）。
-									const grouped = !q && uiAlignSlots.includes(slot);
-									const segments: { align: string | null; items: UiSlotEntry[] }[] = grouped
-										? (["start", "center", "end"] as const)
-												.map((align) => ({ align, items: entries.filter((e) => e.align === align) }))
-												.filter((g) => g.items.length > 0)
-										: [
-												{
-													align: null,
-													items: q
-														? entries.filter((e) => `${e.label} ${e.id} ${e.source}`.toLowerCase().includes(q))
-														: entries,
-												},
-											];
-									const total = segments.reduce((n, g) => n + g.items.length, 0);
-									// 搜索时藏掉无命中的分区（22 个分区全展开翻不动）。
-									if (q && total === 0) return null;
-									const renderRow = (it: UiSlotEntry, rowItems: UiSlotEntry[]) => {
-										const idx = rowItems.findIndex((e) => e.id === it.id);
-										const required = REQUIRED_TOPBAR_ITEM_IDS.has(it.id);
-										return (
-											<div key={it.id} className="set-row">
-												<label className="set-toggle" title={required ? t("uiLayoutRequired") : it.id}>
-													<input
-														type="checkbox"
-														checked={!it.hidden}
-														disabled={required}
-														onChange={() => toggleUiHidden(it)}
-													/>
-													<span>
-														{it.icon ? `${it.icon} ` : ""}
-														{it.label}
-													</span>
-												</label>
-												<div className="set-row-actions">
-													{it.arrangedBy.length > 0 && (
-														<span className="set-ui-source" title={it.arrangedBy.join(", ")}>
-															{t("uiLayoutArranged")}
-														</span>
-													)}
-													{it.movedFrom && (
-														<span className="set-ui-source" title={it.id}>
-															{t("uiLayoutMovedFrom")}: {uiSlotTitle(it.movedFrom)}
-														</span>
-													)}
-													{uiAlignSlots.includes(slot) && (
-														<label className="set-ui-align" title={t("uiLayoutAlign")}>
-															<select
-																value={it.align}
-																onChange={(e) => setUiAlign(it.id, e.target.value)}
-																aria-label={t("uiLayoutAlign")}
-															>
-																<option value="start">start</option>
-																<option value="center">center</option>
-																<option value="end">end</option>
-															</select>
-														</label>
-													)}
-													<input
-														key={`${it.id}:${layout?.labels?.[it.id] ?? ""}`}
-														className="set-ui-label"
-														defaultValue={layout?.labels?.[it.id] ?? ""}
-														placeholder={t("uiLayoutRename")}
-														title={t("uiLayoutRename")}
-														aria-label={t("uiLayoutRename")}
-														onBlur={(e) => {
-															if (e.target.value !== (layout?.labels?.[it.id] ?? "")) setUiLabel(it.id, e.target.value);
-														}}
-														onKeyDown={(e) => {
-															if (e.key === "Enter" && !e.nativeEvent.isComposing)
-																(e.target as HTMLInputElement).blur();
-														}}
-													/>
-													{it.userOverrides.length > 0 && (
-														<button type="button" className="set-uninstall" onClick={() => restoreUi(it.id)}>
-															{t("uiLayoutRestore")}
-														</button>
-													)}
-													<button
-														type="button"
-														className="set-uninstall"
-														disabled={!!q || idx <= 0}
-														onClick={() => moveUiEntry(entries, rowItems, it.id, -1)}
-													>
-														↑
-													</button>
-													<button
-														type="button"
-														className="set-uninstall"
-														disabled={!!q || idx < 0 || idx >= rowItems.length - 1}
-														onClick={() => moveUiEntry(entries, rowItems, it.id, 1)}
-													>
-														↓
-													</button>
-												</div>
-											</div>
-										);
-									};
-									return (
-										<div key={slot} className="set-ui-slot">
-											<div className="set-ui-slot-title">{t(labelKey as Parameters<typeof t>[0])}</div>
-											{/* 顶栏按钮文字总开关：关掉后顶栏只剩图标（角标保留，溢出菜单仍带文字）。 */}
-											{slot === "topbar.primary" && (
-												<label className="set-toggle" title="topbarText">
-													<input
-														type="checkbox"
-														checked={layout?.topbarText !== false}
-														onChange={(e) => setLayout({ topbarText: e.target.checked })}
-													/>
-													<span>{t("uiLayoutTopbarText")}</span>
-												</label>
-											)}
-											{entries.length === 0 ? (
-												<div className="set-empty">{t("uiLayoutEmpty")}</div>
-											) : (
-												segments.map((seg) => (
-													<Fragment key={seg.align ?? "all"}>
-														{seg.align && <div className="set-ui-slot-title set-ui-seg">{seg.align}</div>}
-														{seg.items.map((it) => renderRow(it, seg.items))}
-													</Fragment>
-												))
-											)}
-										</div>
-									);
-								})}
-							</div>
-						)}
 						{/* 插件目录授权（issue #146）：插件访问工作区外目录要经用户确认，
 						    这里列出已授权目录并支持逐条撤销（插件自己也能 requestAccess）。 */}
 						{/* ---- 浏览器操作（page-picker / browser_page 工具，原顶栏芯片 + 弹窗）--- */}
@@ -2897,46 +2247,6 @@ export function SettingsModal({
 																{t("settingsTools")} →
 															</button>
 														</div>
-													</div>
-												)}
-												{/* 运行时日志：host.log 分级缓冲，按需拉取（不进快照），与诊断互不干扰 */}
-												<div className="set-row set-log-row">
-													<button
-														type="button"
-														className="set-diag-toggle"
-														onClick={() => {
-															if (logOpen === p.id) setLogOpen(null);
-															else {
-																setLogOpen(p.id);
-																appSend(pluginLogsFetch(p.id));
-															}
-														}}
-													>
-														<FiFileText />
-														{t("pluginLogTitle")} ({getPluginLogs(p.id).length}) ·{" "}
-														{logOpen === p.id ? t("pluginLogHide") : t("pluginLogShow")}
-													</button>
-													{logOpen === p.id && <PluginLogView pluginId={p.id} />}
-												</div>
-												{/* 诊断记录：manifest/ui 解析丢弃原因 + 运行时 warning/error 摘要 */}
-												{p.diagnostics && p.diagnostics.length > 0 && (
-													<div className="set-row set-diag-row">
-														<button
-															type="button"
-															className="set-diag-toggle"
-															onClick={() => setDiagOpen(diagOpen === p.id ? null : p.id)}
-														>
-															<FiAlertTriangle />
-															{t("pluginDiagTitle")} ({p.diagnostics.length}) ·{" "}
-															{diagOpen === p.id ? t("pluginDiagHide") : t("pluginDiagShow")}
-														</button>
-														{diagOpen === p.id && (
-															<ul className="set-diag-list">
-																{p.diagnostics.map((d, i) => (
-																	<li key={`${p.id}-${i}`}>{d}</li>
-																))}
-															</ul>
-														)}
 													</div>
 												)}
 												{/* 特权 DOM：声明了 dom 能力的插件，bundle 默认 403，需用户逐个授权 */}
@@ -3649,14 +2959,6 @@ export function SettingsModal({
 												onChange={(e) => setRuleDraft({ ...ruleDraft, label: e.target.value })}
 											/>
 										</FieldRow>
-										<FieldRow label={t("approvalRuleLabelEn")}>
-											<input
-												className="set-input"
-												value={ruleDraft.labelEn ?? ""}
-												placeholder="e.g. Block dangerous Docker commands"
-												onChange={(e) => setRuleDraft({ ...ruleDraft, labelEn: e.target.value })}
-											/>
-										</FieldRow>
 										<FieldRow label={t("approvalRuleTools")} tip={t("approvalRuleToolsTip")}>
 											<input
 												className="set-input"
@@ -3746,14 +3048,6 @@ export function SettingsModal({
 												value={ruleDraft.reason ?? ""}
 												placeholder="例如：检测到删除镜像或容器操作"
 												onChange={(e) => setRuleDraft({ ...ruleDraft, reason: e.target.value })}
-											/>
-										</FieldRow>
-										<FieldRow label={t("approvalRuleReasonEn")}>
-											<input
-												className="set-input"
-												value={ruleDraft.reasonEn ?? ""}
-												placeholder="e.g. Detected docker image/container removal"
-												onChange={(e) => setRuleDraft({ ...ruleDraft, reasonEn: e.target.value })}
 											/>
 										</FieldRow>
 										<div className="set-row">

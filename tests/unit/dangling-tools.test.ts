@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findDanglingToolCalls, healDanglingToolCallFile } from "../../server/dangling-tools.js";
+import {
+	findDanglingToolCalls,
+	findTrailingDanglingToolCalls,
+	healDanglingToolCallFile,
+} from "../../server/dangling-tools.js";
 
 const assistantWithCalls = (ids: string[]) => ({
 	role: "assistant",
@@ -73,6 +77,34 @@ describe("healDanglingToolCallFile", () => {
 		expect(e2.message.toolCallId).toBe("call-2");
 		// healed file is clean on second pass
 		expect(healDanglingToolCallFile(file)).toBe(0);
+	});
+
+	it("不会在无关消息之后追加历史悬空调用的结果", () => {
+		const dir = mkdtempSync(join(tmpdir(), "dangling-"));
+		const file = join(dir, "s.jsonl");
+		const raw = [
+			JSON.stringify({ type: "session", id: "s1" }),
+			JSON.stringify({ type: "message", id: "m1", parentId: null, message: assistantWithCalls(["old-call"]) }),
+			JSON.stringify({
+				type: "message",
+				id: "m2",
+				parentId: "m1",
+				message: { role: "user", content: [{ type: "text", text: "next topic" }] },
+			}),
+			JSON.stringify({
+				type: "message",
+				id: "m3",
+				parentId: "m2",
+				message: { role: "assistant", content: [{ type: "text", text: "plain answer" }] },
+			}),
+		].join("\n");
+		writeFileSync(file, `${raw}\n`, "utf8");
+
+		expect(findTrailingDanglingToolCalls([assistantWithCalls(["old-call"]), { role: "user", content: [] }])).toEqual(
+			[],
+		);
+		expect(healDanglingToolCallFile(file)).toBe(0);
+		expect(readFileSync(file, "utf8")).toBe(`${raw}\n`);
 	});
 
 	it("healthy file is untouched", () => {

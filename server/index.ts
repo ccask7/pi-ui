@@ -125,19 +125,6 @@ try {
 } catch {
 	/* 路径比较失败不影响启动 */
 }
-// Dev-no-cache setting read without a ClientStateStore instance (the index.html
-// route runs before any client attaches). Reads the same global settings blob.
-function readDevNoCacheSetting(): boolean | undefined {
-	try {
-		const raw = readFileSync(join(DATA_DIR, "client-state.json"), "utf8");
-		const all = JSON.parse(raw) as Record<string, { settings?: { devNoCache?: unknown } }>;
-		const v = all["__settings__"]?.settings?.devNoCache;
-		return typeof v === "boolean" ? v : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
 /** Bind address. Default is loopback ONLY — the service is a local personal
  *  tool and should not be reachable from the network unless explicitly asked
  *  (e.g. PI_WEB_HOST=0.0.0.0 for LAN access / Docker port mapping). */
@@ -726,17 +713,9 @@ if (existsSync(webDist)) {
 		// Callback form: a failed stat here (npm i -g is mid-replacement of the
 		// package dir) responds 503 instead of crashing the request pipeline
 		// with an unhandled ENOENT stack trace.
-		// Dev caching (settings → message display → devNoCache): index.html pins
-		// hashed asset URLs — a cached copy keeps pointing at stale bundles
-		// after a rebuild+restart. Default follows the install: ON from source
-		// (.git next to the package root), OFF for installs. PI_WEB_DEV_CACHE=0/1
-		// overrides either way.
-		const devCache = process.env.PI_WEB_DEV_CACHE;
-		const fromSource = existsSync(join(pkgRoot, ".git"));
-		const envDefault = devCache !== undefined ? devCache !== "0" : fromSource;
-		const stored = readDevNoCacheSetting();
-		const noStore = stored ?? envDefault;
-		res.setHeader("Cache-Control", noStore ? "no-store" : "public, max-age=0");
+		// index.html pins hashed asset URLs — always disable caching so a rebuild
+		// cannot leave the page pointing at stale bundles.
+		res.setHeader("Cache-Control", "no-store");
 		// dotfiles: allow — issue #223：nvm 等安装路径本身在隐藏目录下（如 ~/.nvm/…），同上需放行。
 		res.sendFile(join(webDist, "index.html"), { dotfiles: "allow" }, (err) => {
 			if (err && !res.headersSent) {
@@ -950,6 +929,7 @@ export interface DispatchSession {
 	 *  新对话（/new <prompt> 用）。此处只管转发，返回值被丢弃，故允许 void。
 	 *  preset = DSH Agent 预设（pi 引擎忽略）。 */
 	newChat(preset?: string, ephemeral?: boolean): Promise<boolean | void>;
+	promptNewTask?(cwd: string, text: string, attachments?: PromptAttachment[]): Promise<void>;
 	editMessage(messageId: string, text: string, attachments?: PromptAttachment[]): Promise<void>;
 	forkSession?(messageId: string, position?: "before" | "at", targetConvId?: string): Promise<void>;
 	cycleModel(): Promise<void>;
@@ -1529,6 +1509,26 @@ function pushNoticeToAll(level: "info" | "warning" | "error", text: string, text
 	}
 }
 
+function mcpServersMessage() {
+	return {
+		type: "mcp_servers" as const,
+		servers: mcpBridge.getServerSnapshots(),
+		configPath: join(DATA_DIR, "mcp.json"),
+	};
+}
+
+function pushMcpServersToAll(): void {
+	const payload = JSON.stringify(mcpServersMessage());
+	for (const client of wss.clients) {
+		if (client.readyState !== WebSocket.OPEN) continue;
+		try {
+			client.send(payload);
+		} catch {
+			/* 死连接由 socket 清理 */
+		}
+	}
+}
+
 // MCP 工具桥：读取 <dataDir>/mcp.json 启动外部 MCP 服务器（stdio），把它们的
 // 工具并入与插件工具相同的 customTools 管线；单服务器失败不炸进程。
 const mcpBridge = new McpBridge(DATA_DIR, (...a) => console.log("[mcp]", ...a));
@@ -1537,7 +1537,10 @@ const mcpBridge = new McpBridge(DATA_DIR, (...a) => console.log("[mcp]", ...a));
 const mcpHotReload = createMcpHotReload({
 	dataDir: DATA_DIR,
 	reload: () => mcpBridge.reload(),
-	onToolsChanged: () => service.applyPluginAgentTools(),
+	onToolsChanged: () => {
+		service.applyPluginAgentTools();
+		pushMcpServersToAll();
+	},
 	onNotice: (level, text, textEn) => pushNoticeToAll(level, text, textEn),
 	log: (...a) => console.log(...a),
 });
@@ -1885,6 +1888,16 @@ wss.on("connection", (ws) => {
 			case "new_chat":
 				void cs.newChat(msg.preset, msg.ephemeral);
 				break;
+			case "new_task":
+				if (cs.promptNewTask) void cs.promptNewTask(msg.cwd, msg.text, msg.attachments);
+				else
+					send({
+						type: "notice",
+						level: "error",
+						text: "当前引擎不支持新建任务",
+						textEn: "New tasks are not supported by this engine",
+					});
+				break;
 			case "edit_message":
 				void cs.editMessage(msg.messageId, msg.text, msg.attachments);
 				break;
@@ -1927,6 +1940,9 @@ wss.on("connection", (ws) => {
 				break;
 			case "list_projects":
 				void cs.pushProjects();
+				break;
+			case "list_mcp_servers":
+				send(mcpServersMessage());
 				break;
 			case "remove_project":
 				void cs.removeProject(msg.path);

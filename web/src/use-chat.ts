@@ -26,6 +26,7 @@ import type {
 	PermissionOption,
 	UiAgentPreset,
 	UiHostMetrics,
+	UiMcpServerInfo,
 	UiModelConfigEntry,
 	UiPendingQuestion,
 	UiPluginInfo,
@@ -261,6 +262,9 @@ export interface ChatState {
 	plugins: UiPluginInfo[];
 	/** Server-side plugin reload counter (import-cache buster, see plugins msg). */
 	pluginsEpoch: number;
+	/** Read-only MCP catalog for the capabilities panel. */
+	mcpServers: UiMcpServerInfo[];
+	mcpConfigPath: string;
 	/** 插件目录授权表（issue #146）：设置面板列出 + 可撤销。 */
 	pluginGrants: { pluginId: string; paths: string[] }[];
 	/** 插件能力授权表（动态授权）：设置面板列出 + 可撤销；session 授权只在本次运行有效。 */
@@ -422,6 +426,7 @@ type Action =
 	| { type: "bg_servers"; servers: BgServer[] }
 	| { type: "scheduler_tasks"; tasks: SchedulerTaskView[] }
 	| { type: "plugins"; plugins: UiPluginInfo[]; epoch: number }
+	| { type: "mcp_servers"; servers: UiMcpServerInfo[]; configPath: string }
 	/** 插件目录授权表（服务端推）。 */
 	| { type: "plugin_grants"; grants: { pluginId: string; paths: string[] }[] }
 	/** 插件能力授权表（服务端推；session 授权只在本次运行有效）。 */
@@ -790,6 +795,8 @@ function reducer(state: ChatState, action: Action): ChatState {
 			return { ...state, schedulerTasks: action.tasks };
 		case "plugins":
 			return { ...state, plugins: action.plugins, pluginsEpoch: action.epoch };
+		case "mcp_servers":
+			return { ...state, mcpServers: action.servers, mcpConfigPath: action.configPath };
 		case "plugin_grants":
 			return { ...state, pluginGrants: action.grants };
 		case "plugin_permissions":
@@ -980,6 +987,8 @@ export function useChat() {
 		scmDirty: 0,
 		plugins: [],
 		pluginsEpoch: 0,
+		mcpServers: [],
+		mcpConfigPath: "",
 		pluginGrants: [],
 		pluginPermissions: [],
 		pathRequests: [],
@@ -1151,12 +1160,8 @@ export function useChat() {
 					// The stamp is per-build-id, so the NEXT rebuild reloads again.
 					// Dev-server (Vite :5173) has no baked id — never reload there.
 					const mine = typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : "";
-					// Auto-reload setting (display tab, default on from source / off
-					// for installs): settings may not have arrived yet on first
-					// connect — fall back to ON so a fresh build never strands a stale
-					// page on its very first load.
-					const autoReload = chatApi.current.chat.settings?.autoReload ?? true;
-					if (autoReload && msg.buildId && mine && msg.buildId !== mine) {
+					// Always reload a stale bundle after a server rebuild.
+					if (msg.buildId && mine && msg.buildId !== mine) {
 						const key = `ccui-reloaded-${msg.buildId}`;
 						if (!sessionStorage.getItem(key)) {
 							sessionStorage.setItem(key, "1");
@@ -1570,6 +1575,9 @@ export function useChat() {
 					break;
 				case "plugins":
 					dispatch({ type: "plugins", plugins: msg.plugins, epoch: msg.epoch });
+					break;
+				case "mcp_servers":
+					dispatch({ type: "mcp_servers", servers: msg.servers, configPath: msg.configPath });
 					break;
 				case "plugin_grants":
 					dispatch({ type: "plugin_grants", grants: msg.grants });

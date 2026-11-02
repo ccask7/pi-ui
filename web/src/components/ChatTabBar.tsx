@@ -187,7 +187,8 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 							aria-selected={active}
 							onClick={() => {
 								setArmed(null);
-								if (!active) panelSend({ type: "switch_conversation", id: c.id });
+								// 当前标签也要经过 panelSend：插件页中点击它应退出插件并返回会话。
+								panelSend({ type: "switch_conversation", id: c.id });
 							}}
 							onDoubleClick={() => {
 								setRenameDraft(c.title);

@@ -1,13 +1,5 @@
 import { Fragment, useState, type ReactNode } from "react";
-import {
-	FiFolderPlus,
-	FiGitBranch,
-	FiMessageSquare,
-	FiSearch,
-	FiSettings,
-	FiLayers,
-	FiTerminal,
-} from "react-icons/fi";
+import { FiFolderPlus, FiGitBranch, FiMessageSquare, FiSettings, FiLayers, FiTerminal } from "react-icons/fi";
 import type { ChatState } from "../use-chat";
 import { appUrl } from "../base-url";
 import { PluginIcon } from "../plugin-icon";
@@ -58,8 +50,6 @@ interface TopBarProps {
 	onOpenSettings: () => void;
 	/** Open the background-task panel (AI-started servers — stop individually or all). */
 	onOpenBgTasks: () => void;
-	/** Open the global search panel (sessions / projects / workspace files). */
-	onOpenGlobalSearch: () => void;
 }
 
 export function TopBar({
@@ -72,7 +62,6 @@ export function TopBar({
 	onViewChange,
 	onOpenSettings,
 	onOpenBgTasks,
-	onOpenGlobalSearch,
 }: TopBarProps) {
 	const { t } = useI18n();
 	/* 「打开项目」按钮（host:open-project）的项目选择器：与左栏 📁+ 同一个组件、同一套行为
@@ -103,7 +92,6 @@ export function TopBar({
 		"host:chat",
 		"host:terminal",
 		"host:git",
-		"host:search",
 		"host:tasks",
 		"host:settings",
 		"host:new-ephemeral-chat",
@@ -234,12 +222,6 @@ export function TopBar({
 				<span>{t("scmTab")}</span>
 			</button>
 		) : null,
-		"host:search": (
-			<button type="button" className="chip" data-tip={t("searchGlobalTip")} onClick={onOpenGlobalSearch}>
-				<FiSearch />
-				<span className="chip-sub">{t("searchGlobal")}</span>
-			</button>
-		),
 		"host:tasks": (
 			<button type="button" className="chip bg-task-chip" data-tip={t("bgTasksTip")} onClick={onOpenBgTasks}>
 				<FiLayers />
@@ -257,8 +239,8 @@ export function TopBar({
 
 	/** 桌面工具 chips 的可见性历史口径（不扩大）：只有 search / tasks / settings 这几个成员
 	 *  的显隐还受 PI_WEB_TABS 白名单管（服务端会拒绝对应的消息，画出来只会给一个点了没反应用的按钮）。 */
-	const TABS_GATED_IDS = new Set(["host:search", "host:tasks", "host:settings"]);
-	/** TABS 白名单门禁（历史口径，不扩大）：search/tasks/settings 的显隐还受白名单管，
+	const TABS_GATED_IDS = new Set(["host:tasks", "host:settings"]);
+	/** TABS 白名单门禁（历史口径，不扩大）：tasks/settings 的显隐还受白名单管，
 	 *  其余宿主入口只看 slot（各节点工厂内部自行判断，见 hostNodes）。 */
 	const isTabGatedOff = (id: string) => TABS_GATED_IDS.has(id) && !tabOn(id.slice("host:".length));
 	/**
@@ -345,7 +327,7 @@ export function TopBar({
 	const segStart = flowItems.filter((it) => zoneOf(it) === "start");
 	const segCenter = flowItems.filter((it) => zoneOf(it) === "center");
 	const segEnd = flowItems.filter((it) => zoneOf(it) === "end");
-	// 顶栏按钮文字总开关（设置 → 界面布局 → 顶栏，默认开）：关掉后顶栏只剩图标
+	// 顶栏按钮文字（兼容既有布局偏好，默认开）：关闭后顶栏只剩图标
 	// （数字角标保留；溢出菜单里仍带文字；实现见 styles.css 的 .topbar.no-labels）。
 	const hideTopbarText = chat.settings?.uiLayout?.topbarText === false;
 	return (

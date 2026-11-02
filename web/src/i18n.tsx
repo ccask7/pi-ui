@@ -56,6 +56,14 @@ export const zh = {
 	themeLight: "浅色",
 	themeDark: "深色",
 	newChat: "新对话",
+	newTask: "新建任务",
+	taskProject: "任务项目",
+	taskProjectRequired: "请选择任务项目",
+	pluginEntry: "插件",
+	mcpEmpty: "尚未配置 MCP 服务器",
+	mcpRunning: "运行中",
+	mcpError: "启动失败",
+	mcpToolCount: "{count} 个工具",
 	newChatEphemeral: "临时对话",
 	newChatEphemeralTip: "临时对话（仅内存，关闭即销毁，不进历史记录）",
 	ephemeralBadge: "临时",
@@ -228,6 +236,7 @@ export const zh = {
 	noFinishedSubagents: "没有可关闭的已结束子代理",
 	collapseSection: "折叠",
 	expandSection: "展开",
+	showMoreSessions: "查看更多({n})",
 	emptyChat: "空对话",
 
 	/* message edit */
@@ -1074,7 +1083,7 @@ export const zh = {
 	toolsBlockedByPreset: "当前默认预设「{name}」下不可用，切回「全功能」恢复",
 	skillsHiddenByPreset: "技能名录被默认预设「{name}」隐藏（skill 加载工具不可用时不同步展示），切回全功能恢复",
 	toolsSubagentDepHint:
-		"逐个开关：关闭 subagent_spawn 后其余（等待/查询/改向/停止）无会话可管，只会返回空列表或“未找到”；delegate_task 走 spawn 通道，spawn 关了它也派不出去。",
+		"统一启用或关闭子代理的创建、查询、等待、改向、停止、模板和交接工具；delegate_task 也依赖子代理创建通道。",
 	delegateTaskEnabledDesc:
 		"把定义清楚的任务派给 specialist 子代理模板：六段派单（TASK/EXPECTED OUTCOME/REQUIRED TOOLS/MUST DO/MUST NOT DO/CONTEXT）在服务端校验，缺段或含糊直接报错打回。执行体复用子代理 spawn 通道。",
 	delegateTaskOffHint: "已关闭：AI 无法使用 delegate_task 派单（可用 subagent_spawn 自由派单，不带六段校验）",
@@ -1090,6 +1099,20 @@ export const zh = {
 	settingsMessageDisplay: "对话",
 	settingsAppearance: "界面设置",
 	settingsGeneral: "通用",
+	softwareUpdate: "软件更新",
+	checkUpdates: "检查更新",
+	checkingUpdates: "正在检查…",
+	updateManualHint: "仅在点击后连接 GitHub 检查新版本",
+	updateDesktopOnly: "自动更新仅支持 Windows 桌面安装版",
+	updateLatest: "当前已是最新版本",
+	updateAvailable: "发现新版本 v{version}",
+	updateNow: "立即更新",
+	updateDownloading: "正在下载",
+	updateReady: "更新已就绪",
+	updateReadyDesc: "安装时将关闭 Cc，现有项目、会话和设置会保留。",
+	updateRestart: "重启并安装",
+	updateViewRelease: "查看 Release",
+	updateFailed: "更新失败",
 	thinkingWrap: "完整显示思考",
 	thinkingWrapDesc:
 		"开启：思考内容始终完整展开并自动换行（流式推理过程也实时可见）；关闭：折叠成一行摘要，流式中一行实时显示最新文本",
@@ -1380,7 +1403,7 @@ export const zh = {
 	/* 聊天背景图（壁纸，issue #100） */
 	wallpaperTitle: "聊天背景图",
 	wallpaperDesc:
-		"给整个窗口加一张背景图（左右面板、顶栏、底栏也会透出）：主题自带的图会自动生效，在此填地址则优先用你的；用压暗与模糊保证文字清晰。",
+		"给整个窗口加一张背景图（左右面板、顶栏、底栏也会透出）：主题自带的图会自动生效，上传图片后优先使用你的图片；用压暗与模糊保证文字清晰。",
 	wallpaperUrlPh: "图片地址（https://…，留空关闭）",
 	wallpaperDim: "压暗",
 	wallpaperBlur: "模糊",
@@ -1506,13 +1529,22 @@ const en: Record<keyof typeof zh, string> = {
 	sound: "Sound",
 	theme: "Theme",
 	themeHint: "Themes only change colors, not layout. On light themes the window buttons turn dark automatically.",
-	themeRememberHint: "Your choice is remembered across restarts (it is stored per window origin, and the desktop shell now uses a fixed port).",
+	themeRememberHint:
+		"Your choice is remembered across restarts (it is stored per window origin, and the desktop shell now uses a fixed port).",
 	themeDefault: "Dark (default)",
 	themeGroupClassics: "Classics",
 	themeGroupBuiltin: "Original",
 	themeLight: "Light",
 	themeDark: "Dark",
 	newChat: "New chat",
+	newTask: "New task",
+	taskProject: "Task project",
+	taskProjectRequired: "Select a task project",
+	pluginEntry: "Plugins",
+	mcpEmpty: "No MCP servers configured",
+	mcpRunning: "Running",
+	mcpError: "Failed to start",
+	mcpToolCount: "{count} tools",
 	newChatEphemeral: "Ephemeral chat",
 	newChatEphemeralTip: "Ephemeral chat (in-memory only, auto-discarded on close, not saved to history)",
 	ephemeralBadge: "Ephemeral",
@@ -1691,6 +1723,7 @@ const en: Record<keyof typeof zh, string> = {
 	noFinishedSubagents: "No finished subagents to dismiss",
 	collapseSection: "Collapse",
 	expandSection: "Expand",
+	showMoreSessions: "Show more ({n})",
 	emptyChat: "Empty chat",
 
 	/* message edit */
@@ -2559,7 +2592,7 @@ const en: Record<keyof typeof zh, string> = {
 	skillsHiddenByPreset:
 		"Skill catalog hidden by default preset “{name}” (not shown while the skill loader is unavailable); switch back to full features to restore",
 	toolsSubagentDepHint:
-		"Toggled individually: with subagent_spawn off, the rest (wait/get/steer/stop) have no sessions to manage and only return empty lists or “not found”; delegate_task rides the spawn channel, so it cannot dispatch with spawn off.",
+		"Enable or disable all subagent creation, query, wait, steering, stop, template, and handoff tools together; delegate_task also depends on the subagent creation channel.",
 	delegateTaskEnabledDesc:
 		"Delegate a well-defined task to a specialist subagent template: the six-section brief (TASK/EXPECTED OUTCOME/REQUIRED TOOLS/MUST DO/MUST NOT DO/CONTEXT) is validated server-side; missing or vague sections are rejected. Runs on the subagent spawn channel.",
 	delegateTaskOffHint:
@@ -2579,6 +2612,20 @@ const en: Record<keyof typeof zh, string> = {
 	settingsMessageDisplay: "Conversation",
 	settingsAppearance: "Appearance",
 	settingsGeneral: "General",
+	softwareUpdate: "Software Update",
+	checkUpdates: "Check for Updates",
+	checkingUpdates: "Checking…",
+	updateManualHint: "Connects to GitHub only when you click Check for Updates",
+	updateDesktopOnly: "Automatic updates are available only in the Windows desktop app",
+	updateLatest: "You are using the latest version",
+	updateAvailable: "Version v{version} is available",
+	updateNow: "Update Now",
+	updateDownloading: "Downloading",
+	updateReady: "Update Ready",
+	updateReadyDesc: "Cc will close during installation. Your projects, conversations, and settings will be preserved.",
+	updateRestart: "Restart and Install",
+	updateViewRelease: "View Release",
+	updateFailed: "Update failed",
 	thinkingWrap: "Show full thinking",
 	thinkingWrapDesc:
 		"On: thinking always expands fully and wraps (live reasoning visible while streaming); Off: collapses to a one-line summary with the latest text shown live while streaming",
@@ -2636,7 +2683,8 @@ const en: Record<keyof typeof zh, string> = {
 	pluginTopbarMore: "More plugin buttons",
 	pluginMenuTitle: "Plugins",
 	pluginViewsTitle: "Plugin views",
-	pluginViewsHint: "Full-page views contributed by plugins. Click Open to switch to one (the top-bar plugin menu was removed).",
+	pluginViewsHint:
+		"Full-page views contributed by plugins. Click Open to switch to one (the top-bar plugin menu was removed).",
 	pluginViewsEmpty: "No plugin views available.",
 	pluginViewOpen: "Open",
 	pluginMenuPin: "Pin to top bar",
@@ -2883,7 +2931,7 @@ const en: Record<keyof typeof zh, string> = {
 	/* Chat wallpaper (issue #100) */
 	wallpaperTitle: "Chat wallpaper",
 	wallpaperDesc:
-		"Show a full-window background image (side panels, top and bottom bars included): a theme-provided image applies automatically, a URL here takes precedence; use dim and blur to keep text readable.",
+		"Show a full-window background image (side panels, top and bottom bars included): a theme-provided image applies automatically, an uploaded image takes precedence; use dim and blur to keep text readable.",
 	wallpaperUrlPh: "Image URL (https://…, empty = off)",
 	wallpaperDim: "Dim",
 	wallpaperBlur: "Blur",

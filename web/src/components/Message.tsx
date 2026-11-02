@@ -32,6 +32,7 @@ import { StreamMarkdown } from "./StreamMarkdown";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolCallBlock, type ToolView } from "./ToolCallBlock";
 import { ActivityGroup } from "./ActivityGroup";
+import type { TurnActivity } from "../activity-turns";
 import { useT, type Translate } from "../i18n";
 import { parseSkillBlock, type SkillBlock } from "../skill-block";
 import { isRasterImage, fileToProcessedImage } from "../image-paste";
@@ -141,6 +142,8 @@ function truncateText(text: string, max: number): string {
 
 interface MessageProps {
 	message: UiMessage;
+	/** 同一用户回合的聚合工作记录；未提供时兼容单消息独立渲染。 */
+	turnActivity?: TurnActivity;
 	/** toolResult messages by toolCallId (precomputed in MessageList, memoized). */
 	toolResults: ReadonlyMap<string, UiMessage>;
 	liveOutputs: ReadonlyMap<string, { toolName: string; text: string }>;
@@ -205,6 +208,7 @@ interface MessageProps {
 
 export const Message = memo(function Message({
 	message,
+	turnActivity,
 	toolResults,
 	liveOutputs,
 	toolStatuses,
@@ -641,27 +645,35 @@ export const Message = memo(function Message({
 	const showExportCheck = exportImage.open && canCopyWhole;
 	const exportForceThinking = exportSelected && exportImage.includeThinking;
 	const exportForceTools = exportSelected && exportImage.includeTools;
+	const hasAssistantText =
+		message.role === "assistant" && message.content.some((block) => !!asText(block)?.text.trim());
+	const isStageMessage =
+		hasAssistantText && !!turnActivity && (turnActivity.streaming || turnActivity.finalTextId !== message.id);
+	const isTurnContinuation = message.role === "assistant" && !!turnActivity && turnActivity.headerId !== message.id;
+	const showMessageMeta = message.role !== "assistant" || !turnActivity || !isTurnContinuation;
 
-	/** 一次助手回复只保留一个过程收纳；自然语言文本仍按原顺序独立显示。 */
+	/** 一次用户回合只保留一个过程收纳；自然语言文本仍按原顺序独立显示。 */
 	const renderContent = (skipText = false): ReactNode[] => {
-		const activity =
+		const ownActivity =
 			message.role === "assistant" ? message.content.filter((block) => asThinking(block) || asToolCall(block)) : [];
+		const activity = turnActivity?.blocks ?? ownActivity;
+		const ownsActivity = !turnActivity || turnActivity.ownerId === message.id;
 		let activityInserted = false;
 		const nodes: ReactNode[] = [];
 		message.content.forEach((block, i) => {
 			if (skipText && block.type === "text") return;
-			if (activity.length > 0 && (asThinking(block) || asToolCall(block))) {
-				if (activityInserted) return;
+			if (ownActivity.length > 0 && (asThinking(block) || asToolCall(block))) {
+				if (activityInserted || !ownsActivity) return;
 				activityInserted = true;
 				nodes.push(
 					<ActivityGroup
-						key={`${message.id}-activity`}
+						key={`${turnActivity?.ownerId ?? message.id}-activity`}
 						blocks={activity}
-						startedAt={message.timestamp ?? Date.now()}
+						startedAt={turnActivity?.startedAt ?? message.timestamp ?? Date.now()}
 						toolResults={toolResults}
 						liveOutputs={liveOutputs}
 						toolStatuses={toolStatuses}
-						streaming={streaming && isLast}
+						streaming={turnActivity?.streaming ?? (streaming && isLast)}
 						onKillBash={onKillBash}
 						toolsWrap={toolsWrap}
 						toolImages={toolImages}
@@ -702,7 +714,7 @@ export const Message = memo(function Message({
 	return (
 		<div
 			ref={cardRef}
-			className={`msg msg-${message.role}${isGoalReview ? " msg-goal-review" : ""}${exportSelected ? " msg-export-selected" : ""}`}
+			className={`msg msg-${message.role}${isGoalReview ? " msg-goal-review" : ""}${isTurnContinuation ? " msg-turn-continuation" : ""}${isStageMessage ? " msg-stage" : ""}${exportSelected ? " msg-export-selected" : ""}`}
 			data-role={message.role}
 			data-msg-id={message.id}
 			onContextMenu={onMsgContextMenu}
@@ -718,43 +730,45 @@ export const Message = memo(function Message({
 					onChange={() => toggleExportImageSelect(message.id)}
 				/>
 			)}
-			<div className="msg-meta">
-				{onCollapse && (
-					<button
-						type="button"
-						className="msg-collapse-btn"
-						title={t("collapseMsg")}
-						onClick={() => onCollapse(message.id)}
-					>
-						<FiChevronUp /> {t("collapseMsg")}
-					</button>
-				)}
-				<span className="msg-role">
-					{message.role === "custom"
-						? isGoalWizard
-							? t("goalWizardCard")
-							: isGoalReview
-								? t("goalBarTitle")
-								: message.customType === "file"
-									? t("attachment")
-									: `${t("plugin")} · ${message.customType ?? t("unknown")}`
-						: roleLabel(message.role, t)}
-				</span>
-				{message.model && <span className="msg-model">{message.model}</span>}
-				{message.timestamp && <span className="msg-time">{formatTime(message.timestamp)}</span>}
-				{qnIndex !== undefined && onJump && (
-					<button
-						type="button"
-						className={`qn-tag ${qnActive ? "active" : ""}`}
-						title={`${qnIndex + 1}. ${questionText}`}
-						aria-label={`${qnIndex + 1}. ${questionText}`}
-						onClick={() => onJump(message.id)}
-					>
-						<span className="qn-tag-bar" />
-						<span className="qn-tag-idx">{qnIndex + 1}</span>
-					</button>
-				)}
-			</div>
+			{showMessageMeta && (
+				<div className="msg-meta">
+					{onCollapse && (
+						<button
+							type="button"
+							className="msg-collapse-btn"
+							title={t("collapseMsg")}
+							onClick={() => onCollapse(message.id)}
+						>
+							<FiChevronUp /> {t("collapseMsg")}
+						</button>
+					)}
+					<span className="msg-role">
+						{message.role === "custom"
+							? isGoalWizard
+								? t("goalWizardCard")
+								: isGoalReview
+									? t("goalBarTitle")
+									: message.customType === "file"
+										? t("attachment")
+										: `${t("plugin")} · ${message.customType ?? t("unknown")}`
+							: roleLabel(message.role, t)}
+					</span>
+					{message.model && <span className="msg-model">{message.model}</span>}
+					{message.timestamp && <span className="msg-time">{formatTime(message.timestamp)}</span>}
+					{qnIndex !== undefined && onJump && (
+						<button
+							type="button"
+							className={`qn-tag ${qnActive ? "active" : ""}`}
+							title={`${qnIndex + 1}. ${questionText}`}
+							aria-label={`${qnIndex + 1}. ${questionText}`}
+							onClick={() => onJump(message.id)}
+						>
+							<span className="qn-tag-bar" />
+							<span className="qn-tag-idx">{qnIndex + 1}</span>
+						</button>
+					)}
+				</div>
+			)}
 			<div className="msg-body">
 				{editing ? (
 					<div

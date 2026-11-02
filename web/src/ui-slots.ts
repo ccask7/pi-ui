@@ -301,17 +301,7 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		group: "views",
 		align: "end",
 	},
-	// 工具组：全局搜索 / 浏览器操作 / 后台任务（后台任务的角标数由运行时给 badge）。
-	{
-		id: "host:search",
-		slot: "topbar.primary",
-		labelKey: "searchGlobal",
-		icon: "search",
-		kind: "action",
-		order: 40,
-		group: "tools",
-		align: "end",
-	},
+	// 工具组：后台任务（角标数由运行时给 badge）。全局搜索入口在左栏品牌行。
 	{
 		id: "host:tasks",
 		slot: "topbar.primary",

@@ -1,8 +1,8 @@
 /**
  * desktop preload — 业务全部走 HTTP/WS，不走 IPC，避免和 web/ 现有协议分叉。
  * 仅有的两个 IPC 是壳层欢迎页（welcome.html）的控制面：server 未起之前，
- * 「选目录 / 启动」只能走壳。（上游此处还有 electron-updater 的更新通道，
- * 本 fork 已随自更新功能一起裁掉，见 desktop/main.ts 头部注释。）
+ * 「选目录 / 启动」只能走壳。更新使用独立的手动 IPC：渲染进程不能传入
+ * 下载地址或执行路径，主进程仅使用固定仓库 Release 中缓存的安装包。
  *
  * 文件名必须是 .cts（tsc 产出 preload.cjs，CommonJS）：sandbox:true 的渲染进程
  * 里 preload 只支持 CJS；仓库 "type": "module" 下的 .js 会被当 ESM，静默加载失败
@@ -28,9 +28,22 @@ contextBridge.exposeInMainWorld("piDesktop", {
 	setTitleBarOverlay: (color: string, symbolColor: string, height?: number): Promise<void> =>
 		ipcRenderer.invoke("desktop:titlebar-overlay", color, symbolColor, height),
 	/** 读「窗口透明」开关的权威值（主进程 window-prefs.json）。 */
-	getWindowTransparent: (): Promise<{ transparent: boolean }> =>
-		ipcRenderer.invoke("desktop:get-window-transparent"),
+	getWindowTransparent: (): Promise<{ transparent: boolean }> => ipcRenderer.invoke("desktop:get-window-transparent"),
 	/** 写「窗口透明」开关：主进程会重建窗口（transparent 是构造期选项）。 */
 	setWindowTransparent: (on: boolean): Promise<{ transparent: boolean }> =>
 		ipcRenderer.invoke("desktop:set-window-transparent", on),
+	/** 手动更新：检查与下载是两个独立 IPC，均只由设置页的用户操作触发。 */
+	updater: {
+		getInfo: (): Promise<{ supported: boolean; currentVersion: string }> => ipcRenderer.invoke("desktop:update-info"),
+		check: (): Promise<unknown> => ipcRenderer.invoke("desktop:update-check"),
+		download: (): Promise<{ status: "ready" | "cancelled" | "error"; message?: string }> =>
+			ipcRenderer.invoke("desktop:update-download"),
+		cancel: (): Promise<void> => ipcRenderer.invoke("desktop:update-cancel"),
+		install: (): Promise<string | null> => ipcRenderer.invoke("desktop:update-install"),
+		onProgress: (listener: (percent: number | null) => void): (() => void) => {
+			const handler = (_event: unknown, percent: number | null) => listener(percent);
+			ipcRenderer.on("desktop:update-progress", handler);
+			return () => ipcRenderer.removeListener("desktop:update-progress", handler);
+		},
+	},
 });

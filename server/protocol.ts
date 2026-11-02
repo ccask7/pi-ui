@@ -472,6 +472,8 @@ export type ClientMessage =
 	 *  carries the generated single-line message; ok:false on any failure. */
 	| { type: "scm_commitmsg"; reqId: number }
 	| { type: "new_chat"; preset?: string; ephemeral?: boolean }
+	/** 从新建任务草稿一次性创建目标项目会话并发送首条消息，避免 set_cwd/new_chat/prompt 串项目。 */
+	| { type: "new_task"; cwd: string; text: string; attachments?: PromptAttachment[] }
 	/** Edit a past user question and re-ask it (forks a new session at that point). */
 	| {
 			type: "edit_message";
@@ -697,6 +699,8 @@ export type ClientMessage =
 	// -- settings (system prompt / skills / extensions / presets) ------------
 	/** Request the current settings state (also pushed automatically on attach). */
 	| { type: "get_settings" }
+	/** Read-only MCP catalog for the capabilities panel. */
+	| { type: "list_mcp_servers" }
 	/** Apply a partial settings update: compose template / per-source overrides or
 	 *  skill/extension toggles. Each change is persisted per client; prompt
 	 *  template changes reload the runtime, while review changes affect the next review. */
@@ -1959,6 +1963,19 @@ export interface UiSkillInfo {
 	enabled: boolean;
 }
 
+export interface UiMcpToolInfo {
+	name: string;
+	description: string;
+}
+
+/** Safe MCP display data: no command environment or secrets leave the server. */
+export interface UiMcpServerInfo {
+	name: string;
+	status: "running" | "error";
+	error?: string;
+	tools: UiMcpToolInfo[];
+}
+
 /** One loaded extension, with whether it is currently enabled. Disabled
  *  extensions are unloaded from the runtime (tools/commands disappear). */
 export interface UiExtensionInfo {
@@ -2516,6 +2533,8 @@ export type ServerMessage =
 	 *  extensions, saved presets). Pushed on attach and after every settings
 	 *  change. */
 	| { type: "settings_state"; settings: UiSettingsState }
+	/** Read-only MCP catalog; refreshed on demand and after mcp.json hot reload. */
+	| { type: "mcp_servers"; servers: UiMcpServerInfo[]; configPath: string }
 	// -- plugins (<dataDir>/plugins) -----------------------------------------
 	/** Installed-plugin catalog. Pushed on attach (the dir is re-scanned each
 	 *  time so freshly dropped plugins appear without a server restart) and

@@ -100,16 +100,15 @@ async function main() {
 
 	// -- dropdown structure ---------------------------------------------------
 	await openSoundMenu(page);
-	// 5 sound rows (master + 4 events) + 1 desktop-notification row below them.
+	// 3 sound rows (master + done/error) + 1 desktop-notification row below them.
 	const rows = await page.locator(".sound-row").count();
-	check("sound panel shows master + 4 event rows + notify row", rows === 6);
+	check("sound panel shows master + 2 event rows + notify row", rows === 4);
 	// The desktop-notification block below the sound rows is itself a
 	// .sound-menu (shared layout), so scope every sound-panel query with
 	// :not(.notify-menu) — a bare .sound-menu matches two elements now.
 	check(
 		"event rows labelled",
-		(await page.locator(".sound-menu:not(.notify-menu)").textContent())?.includes("问卷弹出") &&
-			(await page.locator(".sound-menu:not(.notify-menu)").textContent())?.includes("回复结束") &&
+		(await page.locator(".sound-menu:not(.notify-menu)").textContent())?.includes("回复结束") &&
 			(await page.locator(".sound-menu:not(.notify-menu)").textContent())?.includes("出错"),
 	);
 	check("volume slider present", (await page.locator(".sound-volume input[type=range]").count()) === 1);
@@ -119,19 +118,16 @@ async function main() {
 	// Scoped to the sound panel: the desktop-notification block below it also
 	// has a .sound-master row, so a bare ".sound-master" selector is ambiguous.
 	const soundMaster = page.locator(".sound-menu:not(.notify-menu)").locator(".sound-master input[type=checkbox]");
-	const startRow = page.locator(".sound-row", { hasText: "回复开始" });
-	const startCheckbox = startRow.locator('input[type="checkbox"]');
-	check("start cue default off", (await startCheckbox.isChecked()) === false);
+	const doneRow = page.locator(".sound-row", { hasText: "回复结束" });
+	const doneCheckbox = doneRow.locator('input[type="checkbox"]');
+	check("done cue default on", (await doneCheckbox.isChecked()) === true);
 	await soundMaster.uncheck();
-	check(
-		"rows disabled when master off",
-		(await startCheckbox.isDisabled()) === true && (await page.locator(".sound-preview").first().isDisabled()) === true,
-	);
+	check("rows disabled when master off", (await doneCheckbox.isDisabled()) === true);
 	await soundMaster.check();
 
 	// -- toggle an event + set volume ----------------------------------------
-	await startCheckbox.check();
-	check("start cue enabled", await startCheckbox.isChecked());
+	await doneCheckbox.uncheck();
+	check("done cue disabled", !(await doneCheckbox.isChecked()));
 
 	const range = page.locator(".sound-volume input[type=range]");
 	await range.evaluate((el) => {
@@ -141,11 +137,6 @@ async function main() {
 	});
 	await sleep(200);
 	check("volume label updates", (await page.locator(".sound-vol-num").textContent())?.includes("30"));
-
-	// -- 试听 must not throw --------------------------------------------------
-	await startRow.locator(".sound-preview").click();
-	await sleep(300);
-	check("preview plays without errors", consoleErrors.length === 0);
 
 	// -- desktop (PWA) notification switch -----------------------------------
 	// Same dropdown, below the sound rows. Two invariants must hold whatever

@@ -14,6 +14,7 @@ import { ChatTabBar } from "./components/ChatTabBar.js";
 import { LeftPanel } from "./components/LeftPanel";
 import { RightPanel } from "./components/RightPanel";
 import { MessageList } from "./components/MessageList";
+import { CapabilitiesPanel } from "./components/CapabilitiesPanel";
 import { ChatInput } from "./components/ChatInput";
 import { GoalBar } from "./components/GoalBar";
 
@@ -73,7 +74,7 @@ import { appUrl } from "./base-url";
 import type { ClientMessage, CommandDef, PromptAttachment, UiMessage } from "./types";
 import { useT, useI18n } from "./i18n";
 import { QUICK_PHRASE_DEFAULTS } from "./quick-phrases";
-import { FiAlertCircle, FiAlertTriangle, FiChevronsLeft, FiChevronsRight, FiInfo, FiX } from "react-icons/fi";
+import { FiAlertCircle, FiAlertTriangle, FiInfo, FiSidebar, FiX } from "react-icons/fi";
 import type { Notice } from "./use-chat";
 import { fileToProcessedImage, isRasterImage, type ProcessedImage } from "./image-paste";
 import { randomUuid } from "./uuid";
@@ -205,13 +206,18 @@ function ResizeHandle({ side, width, onResize }: { side: PanelSide; width: numbe
 	);
 }
 
-/** 面板折叠后留在原位置的展开条：贴在主区边缘，点击恢复面板。
- *  只在桌面端出现（移动端抽屉由顶栏按钮控制）。 */
+/** 面板折叠后只在对应上角保留一个侧栏图标，点击恢复，不占整列。 */
 function PanelRail({ side, onClick }: { side: PanelSide; onClick: () => void }) {
 	const t = useT();
 	return (
-		<button type="button" className={`panel-rail panel-rail-${side}`} title={t("expandPanel")} onClick={onClick}>
-			{side === "left" ? <FiChevronsRight /> : <FiChevronsLeft />}
+		<button
+			type="button"
+			className={`panel-rail panel-rail-${side}`}
+			title={t("expandPanel")}
+			aria-label={t("expandPanel")}
+			onClick={onClick}
+		>
+			<FiSidebar />
 		</button>
 	);
 }
@@ -326,6 +332,17 @@ export function App() {
 		return () => window.removeEventListener("drop", clear, true);
 	}, []);
 	const [viewChosen, setView] = useState<ViewName>("chat");
+	// 左栏「插件」只替换对话内容，不注册顶栏视图或改动右栏。
+	const [pluginsOpen, setPluginsOpen] = useState(false);
+	/** 新建任务先停留在前端草稿；首条消息由服务端按选中项目原子创建。 */
+	const [newTaskOpen, setNewTaskOpen] = useState(false);
+	const [newTaskCwd, setNewTaskCwd] = useState(cwd);
+	const openNewTask = useCallback(() => {
+		setNewTaskCwd(cwd);
+		setNewTaskOpen(true);
+		setPluginsOpen(false);
+		setView("chat");
+	}, [cwd]);
 	/* PI_WEB_TABS: a tab this instance does not offer cannot be shown, even if
 	   something else asks for it — a plugin firing ccui:plugin-run-command,
 	   or a panel's "open this in a terminal" button. The server refuses those
@@ -339,14 +356,13 @@ export function App() {
 		() => chat.plugins.filter((p) => !chat.settings?.disabledPlugins?.includes(p.id)),
 		[chat.plugins, chat.settings?.disabledPlugins],
 	);
-	// 插件贡献的顶栏条目（issue #146）：插件只声明，宿主渲染/排序/溢出；用户可在设置
-	// 面板隐藏或调序（偏好 per-client 持久化）。顺序与设置面板里看到的一致。
+	// 插件贡献的顶栏条目（issue #146）：插件只声明，宿主渲染/排序；既有用户布局偏好继续生效。
 	// 宿主 UI 扩展点全量计算（issue #146 完整版）：内置条目 + 插件贡献 + 插件 arrange
 	// + 用户偏好（最高优先级）→ 每个 slot 的最终条目。渲染层只负责摆位置。
 	const uiSlots = useMemo(() => {
 		// 合并诊断（P0-1：失败不许静默）：未知 slot / 未知 kind / arrange 目标不存在 /
 		// 插件被禁用或激活失败 → 带归因的 diagnostics，这里 console.warn 一条，
-		// 设置面板「界面布局」页再展示给用户（同一份数据，两处都不吞）。
+		// 这里通过 console.warn 暴露给开发者。
 		const diagnostics: UiDiagnostic[] = [];
 		const slots = buildUiSlots(withPluginViewItems(chat.plugins), {
 			locale,
@@ -359,8 +375,7 @@ export function App() {
 		for (const d of diagnostics) console.warn(`[ui-slot] ${d.pluginId ? `[${d.pluginId}] ` : ""}${d.message}`);
 		return slots;
 	}, [chat.plugins, chat.settings?.disabledPlugins, chat.settings?.uiLayout, locale, t]);
-	// 顶栏：只画非 hidden 的 topbar.primary（「⋯」溢出菜单已删，顶栏改横向滚动；
-	// 被用户隐藏的条目仍在 设置 → 界面布局 里勾回来）。
+	// 顶栏：只画非 hidden 的 topbar.primary（「⋯」溢出菜单已删，顶栏改横向滚动）。
 	const uiPrimary = useMemo(() => uiSlots["topbar.primary"].filter((e) => !e.hidden), [uiSlots]);
 	// 面板槽位（收尾接线）：非 hidden 条目直传面板，空数组时面板返回 null，DOM 与旧版一致。
 	const uiLeftSessions = useMemo(() => uiSlots["leftpanel.sessions"].filter((e) => !e.hidden), [uiSlots]);
@@ -983,7 +998,14 @@ export function App() {
 	// 稳定包装是为了不让 RightPanel 的轮询 effect 反复重建（send 本身是稳定的）。
 	const panelSend = useCallback(
 		(msg: ClientMessage) => {
-			if (msg.type === "new_chat" || msg.type === "switch_conversation" || msg.type === "switch_session") {
+			if (
+				msg.type === "new_chat" ||
+				msg.type === "set_cwd" ||
+				msg.type === "switch_conversation" ||
+				msg.type === "switch_session"
+			) {
+				setPluginsOpen(false);
+				setNewTaskOpen(false);
 				setView((prev) => (prev !== "chat" ? "chat" : prev));
 			}
 			return send(msg);
@@ -1287,6 +1309,7 @@ export function App() {
 				uiContextTopbar={uiSlots["contextmenu.topbar"]}
 				onUiAction={onUiAction}
 				onViewChange={(v: ViewName) => {
+					if (v === "chat") setPluginsOpen(false);
 					// The terminal panel stays mounted while hidden. Create the first
 					// shell on the user's terminal-view click, not on initial mount.
 					terminalOpenRequested.current = v === "terminal" && chat.terminals.length === 0;
@@ -1300,7 +1323,6 @@ export function App() {
 					setSettingsOpen(true);
 				}}
 				onOpenBgTasks={() => setBgTasksOpen(true)}
-				onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
 			/>
 			{chat.protocolMismatch && <div className="protocol-banner">⚠ {t("protocolMismatch")}</div>}
 			<div className="notices">
@@ -1408,6 +1430,10 @@ export function App() {
 								projects={chat.projects}
 								pathCompletions={chat.pathCompletions}
 								activeConversationId={chat.activeConversationId}
+								pluginsActive={pluginsOpen}
+								onOpenPlugins={() => setPluginsOpen(true)}
+								onNewTask={openNewTask}
+								onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
 								/* 宿主 UI 扩展点（contextmenu.session）：条目由 buildUiSlots 算好，左栏只管开菜单 +
 								   分派它自己的两条内置项（host:conv-dismiss-subagents / host:conv-force-dismiss）。 */
 								uiContextSession={uiSlots["contextmenu.session"]}
@@ -1424,146 +1450,192 @@ export function App() {
 								activeConversationId={chat.activeConversationId}
 								panelSend={panelSend}
 							/>
-							{/* 对话头部条（chat.header 槽位）：纯插件新增位，无条目时不渲染。 */}
-							{uiChatHeader.length > 0 && (
-								<div className="chat-header" role="toolbar">
-									{renderSlotToolbar(uiChatHeader, onUiAction)}
-								</div>
-							)}
-							{chat.state ? (
-								<>
-									{chat.state.isEphemeral && (
-										<div className="ephemeral-banner">
-											<span>🎭 {t("ephemeralBannerText")}</span>
+							<div className={`conversation-content${pluginsOpen ? " hidden" : ""}`}>
+								{/* 对话头部条（chat.header 槽位）：纯插件新增位，无条目时不渲染。 */}
+								{uiChatHeader.length > 0 && (
+									<div className="chat-header" role="toolbar">
+										{renderSlotToolbar(uiChatHeader, onUiAction)}
+									</div>
+								)}
+								{chat.state ? (
+									<>
+										{chat.state.isEphemeral && (
+											<div className="ephemeral-banner">
+												<span>🎭 {t("ephemeralBannerText")}</span>
+												<button
+													type="button"
+													className="ephemeral-save"
+													onClick={() => send({ type: "persist_conversation", id: activeConvId })}
+												>
+													💾 {t("saveEphemeral")}
+												</button>
+											</div>
+										)}
+										{newTaskOpen ? (
+											<div className="new-task-empty" aria-label={t("newTask")} />
+										) : (
+											<MessageList
+												uiMessageActions={uiSlots["message.actions"]}
+												uiContextMessage={uiSlots["contextmenu.message"]}
+												/* 工具调用卡片的工具名右键菜单（contextmenu.toolcall）：条目已合并好，
+										   工具卡只管开菜单 + 分派它自己的 host:tool-info。 */
+												uiContextToolCall={uiSlots["contextmenu.toolcall"]}
+												uiChatEmpty={uiChatEmpty}
+												onUiAction={onUiAction}
+												key={chat.state.conversationId ?? "boot"}
+												state={chat.state}
+												liveOutputs={chat.liveOutputs}
+												toolStatuses={chat.toolStatuses}
+												onEdit={onEditMessage}
+												onKillBash={() => send({ type: "abort_bash" })}
+												onRetry={() => {
+													// 重试沿用当前模型续跑上一轮请求，同样算一次模型使用（下拉按次数排序）。
+													if (send({ type: "retry_last" })) {
+														const m = chat.state?.model;
+														if (m) recordModelUsage(`${m.provider}/${m.id}`);
+													}
+												}}
+												onRemoveQueued={onRemoveQueued}
+												onRecallQueued={onRecallQueued}
+												thinkingWrap={chat.settings?.thinkingWrap ?? true}
+												toolsWrap={chat.settings?.toolsWrap ?? true}
+												toolImages={chat.settings?.toolImagesEnabled ?? true}
+												jumpTarget={searchJump}
+												onJumpDone={() => setSearchJump(null)}
+											/>
+										)}
+									</>
+								) : (
+									<div className="boot-wait">{chat.ready ? t("loadingSession") : t("connectingServer")}</div>
+								)}
+
+								{chat.settings?.goalModeEnabled !== false && (
+									<GoalBar
+										goal={chat.goal}
+										models={chat.models}
+										modelsLoading={chat.modelsLoading}
+										activeConversationId={chat.activeConversationId}
+										uiGoalbarActions={uiGoalbarActions}
+										onUiAction={onUiAction}
+									/>
+								)}
+								{/* 扩展问卷：非模态内联面板，插在输入框上方，对话内容保持可见 */}
+								{/* 通用右键菜单（contextmenu.* 槽位）：各处的 onContextMenu 打开它。 */}
+								<ContextMenu onAction={(entry, target, value) => onUiAction(entry, value, target)} />
+								{chat.dialog && <Dialog dialog={chat.dialog} />}
+								{/* 本地插件对话框（host.dialogs.*）：复用 .dialog-inline 样式，按钮 resolve 后清态 */}
+								{pluginDialog && (
+									<div className="dialog-inline" data-dialog-kind={pluginDialog.kind}>
+										<div className="dialog-head">
+											<span className="dialog-badge">{t("pluginRequest")}</span>
+											{pluginDialog.title && <span className="dialog-title">{pluginDialog.title}</span>}
 											<button
 												type="button"
-												className="ephemeral-save"
-												onClick={() => send({ type: "persist_conversation", id: activeConvId })}
+												className="dialog-dismiss"
+												title={t("cancel")}
+												onClick={() => {
+													const cur = pluginDialogRef.current;
+													pluginDialogRef.current = null;
+													setPluginDialog(null);
+													try {
+														if (cur?.kind === "confirm") cur.resolve(false);
+														else cur?.resolve({ ok: false });
+													} catch {
+														/* 忽略 */
+													}
+												}}
 											>
-												💾 {t("saveEphemeral")}
+												✕
 											</button>
 										</div>
-									)}
-									<MessageList
-										uiMessageActions={uiSlots["message.actions"]}
-										uiContextMessage={uiSlots["contextmenu.message"]}
-										/* 工具调用卡片的工具名右键菜单（contextmenu.toolcall）：条目已合并好，
-										   工具卡只管开菜单 + 分派它自己的 host:tool-info。 */
-										uiContextToolCall={uiSlots["contextmenu.toolcall"]}
-										uiChatEmpty={uiChatEmpty}
-										onUiAction={onUiAction}
-										key={chat.state.conversationId ?? "boot"}
-										state={chat.state}
-										liveOutputs={chat.liveOutputs}
-										toolStatuses={chat.toolStatuses}
-										onEdit={onEditMessage}
-										onKillBash={() => send({ type: "abort_bash" })}
-										onRetry={() => {
-											// 重试沿用当前模型续跑上一轮请求，同样算一次模型使用（下拉按次数排序）。
-											if (send({ type: "retry_last" })) {
-												const m = chat.state?.model;
-												if (m) recordModelUsage(`${m.provider}/${m.id}`);
-											}
-										}}
-										onRemoveQueued={onRemoveQueued}
-										onRecallQueued={onRecallQueued}
-										thinkingWrap={chat.settings?.thinkingWrap ?? true}
-										toolsWrap={chat.settings?.toolsWrap ?? true}
-										toolImages={chat.settings?.toolImagesEnabled ?? true}
-										jumpTarget={searchJump}
-										onJumpDone={() => setSearchJump(null)}
-									/>
-								</>
-							) : (
-								<div className="boot-wait">{chat.ready ? t("loadingSession") : t("connectingServer")}</div>
-							)}
-
-							{chat.settings?.goalModeEnabled !== false && (
-								<GoalBar
-									goal={chat.goal}
-									models={chat.models}
-									modelsLoading={chat.modelsLoading}
-									activeConversationId={chat.activeConversationId}
-									uiGoalbarActions={uiGoalbarActions}
-									onUiAction={onUiAction}
-								/>
-							)}
-							{/* 扩展问卷：非模态内联面板，插在输入框上方，对话内容保持可见 */}
-							{/* 通用右键菜单（contextmenu.* 槽位）：各处的 onContextMenu 打开它。 */}
-							<ContextMenu onAction={(entry, target, value) => onUiAction(entry, value, target)} />
-							{chat.dialog && <Dialog dialog={chat.dialog} />}
-							{/* 本地插件对话框（host.dialogs.*）：复用 .dialog-inline 样式，按钮 resolve 后清态 */}
-							{pluginDialog && (
-								<div className="dialog-inline" data-dialog-kind={pluginDialog.kind}>
-									<div className="dialog-head">
-										<span className="dialog-badge">{t("pluginRequest")}</span>
-										{pluginDialog.title && <span className="dialog-title">{pluginDialog.title}</span>}
-										<button
-											type="button"
-											className="dialog-dismiss"
-											title={t("cancel")}
-											onClick={() => {
-												const cur = pluginDialogRef.current;
-												pluginDialogRef.current = null;
-												setPluginDialog(null);
-												try {
-													if (cur?.kind === "confirm") cur.resolve(false);
-													else cur?.resolve({ ok: false });
-												} catch {
-													/* 忽略 */
-												}
-											}}
-										>
-											✕
-										</button>
-									</div>
-									{pluginDialog.kind === "select" && (
-										<div className="dialog-options">
-											{(pluginDialog.options ?? []).map((opt, i) => {
-												const sel = pluginDialog.multi ? pluginDialogSel.includes(i) : false;
-												return (
+										{pluginDialog.kind === "select" && (
+											<div className="dialog-options">
+												{(pluginDialog.options ?? []).map((opt, i) => {
+													const sel = pluginDialog.multi ? pluginDialogSel.includes(i) : false;
+													return (
+														<button
+															type="button"
+															key={i}
+															className={`dialog-option ${sel ? "sel" : ""}`}
+															title={opt.description}
+															onClick={() => {
+																if (pluginDialog.multi) {
+																	setPluginDialogSel((prev) =>
+																		prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i],
+																	);
+																	return;
+																}
+																const cur = pluginDialogRef.current;
+																pluginDialogRef.current = null;
+																setPluginDialog(null);
+																try {
+																	cur?.resolve({ ok: true, selected: [opt.label] });
+																} catch {
+																	/* 忽略 */
+																}
+															}}
+														>
+															{opt.label}
+															{opt.description && <span className="dialog-hint">{opt.description}</span>}
+														</button>
+													);
+												})}
+												{(pluginDialog.options ?? []).length === 0 && (
+													<div className="dialog-hint">{t("noOptions")}</div>
+												)}
+												{pluginDialog.multi && (
+													<div className="dialog-actions">
+														<button
+															type="button"
+															className="btn primary"
+															onClick={() => {
+																const cur = pluginDialogRef.current;
+																const labels = (cur?.options ?? [])
+																	.filter((_, idx) => pluginDialogSel.includes(idx))
+																	.map((o) => o.label);
+																pluginDialogRef.current = null;
+																setPluginDialog(null);
+																try {
+																	cur?.resolve({ ok: true, selected: labels });
+																} catch {
+																	/* 忽略 */
+																}
+															}}
+														>
+															{t("ok")}
+														</button>
+													</div>
+												)}
+											</div>
+										)}
+										{pluginDialog.kind === "confirm" && (
+											<div className="dialog-body">
+												<div className="dialog-actions">
 													<button
 														type="button"
-														key={i}
-														className={`dialog-option ${sel ? "sel" : ""}`}
-														title={opt.description}
+														className="btn"
 														onClick={() => {
-															if (pluginDialog.multi) {
-																setPluginDialogSel((prev) =>
-																	prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i],
-																);
-																return;
-															}
 															const cur = pluginDialogRef.current;
 															pluginDialogRef.current = null;
 															setPluginDialog(null);
 															try {
-																cur?.resolve({ ok: true, selected: [opt.label] });
+																cur?.resolve(false);
 															} catch {
 																/* 忽略 */
 															}
 														}}
 													>
-														{opt.label}
-														{opt.description && <span className="dialog-hint">{opt.description}</span>}
+														{t("cancel")}
 													</button>
-												);
-											})}
-											{(pluginDialog.options ?? []).length === 0 && <div className="dialog-hint">{t("noOptions")}</div>}
-											{pluginDialog.multi && (
-												<div className="dialog-actions">
 													<button
 														type="button"
 														className="btn primary"
 														onClick={() => {
 															const cur = pluginDialogRef.current;
-															const labels = (cur?.options ?? [])
-																.filter((_, idx) => pluginDialogSel.includes(idx))
-																.map((o) => o.label);
 															pluginDialogRef.current = null;
 															setPluginDialog(null);
 															try {
-																cur?.resolve({ ok: true, selected: labels });
+																cur?.resolve(true);
 															} catch {
 																/* 忽略 */
 															}
@@ -1572,300 +1644,278 @@ export function App() {
 														{t("ok")}
 													</button>
 												</div>
-											)}
-										</div>
-									)}
-									{pluginDialog.kind === "confirm" && (
-										<div className="dialog-body">
-											<div className="dialog-actions">
-												<button
-													type="button"
-													className="btn"
-													onClick={() => {
-														const cur = pluginDialogRef.current;
-														pluginDialogRef.current = null;
-														setPluginDialog(null);
-														try {
-															cur?.resolve(false);
-														} catch {
-															/* 忽略 */
-														}
-													}}
-												>
-													{t("cancel")}
-												</button>
-												<button
-													type="button"
-													className="btn primary"
-													onClick={() => {
-														const cur = pluginDialogRef.current;
-														pluginDialogRef.current = null;
-														setPluginDialog(null);
-														try {
-															cur?.resolve(true);
-														} catch {
-															/* 忽略 */
-														}
-													}}
-												>
-													{t("ok")}
-												</button>
 											</div>
-										</div>
-									)}
-									{pluginDialog.kind === "input" && (
-										<div className="dialog-body">
-											<input
-												className="dialog-input"
-												value={pluginDialogInput}
-												placeholder={pluginDialog.placeholder || t("inputPlaceholder")}
-												autoFocus
-												onChange={(e) => setPluginDialogInput(e.target.value)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-														const cur = pluginDialogRef.current;
-														pluginDialogRef.current = null;
-														setPluginDialog(null);
-														try {
-															cur?.resolve({ ok: true, value: pluginDialogInput });
-														} catch {
-															/* 忽略 */
-														}
-													}
-												}}
-											/>
-											<div className="dialog-actions">
-												<button
-													type="button"
-													className="btn"
-													onClick={() => {
-														const cur = pluginDialogRef.current;
-														pluginDialogRef.current = null;
-														setPluginDialog(null);
-														try {
-															cur?.resolve({ ok: false });
-														} catch {
-															/* 忽略 */
+										)}
+										{pluginDialog.kind === "input" && (
+											<div className="dialog-body">
+												<input
+													className="dialog-input"
+													value={pluginDialogInput}
+													placeholder={pluginDialog.placeholder || t("inputPlaceholder")}
+													autoFocus
+													onChange={(e) => setPluginDialogInput(e.target.value)}
+													onKeyDown={(e) => {
+														if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+															const cur = pluginDialogRef.current;
+															pluginDialogRef.current = null;
+															setPluginDialog(null);
+															try {
+																cur?.resolve({ ok: true, value: pluginDialogInput });
+															} catch {
+																/* 忽略 */
+															}
 														}
 													}}
-												>
-													{t("cancel")}
-												</button>
-												<button
-													type="button"
-													className="btn primary"
-													onClick={() => {
-														const cur = pluginDialogRef.current;
-														pluginDialogRef.current = null;
-														setPluginDialog(null);
-														try {
-															cur?.resolve({ ok: true, value: pluginDialogInput });
-														} catch {
-															/* 忽略 */
-														}
-													}}
-												>
-													{t("ok")}
-												</button>
+												/>
+												<div className="dialog-actions">
+													<button
+														type="button"
+														className="btn"
+														onClick={() => {
+															const cur = pluginDialogRef.current;
+															pluginDialogRef.current = null;
+															setPluginDialog(null);
+															try {
+																cur?.resolve({ ok: false });
+															} catch {
+																/* 忽略 */
+															}
+														}}
+													>
+														{t("cancel")}
+													</button>
+													<button
+														type="button"
+														className="btn primary"
+														onClick={() => {
+															const cur = pluginDialogRef.current;
+															pluginDialogRef.current = null;
+															setPluginDialog(null);
+															try {
+																cur?.resolve({ ok: true, value: pluginDialogInput });
+															} catch {
+																/* 忽略 */
+															}
+														}}
+													>
+														{t("ok")}
+													</button>
+												</div>
 											</div>
-										</div>
-									)}
-								</div>
-							)}
-							{pendingPermRequest && (
-								<div className="dialog-inline" data-dialog-kind="confirm">
-									<div className="dialog-head">
-										<span className="dialog-badge">{t("pluginRequest")}</span>
-										<span className="dialog-title">{t("pluginPermTitle")}</span>
-										<button
-											type="button"
-											className="dialog-dismiss"
-											title={t("cancel")}
-											onClick={() => answerPermRequest(pendingPermRequest.id, false)}
-										>
-											✕
-										</button>
+										)}
 									</div>
-									<div className="dialog-body">
-										{pendingPermRequest.family === "net"
-											? t("pluginPermBodyNet")
-													.replace("{plugin}", pendingPermRequest.pluginId)
-													.replace("{hosts}", (pendingPermRequest.hosts ?? []).join(", "))
-											: t("pluginPermBodyLlm")
-													.replace("{plugin}", pendingPermRequest.pluginId)
-													.replace(
-														"{models}",
-														(pendingPermRequest.models ?? []).length > 0
-															? ` ${(pendingPermRequest.models ?? []).join(", ")}`
-															: "",
-													)}
-										{pendingPermRequest.reason && <div className="dialog-hint">{pendingPermRequest.reason}</div>}
-										<div className="dialog-actions">
+								)}
+								{pendingPermRequest && (
+									<div className="dialog-inline" data-dialog-kind="confirm">
+										<div className="dialog-head">
+											<span className="dialog-badge">{t("pluginRequest")}</span>
+											<span className="dialog-title">{t("pluginPermTitle")}</span>
 											<button
 												type="button"
-												className="btn"
+												className="dialog-dismiss"
+												title={t("cancel")}
 												onClick={() => answerPermRequest(pendingPermRequest.id, false)}
 											>
-												{t("pluginGrantDeny")}
-											</button>
-											<button
-												type="button"
-												className="btn"
-												onClick={() => answerPermRequest(pendingPermRequest.id, true)}
-											>
-												{t("pluginPermOnce")}
-											</button>
-											<button
-												type="button"
-												className="btn primary"
-												onClick={() => answerPermRequest(pendingPermRequest.id, true, true)}
-											>
-												{t("pluginPermAlways")}
+												✕
 											</button>
 										</div>
+										<div className="dialog-body">
+											{pendingPermRequest.family === "net"
+												? t("pluginPermBodyNet")
+														.replace("{plugin}", pendingPermRequest.pluginId)
+														.replace("{hosts}", (pendingPermRequest.hosts ?? []).join(", "))
+												: t("pluginPermBodyLlm")
+														.replace("{plugin}", pendingPermRequest.pluginId)
+														.replace(
+															"{models}",
+															(pendingPermRequest.models ?? []).length > 0
+																? ` ${(pendingPermRequest.models ?? []).join(", ")}`
+																: "",
+														)}
+											{pendingPermRequest.reason && <div className="dialog-hint">{pendingPermRequest.reason}</div>}
+											<div className="dialog-actions">
+												<button
+													type="button"
+													className="btn"
+													onClick={() => answerPermRequest(pendingPermRequest.id, false)}
+												>
+													{t("pluginGrantDeny")}
+												</button>
+												<button
+													type="button"
+													className="btn"
+													onClick={() => answerPermRequest(pendingPermRequest.id, true)}
+												>
+													{t("pluginPermOnce")}
+												</button>
+												<button
+													type="button"
+													className="btn primary"
+													onClick={() => answerPermRequest(pendingPermRequest.id, true, true)}
+												>
+													{t("pluginPermAlways")}
+												</button>
+											</div>
+										</div>
 									</div>
-								</div>
-							)}
-							{pendingPathRequest && (
-								<div className="dialog-inline" data-dialog-kind="confirm">
-									<div className="dialog-head">
-										<span className="dialog-badge">{t("pluginRequest")}</span>
-										<span className="dialog-title">{t("pluginGrantRequestTitle")}</span>
-										<button
-											type="button"
-											className="dialog-dismiss"
-											title={t("cancel")}
-											onClick={() => answerPathRequest(pendingPathRequest.id, false)}
-										>
-											✕
-										</button>
-									</div>
-									<div className="dialog-body">
-										{t("pluginGrantRequestBody")
-											.replace("{plugin}", pendingPathRequest.pluginId)
-											.replace("{path}", pendingPathRequest.path)}
-										{pendingPathRequest.reason && <div className="dialog-hint">{pendingPathRequest.reason}</div>}
-										<div className="dialog-actions">
+								)}
+								{pendingPathRequest && (
+									<div className="dialog-inline" data-dialog-kind="confirm">
+										<div className="dialog-head">
+											<span className="dialog-badge">{t("pluginRequest")}</span>
+											<span className="dialog-title">{t("pluginGrantRequestTitle")}</span>
 											<button
 												type="button"
-												className="btn"
+												className="dialog-dismiss"
+												title={t("cancel")}
 												onClick={() => answerPathRequest(pendingPathRequest.id, false)}
 											>
-												{t("pluginGrantDeny")}
-											</button>
-											<button
-												type="button"
-												className="btn primary"
-												onClick={() => answerPathRequest(pendingPathRequest.id, true)}
-											>
-												{t("pluginGrantAllow")}
+												✕
 											</button>
 										</div>
+										<div className="dialog-body">
+											{t("pluginGrantRequestBody")
+												.replace("{plugin}", pendingPathRequest.pluginId)
+												.replace("{path}", pendingPathRequest.path)}
+											{pendingPathRequest.reason && <div className="dialog-hint">{pendingPathRequest.reason}</div>}
+											<div className="dialog-actions">
+												<button
+													type="button"
+													className="btn"
+													onClick={() => answerPathRequest(pendingPathRequest.id, false)}
+												>
+													{t("pluginGrantDeny")}
+												</button>
+												<button
+													type="button"
+													className="btn primary"
+													onClick={() => answerPathRequest(pendingPathRequest.id, true)}
+												>
+													{t("pluginGrantAllow")}
+												</button>
+											</div>
+										</div>
 									</div>
-								</div>
-							)}
-							{pluginPathConfirm && (
-								<div className="dialog-inline" data-dialog-kind="confirm">
-									<div className="dialog-head">
-										<span className="dialog-badge">{t("pluginRequest")}</span>
-										<span className="dialog-title">{t("pluginSessionGrantTitle")}</span>
-										<button
-											type="button"
-											className="dialog-dismiss"
-											title={t("cancel")}
-											onClick={() => {
-												pluginPathConfirm.resolve(false);
-												setPluginPathConfirm(null);
-											}}
-										>
-											✕
-										</button>
-									</div>
-									<div className="dialog-body">
-										{t("pluginSessionGrantBody").replace("{path}", pluginPathConfirm.path)}
-										<div className="dialog-actions">
+								)}
+								{pluginPathConfirm && (
+									<div className="dialog-inline" data-dialog-kind="confirm">
+										<div className="dialog-head">
+											<span className="dialog-badge">{t("pluginRequest")}</span>
+											<span className="dialog-title">{t("pluginSessionGrantTitle")}</span>
 											<button
 												type="button"
-												className="btn"
+												className="dialog-dismiss"
+												title={t("cancel")}
 												onClick={() => {
 													pluginPathConfirm.resolve(false);
 													setPluginPathConfirm(null);
 												}}
 											>
-												{t("cancel")}
-											</button>
-											<button
-												type="button"
-												className="btn primary"
-												onClick={() => {
-													pluginPathConfirm.resolve(true);
-													setPluginPathConfirm(null);
-												}}
-											>
-												{t("ok")}
+												✕
 											</button>
 										</div>
+										<div className="dialog-body">
+											{t("pluginSessionGrantBody").replace("{path}", pluginPathConfirm.path)}
+											<div className="dialog-actions">
+												<button
+													type="button"
+													className="btn"
+													onClick={() => {
+														pluginPathConfirm.resolve(false);
+														setPluginPathConfirm(null);
+													}}
+												>
+													{t("cancel")}
+												</button>
+												<button
+													type="button"
+													className="btn primary"
+													onClick={() => {
+														pluginPathConfirm.resolve(true);
+														setPluginPathConfirm(null);
+													}}
+												>
+													{t("ok")}
+												</button>
+											</div>
+										</div>
 									</div>
-								</div>
-							)}
-							{chat.question && (
-								<QuestionDialog
-									question={chat.question}
-									conversationTitle={
-										chat.question.conversationTitle ||
-										chat.conversations.find((c) => c.id === (chat.question?.conversationId || activeConvId))?.title
-									}
+								)}
+								{chat.question && (
+									<QuestionDialog
+										question={chat.question}
+										conversationTitle={
+											chat.question.conversationTitle ||
+											chat.conversations.find((c) => c.id === (chat.question?.conversationId || activeConvId))?.title
+										}
+									/>
+								)}
+								{/* 跨页作答：别处会话的问卷在本页弹框（id 对方会话作用域，提交带 owner）。 */}
+								{chat.remoteQuestion && (
+									<QuestionDialog
+										question={chat.remoteQuestion}
+										owner={chat.remoteQuestion.owner}
+										conversationTitle={
+											chat.remoteQuestion.conversationTitle ||
+											chat.conversations.find((c) => c.id === chat.remoteQuestion?.convId)?.title
+										}
+									/>
+								)}
+								{/* 任务执行看板 (Plan Mode) */}
+								<PlanBoard plan={chat.state?.plan} />
+								<ChatInput
+									composerLeading={uiSlots["composer.leading"]}
+									composerActions={uiSlots["composer.actions"]}
+									onUiAction={onUiAction}
+									streaming={newTaskOpen ? false : (chat.state?.isStreaming ?? false)}
+									messages={newTaskOpen ? EMPTY_MESSAGES : (chat.state?.messages ?? EMPTY_MESSAGES)}
+									newTaskDraft={newTaskOpen}
+									projectCwd={newTaskOpen ? newTaskCwd : cwd}
+									projects={chat.projects}
+									onProjectChange={setNewTaskCwd}
+									slashCommands={chat.slashCommands}
+									modelState={modelState}
+									models={chat.models}
+									modelsLoading={chat.modelsLoading}
+									providerKeys={chat.providerKeys}
+									defaultModel={chat.defaultModel}
+									attachments={attachments}
+									onRemoveAttachment={removeAttachmentCb}
+									onAddImageFiles={addImageFilesCb}
+									onAddLocalFiles={addLocalFilesCb}
+									onAddPathAttachment={addPathAttachmentCb}
+									fileSearch={chat.fileSearch}
+									onSearchFiles={searchFilesCb}
+									onNotice={pushNotice}
+									onManageModels={openManageModels}
+									onSent={() => {
+										clearAttachments();
+										setNewTaskOpen(false);
+									}}
+									quickPhrases={chat.settings?.quickPhrases ?? []}
+									quickPhrasesEnabled={chat.settings?.quickPhrasesEnabled ?? true}
+									recallDrafts={recallDrafts}
+									permCurrent={chat.state?.permission ?? null}
+									permOptions={chat.permissionPresets?.options ?? undefined}
+									permDefault={chat.permissionPresets?.defaultPreset}
+									currentPreset={chat.state?.agentPreset ?? null}
+									agentPresets={chat.agentPresets?.presets ?? undefined}
+									presetDefault={chat.agentPresets?.defaultPreset}
+									presetBlank={(chat.state?.messages?.length ?? 0) === 0}
+									conversationId={chat.activeConversationId || chat.state?.conversationId || ""}
+									sessionDraft={chat.state?.draft ?? null}
+									sessionId={newTaskOpen ? "" : (chat.state?.sessionId ?? "")}
+								/>
+							</div>
+							{pluginsOpen && (
+								<CapabilitiesPanel
+									settings={chat.settings}
+									agentPresets={chat.agentPresets}
+									mcpServers={chat.mcpServers}
+									mcpConfigPath={chat.mcpConfigPath}
+									send={send}
 								/>
 							)}
-							{/* 跨页作答：别处会话的问卷在本页弹框（id 对方会话作用域，提交带 owner）。 */}
-							{chat.remoteQuestion && (
-								<QuestionDialog
-									question={chat.remoteQuestion}
-									owner={chat.remoteQuestion.owner}
-									conversationTitle={
-										chat.remoteQuestion.conversationTitle ||
-										chat.conversations.find((c) => c.id === chat.remoteQuestion?.convId)?.title
-									}
-								/>
-							)}
-							{/* 任务执行看板 (Plan Mode) */}
-							<PlanBoard plan={chat.state?.plan} />
-							<ChatInput
-								composerLeading={uiSlots["composer.leading"]}
-								composerActions={uiSlots["composer.actions"]}
-								onUiAction={onUiAction}
-								streaming={chat.state?.isStreaming ?? false}
-								messages={chat.state?.messages ?? EMPTY_MESSAGES}
-								slashCommands={chat.slashCommands}
-								modelState={modelState}
-								models={chat.models}
-								modelsLoading={chat.modelsLoading}
-								providerKeys={chat.providerKeys}
-								defaultModel={chat.defaultModel}
-								attachments={attachments}
-								onRemoveAttachment={removeAttachmentCb}
-								onAddImageFiles={addImageFilesCb}
-								onAddLocalFiles={addLocalFilesCb}
-								onAddPathAttachment={addPathAttachmentCb}
-								fileSearch={chat.fileSearch}
-								onSearchFiles={searchFilesCb}
-								onNotice={pushNotice}
-								onManageModels={openManageModels}
-								onSent={clearAttachments}
-								quickPhrases={chat.settings?.quickPhrases ?? []}
-								quickPhrasesEnabled={chat.settings?.quickPhrasesEnabled ?? true}
-								recallDrafts={recallDrafts}
-								permCurrent={chat.state?.permission ?? null}
-								permOptions={chat.permissionPresets?.options ?? undefined}
-								permDefault={chat.permissionPresets?.defaultPreset}
-								currentPreset={chat.state?.agentPreset ?? null}
-								agentPresets={chat.agentPresets?.presets ?? undefined}
-								presetDefault={chat.agentPresets?.defaultPreset}
-								presetBlank={(chat.state?.messages?.length ?? 0) === 0}
-								conversationId={chat.activeConversationId || chat.state?.conversationId || ""}
-								sessionDraft={chat.state?.draft ?? null}
-								sessionId={chat.state?.sessionId ?? ""}
-							/>
 						</main>
 						<ResizeHandle side="right" width={rightWidth} onResize={resizeRight} />
 						<div className={`panel-drawer drawer-right${rightCollapsed ? " hidden" : ""}`}>
@@ -1989,7 +2039,6 @@ export function App() {
 					initialSection={settingsInitialSection}
 					sound={sound}
 					onSoundChange={setSound}
-					onSoundPreview={(kind) => playSound(kind, sound)}
 					themes={themes}
 					theme={theme}
 					onThemeChange={switchTheme}
