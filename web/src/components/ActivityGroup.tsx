@@ -40,7 +40,6 @@ interface ActivityGroupProps {
 	toolStatuses: ReadonlyMap<string, ToolStatus>;
 	streaming: boolean;
 	onKillBash?: () => void;
-	toolsWrap?: boolean;
 	toolImages?: boolean;
 	thinkingWrap?: boolean;
 	forceOpen?: boolean;
@@ -58,7 +57,6 @@ export const ActivityGroup = memo(function ActivityGroup({
 	toolStatuses,
 	streaming,
 	onKillBash,
-	toolsWrap,
 	toolImages,
 	thinkingWrap,
 	forceOpen = false,
@@ -143,7 +141,7 @@ export const ActivityGroup = memo(function ActivityGroup({
 								block={tool}
 								view={view}
 								onKillBash={onKillBash}
-								wrap={toolsWrap}
+								wrap={false}
 								showImages={toolImages ?? true}
 								forceOpen={forceOpen}
 								uiContextToolCall={uiContextToolCall}

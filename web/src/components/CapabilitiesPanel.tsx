@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { FiBox, FiCpu, FiServer } from "react-icons/fi";
-import type { ClientMessage, UiAgentPreset, UiMcpServerInfo, UiSettingsState } from "../types";
+import { FiBox, FiCpu, FiPackage, FiServer } from "react-icons/fi";
+import type { ClientMessage, UiAgentPreset, UiMcpServerInfo, UiPluginInfo, UiSettingsState } from "../types";
 import { useT } from "../i18n";
 import { presetShowsSkillCatalog } from "../../../server/tool-manager.js";
 import { SkillsPanel } from "./SkillsPanel";
+import { ExtensionsPanel } from "./ExtensionsPanel";
+import { PluginsPanel } from "./PluginsPanel";
 
 function McpPanel({ servers, configPath }: { servers: UiMcpServerInfo[]; configPath: string }) {
 	const t = useT();
@@ -49,16 +51,26 @@ export function CapabilitiesPanel({
 	agentPresets,
 	mcpServers,
 	mcpConfigPath,
+	plugins,
+	pluginGrants,
+	pluginPermissions,
+	onOpenPluginView,
+	onOpenTools,
 	send,
 }: {
 	settings: UiSettingsState | null;
 	agentPresets: { presets: UiAgentPreset[]; defaultPreset: string } | null;
 	mcpServers: UiMcpServerInfo[];
 	mcpConfigPath: string;
+	plugins: UiPluginInfo[];
+	pluginGrants: { pluginId: string; paths: string[] }[];
+	pluginPermissions: { pluginId: string; family: "net" | "llm"; hosts?: string[]; models?: string[]; session?: boolean; reason?: string }[];
+	onOpenPluginView: (id: string) => void;
+	onOpenTools: () => void;
 	send: (msg: ClientMessage) => boolean;
 }) {
 	const t = useT();
-	const [tab, setTab] = useState<"skills" | "mcp">("skills");
+	const [tab, setTab] = useState<"plugins" | "skills" | "mcp">("skills");
 	useEffect(() => {
 		send({ type: "list_mcp_servers" });
 	}, [send]);
@@ -84,16 +96,37 @@ export function CapabilitiesPanel({
 				<button
 					type="button"
 					role="tab"
+					aria-selected={tab === "plugins"}
+					className={tab === "plugins" ? "active" : ""}
+					onClick={() => setTab("plugins")}
+				>
+					<FiBox /> {t("settingsExtensions")}
+				</button>
+				<button
+					type="button"
+					role="tab"
 					aria-selected={tab === "mcp"}
 					className={tab === "mcp" ? "active" : ""}
 					onClick={() => setTab("mcp")}
 				>
 					<FiServer /> MCP
 				</button>
-				<FiBox className="capabilities-mark" aria-hidden />
 			</div>
 			<div className="capabilities-body" role="tabpanel">
-				{tab === "skills" ? (
+				{tab === "plugins" ? (
+					settings ? (
+						<div className="capabilities-plugin-groups">
+							<section className="capabilities-plugin-group capabilities-extension-group">
+								<h2><FiPackage />{t("extensionPackages")}<span className="set-count">{settings.extensions.length}</span></h2>
+								<ExtensionsPanel settings={settings} send={send} />
+							</section>
+							<section className="capabilities-plugin-group capabilities-ui-group">
+								<h2><FiBox />{t("settingsUiPlugins")}<span className="set-count">{plugins.length}</span></h2>
+								<PluginsPanel plugins={plugins} settings={settings} pluginGrants={pluginGrants} pluginPermissions={pluginPermissions} send={send} onOpenPluginView={onOpenPluginView} onOpenTools={onOpenTools} />
+							</section>
+						</div>
+					) : <div className="capabilities-empty">{t("loadingSession")}</div>
+				) : tab === "skills" ? (
 					settings ? (
 						<SkillsPanel
 							settings={settings}

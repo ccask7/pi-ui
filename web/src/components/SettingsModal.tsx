@@ -126,7 +126,7 @@ interface SettingsTerminalBridge {
 
 interface SettingsModalProps {
 	/** Optional direct entry used by the top-bar plugin menu. */
-	initialSection?: "plugins";
+	initialSection?: "tools";
 	chat: {
 		settings: UiSettingsState | null;
 		plugins: UiPluginInfo[];
@@ -581,8 +581,6 @@ export function SettingsModal({
 		{ id: "appearance", icon: <FiImage />, label: t("settingsAppearance") },
 		{ id: "quick", icon: <FiSend />, label: t("quickPhrases"), count: settings.quickPhrases.length },
 		{ id: "skills", icon: <FiCpu />, label: t("settingsSkills"), count: settings.skills.length },
-		{ id: "extensions", icon: <FiPackage />, label: t("settingsExtensions"), count: settings.extensions.length },
-		{ id: "plugins", icon: <FiBox />, label: t("settingsUiPlugins"), count: chat.plugins.length },
 		{ id: "review", icon: <FiZap />, label: t("settingsReview"), count: settings.reviewSkills.length },
 		{ id: "vision" as const, icon: <FiEye />, label: t("settingsVisionBridge") },
 		{ id: "presets", icon: <FiSliders />, label: t("settingsPresets"), count: settings.presets.length },

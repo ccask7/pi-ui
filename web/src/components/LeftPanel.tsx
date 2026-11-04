@@ -196,6 +196,8 @@ export const LeftPanel = memo(function LeftPanel({
 	/** 已 arm 的 scopeId（强行关闭的第一段确认）：点第二次才真关。每次重新打开菜单都复位
 	 *  （老实现在关闭菜单时复位）——两段确认不能跨菜单生效。 */
 	const forceArmedRef = useRef<string | null>(null);
+	/** 历史会话删除的两段确认：第一次仅改菜单文案，第二次才发送删除。 */
+	const deleteArmedRef = useRef<string | null>(null);
 	/** 菜单要用的 host 分派器（在下面定义）：showSessionMenu 在渲染期就要把它交给菜单，
 	 *  而分派器又要反过来用 showSessionMenu 重开菜单 —— 用一个 ref 打破这个循环。 */
 	const hostActionRef = useRef<(entry: UiSlotEntry, target: ContextMenuRequest["target"]) => void | boolean>(() => {});
@@ -234,6 +236,7 @@ export const LeftPanel = memo(function LeftPanel({
 						? t("dismissFinishedSubagentsScoped", { n: nFinished })
 						: t("dismissFinishedSubagents", { n: nFinished });
 			const armed = Boolean(scopeId) && forceArmedRef.current === scopeId;
+			const deleteArmed = target.kind === "history" && deleteArmedRef.current === target.id;
 			const entries = (uiContextSession ?? []).map((entry) => {
 				// 插件贡献的条目原样透传（点击由 App 分发给插件）。
 				if (entry.source !== "host") return entry;
@@ -241,6 +244,10 @@ export const LeftPanel = memo(function LeftPanel({
 				// （与悬停 ✎ 铅笔同一套内嵌输入框，见 dispatchHostSessionEntry）。
 				if (entry.id === "host:conv-rename")
 					return target.kind === "running" || target.kind === "history" ? entry : { ...entry, hidden: true };
+				if (entry.id === "host:conv-delete")
+					return target.kind === "history"
+						? { ...entry, ...(deleteArmed ? { label: t("deleteSessionConfirm") } : {}) }
+						: { ...entry, hidden: true };
 				// 过户：只在「另一处」行出现（无 owner/convId 的旧条目同样隐藏）。
 				if (entry.id === "host:conv-takeover")
 					return isElsewhere && takeId && target.owner ? entry : { ...entry, hidden: true };
@@ -321,6 +328,18 @@ export const LeftPanel = memo(function LeftPanel({
 				}
 				forceArmedRef.current = null;
 				panelSend({ type: "dismiss_conversation", id: scopeId, force: true });
+				return;
+			}
+			if (entry.id === "host:conv-delete") {
+				const last = sessionMenuRef.current;
+				if (target.kind !== "history" || !target.id || !last) return;
+				if (deleteArmedRef.current !== target.id) {
+					deleteArmedRef.current = target.id;
+					showSessionMenu(last.x, last.y, last.target);
+					return true;
+				}
+				deleteArmedRef.current = null;
+				panelSend({ type: "delete_session", path: target.id });
 				return;
 			}
 			if (entry.id === "host:conv-persist") {
@@ -469,6 +488,7 @@ export const LeftPanel = memo(function LeftPanel({
 			// 行上的处理器要拦冒泡：整个运行对话区（含空白处）也有一个右键处理器。
 			e.stopPropagation();
 			forceArmedRef.current = null;
+			deleteArmedRef.current = null;
 			showSessionMenu(e.clientX, e.clientY, target);
 		},
 		[sessionMenuAvailable, showSessionMenu],
@@ -574,7 +594,6 @@ export const LeftPanel = memo(function LeftPanel({
 			<div
 				className="lp-row lp-tree-session-row"
 				key={s.path}
-				onMouseLeave={() => setConfirmDel((k) => (k === `sess:${s.path}` ? null : k))}
 				onContextMenu={(e) => openSessionMenu(e, { id: s.path, kind: "history", label: displayName(s) })}
 			>
 				<button
@@ -626,9 +645,6 @@ export const LeftPanel = memo(function LeftPanel({
 				>
 					<FiEdit2 />
 				</button>
-				{delButton(`sess:${s.path}`, t("deleteSession"), t("deleteSessionConfirm"), () =>
-					panelSend({ type: "delete_session", path: s.path }),
-				)}
 				{renderLeftSessions()}
 			</div>
 		);

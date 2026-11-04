@@ -326,6 +326,145 @@ body {
 .capabilities-body .skills-panel {
 	margin: 0;
 }
+.capabilities-plugin-group + .capabilities-plugin-group {
+	margin-top: 24px;
+	padding-top: 20px;
+	border-top: 1px solid var(--border-soft);
+}
+.capabilities-plugin-group > h2 {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	margin: 0 0 10px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text);
+}
+.capabilities-plugin-group > h2 svg {
+	color: var(--text-dim);
+}
+.plugin-list-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+.plugin-compact-list {
+	border: 1px solid var(--border-soft);
+	border-radius: 8px;
+	overflow: hidden;
+}
+.plugin-compact-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding-right: 12px;
+	background: var(--bg-elev);
+}
+.plugin-compact-row + .plugin-compact-row {
+	border-top: 1px solid var(--border-soft);
+}
+.plugin-compact-row:hover {
+	background: var(--glow-03);
+}
+.plugin-compact-main {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex: 1;
+	min-width: 0;
+	padding: 11px 12px;
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	cursor: pointer;
+}
+.plugin-compact-copy {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	flex-direction: column;
+	gap: 3px;
+}
+.plugin-compact-copy strong,
+.plugin-compact-copy > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.plugin-compact-copy strong {
+	font-size: 13px;
+	font-weight: 600;
+}
+.plugin-compact-copy > span {
+	color: var(--text-dim);
+	font-size: 12px;
+}
+.plugin-secondary-section {
+	margin-top: 10px;
+	border-top: 1px solid var(--border-soft);
+}
+.plugin-secondary-section > summary {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 12px 2px;
+	color: var(--text-dim);
+	cursor: pointer;
+	list-style: none;
+}
+.plugin-secondary-section > summary::-webkit-details-marker {
+	display: none;
+}
+.plugin-secondary-section > summary::after {
+	content: "›";
+	margin-left: auto;
+	transition: transform 0.15s;
+}
+.plugin-secondary-section[open] > summary::after {
+	transform: rotate(90deg);
+}
+.plugin-secondary-section > .set-note,
+.plugin-secondary-section > .set-empty,
+.plugin-secondary-section > .set-grant-row {
+	margin-bottom: 10px;
+}
+.plugin-detail-modal {
+	width: min(620px, calc(100vw - 40px));
+	max-height: min(760px, calc(100vh - 60px));
+}
+.plugin-detail-body {
+	overflow-y: auto;
+}
+.plugin-detail-meta {
+	display: grid;
+	gap: 8px;
+	margin: 12px 0;
+	padding: 12px;
+	border-radius: 7px;
+	background: var(--bg-elev);
+}
+.plugin-detail-meta > div {
+	display: grid;
+	grid-template-columns: 80px minmax(0, 1fr);
+	gap: 12px;
+	font-size: 12px;
+}
+.plugin-detail-meta > div > :first-child {
+	color: var(--text-dim);
+}
+.plugin-detail-meta code,
+.plugin-detail-meta > div > :last-child {
+	overflow-wrap: anywhere;
+}
+.plugin-detail-settings {
+	margin-top: 14px;
+}
+.plugin-detail-settings h3 {
+	font-size: 13px;
+}
 .capabilities-empty {
 	display: flex;
 	flex-direction: column;
@@ -1579,6 +1718,10 @@ button.session-item.elsewhere-item.confirm {
 /* rename pencil sits left of the trashcan: grey idle, yellow hover */
 .lp-row .lp-del.lp-rename {
 	right: 32px;
+}
+/* 目录会话的删除入口已迁入右键菜单，编辑按钮占回行尾位置。 */
+.lp-tree-session-row .lp-del.lp-rename {
+	right: 8px;
 }
 .lp-row .lp-del.lp-rename:hover {
 	color: var(--amber);
@@ -5806,7 +5949,7 @@ body:not(.has-wallpaper)::after {
 }
 
 /* 同一用户回合只显示一次 PI 消息头。阶段正文仍是独立消息，保留自己的
- * data-msg-id、复制/搜索/导出行为，只用次级颜色和小圆点区别于最终回答。 */
+ * data-msg-id、复制/搜索/导出行为，只用次级颜色和左侧竖线区别于最终回答。 */
 .msg-assistant.msg-turn-continuation {
 	padding-top: 0;
 	padding-bottom: 8px;
@@ -5819,15 +5962,10 @@ body:not(.has-wallpaper)::after {
 	color: var(--text-dim);
 }
 
-.msg-assistant.msg-stage .msg-body::before {
-	content: "";
-	position: absolute;
-	top: 9px;
-	left: 1px;
-	width: 5px;
-	height: 5px;
-	border-radius: 50%;
-	background: var(--text-faint);
+.msg-assistant.msg-stage .msg-body > .msg-text:not(.msg-text ~ .msg-text) {
+	margin-left: -14px;
+	padding-left: 12px;
+	border-left: 2px solid var(--border);
 }
 
 .msg-assistant.msg-stage .msg-text {

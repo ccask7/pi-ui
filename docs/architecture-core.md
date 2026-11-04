@@ -31,7 +31,7 @@
 
 新增/修改任何消息：只改 `protocol.ts`，然后在 `server/index.ts` 的 `dispatch` switch 和 `web/src/use-chat.ts` 的 `onmessage` switch 各加一个分支。注意 protocol.ts 必须保持**纯类型导出**（不能加 const/function 等运行时代码，否则破坏 type-only 前提）；`npm run check:protocol` 守护这两个不变量。
 
-左栏「插件」通过 `App` 的 `pluginsOpen` 在现有对话区内切换技能/MCP 面板，不注册顶栏或右栏条目；对话组件仅隐藏、不卸载。技能 UI 由设置页与该面板共享 `SkillsPanel`。MCP 使用只读 `list_mcp_servers` / `mcp_servers`（协议 v20），仅发送服务器状态与工具说明，不下发环境变量；`mcp.json` 热加载后广播刷新。
+左栏「插件」通过 `App` 的 `pluginsOpen` 在现有对话区内切换扩展包/技能/MCP 面板，不注册顶栏或右栏条目；对话组件仅隐藏、不卸载。原设置页的 pi 扩展包与界面插件统一迁入 `ExtensionsPanel` / `PluginsPanel`，在「插件」页签内按两组展示，后端安装、授权和执行机制不变；技能 UI 由设置页与该面板共享 `SkillsPanel`。MCP 使用只读 `list_mcp_servers` / `mcp_servers`（协议 v20），仅发送服务器状态与工具说明，不下发环境变量；`mcp.json` 热加载后广播刷新。
 
 左栏「新建任务」先进入前端草稿，不立即创建会话或顶部标签；输入卡片外上方显示可编辑的项目选择器，正式会话不显示。首条消息通过 `new_task`（协议 v21）交由服务端依次完成目录切换、空白会话创建与 prompt 投递，失败时不回退到旧会话。
 

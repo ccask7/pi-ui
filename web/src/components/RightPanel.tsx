@@ -1,13 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
-	FiCheck,
 	FiChevronRight,
-	FiClipboard,
-	FiCopy,
-	FiDownload,
 	FiFile,
 	FiFolder,
-	FiLink,
 	FiMaximize2,
 	FiSidebar,
 	FiX,
@@ -1147,33 +1142,9 @@ export const RightPanel = memo(function RightPanel({
 																				<span className="file-name">{e.name}</span>
 																			</button>
 																		)}
-																		<button
-																			type="button"
-																			className="file-attach ref"
-																			data-tip={t("linkFolderTip")}
-																			aria-label={t("linkFolderTip")}
-																			onClick={() => onAttach(e.path, e.name, "reference", true)}
-																		>
-																			<FiLink />
-																		</button>
-																		<button
-																			type="button"
-																			className={`file-attach copy${copiedKey === `name:${e.path}` ? " copied" : ""}`}
-																			data-tip={t("copyName")}
-																			aria-label={t("copyName")}
-																			onClick={() => copyText(e.name, `name:${e.path}`)}
-																		>
-																			{copiedKey === `name:${e.path}` ? <FiCheck /> : <FiCopy />}
-																		</button>
-																		<button
-																			type="button"
-																			className={`file-attach copy${copiedKey === `path:${e.path}` ? " copied" : ""}`}
-																			data-tip={t("copyPath")}
-																			aria-label={t("copyPath")}
-																			onClick={() => copyText(absPathOf(e.path), `path:${e.path}`)}
-																		>
-																			{copiedKey === `path:${e.path}` ? <FiCheck /> : <FiClipboard />}
-																		</button>
+
+
+
 																	</div>
 																) : (
 																	<div
@@ -1200,45 +1171,9 @@ export const RightPanel = memo(function RightPanel({
 																				<span className="file-name-text">{e.name}</span>
 																			</button>
 																		)}
-																		{/* Download: any file, previewable or not (binary/archives
-									too). Fetched as a blob so Safe Browsing can't block the
-									HTTP download and failures show a readable error. */}
-																		<button
-																			type="button"
-																			className="file-attach download"
-																			data-tip={t("downloadFile")}
-																			onClick={() => downloadEntry(e.path, e.name)}
-																		>
-																			<FiDownload />
-																		</button>
-																		<button
-																			type="button"
-																			className="file-attach ref"
-																			data-tip={t("referenceTip")}
-																			aria-label={t("referenceTip")}
-																			onClick={() => onAttach(e.path, e.name, "reference")}
-																		>
-																			<FiLink />
-																		</button>
-																		<button
-																			type="button"
-																			className={`file-attach copy${copiedKey === `name:${e.path}` ? " copied" : ""}`}
-																			data-tip={t("copyName")}
-																			aria-label={t("copyName")}
-																			onClick={() => copyText(e.name, `name:${e.path}`)}
-																		>
-																			{copiedKey === `name:${e.path}` ? <FiCheck /> : <FiCopy />}
-																		</button>
-																		<button
-																			type="button"
-																			className={`file-attach copy${copiedKey === `path:${e.path}` ? " copied" : ""}`}
-																			data-tip={t("copyPath")}
-																			aria-label={t("copyPath")}
-																			onClick={() => copyText(absPathOf(e.path), `path:${e.path}`)}
-																		>
-																			{copiedKey === `path:${e.path}` ? <FiCheck /> : <FiClipboard />}
-																		</button>
-																	</div>
+
+
+																		</div>
 																),
 															)}
 															{files.truncated && (

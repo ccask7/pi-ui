@@ -7,6 +7,8 @@ import { LeftPanel } from "../../web/src/components/LeftPanel.js";
 import { joinProjectPath, isValidProjectName, parentOf, MACHINE_ROOT } from "../../web/src/components/ProjectPicker.js";
 import { LanguageProvider } from "../../web/src/i18n.js";
 import { resetAppGlobals, setAppGlobals } from "../../web/src/app-globals.js";
+import { buildUiSlots } from "../../web/src/ui-slots.js";
+import { getContextMenu, resetContextMenu } from "../../web/src/context-menu-state.js";
 
 let root: Root | null = null;
 
@@ -87,6 +89,7 @@ function mountLeftPanel(overrides: Record<string, unknown> = {}) {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	resetAppGlobals();
+	resetContextMenu();
 	if (root) act(() => root!.unmount());
 	root = null;
 	document.body.innerHTML = "";
@@ -142,6 +145,30 @@ describe("LeftPanel 标题栏操作与项目管理", () => {
 		expect(container.querySelector(".panel-collapse-btn")).toBeNull();
 		act(() => toggle!.click());
 		expect(onToggleCollapse).toHaveBeenCalledOnce();
+	});
+
+	it("会话删除只保留在右键菜单中，并在菜单内二次确认", () => {
+		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
+		const slots = buildUiSlots([], { locale: "zh", t: (key) => key });
+		const { container, sent } = mountLeftPanel({ uiContextSession: slots["contextmenu.session"] });
+		const row = container.querySelector<HTMLElement>(".lp-tree-session-row")!;
+		expect(row.querySelector(":scope > .lp-del:not(.lp-rename)")).toBeNull();
+
+		act(() => row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 })));
+		const menu = getContextMenu()!;
+		const entry = menu.entries.find((item) => item.id === "host:conv-delete")!;
+		expect(entry.hidden).not.toBe(true);
+		let keepOpen: void | boolean = undefined;
+		act(() => {
+			keepOpen = menu.onHostAction?.(entry, menu.target);
+		});
+		expect(keepOpen).toBe(true);
+		expect(sent.some((msg: any) => msg.type === "delete_session")).toBe(false);
+		const confirmation = getContextMenu()!;
+		const confirmEntry = confirmation.entries.find((item) => item.id === "host:conv-delete")!;
+		expect(confirmEntry.label).toBe("确认删除");
+		act(() => confirmation.onHostAction?.(confirmEntry, confirmation.target));
+		expect(sent).toContainEqual({ type: "delete_session", path: "session-1.jsonl" });
 	});
 
 	it("目录默认显示最近 5 个会话，点击查看更多后显示全部", () => {

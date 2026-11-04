@@ -740,6 +740,17 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		context: "session",
 		order: 25,
 	},
+	// 永久删除历史会话：只在历史行显示；第一次点击切换为确认文案，第二次才删除。
+	{
+		id: "host:conv-delete",
+		slot: "contextmenu.session",
+		labelKey: "deleteSession",
+		icon: "trash",
+		kind: "action",
+		context: "session",
+		order: 60,
+	},
+
 	// ---- 对话引用（issue：让 AI 看别的对话）----
 	// 复制对话 id：运行中对话行才有（历史行是文件 path，没有 conversation id）。
 	{

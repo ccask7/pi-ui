@@ -635,7 +635,7 @@ export function App() {
 	const [manageModelsOpen, setManageModelsOpen] = useState(false);
 	// Settings panel (system prompt / skills / extensions / presets).
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const [settingsInitialSection, setSettingsInitialSection] = useState<"plugins" | undefined>();
+	const [settingsInitialSection, setSettingsInitialSection] = useState<"tools" | undefined>();
 	// 插件请求目录授权时的确认（host.openSession，issue #146）——非模态 inline 面板。
 	const [pluginPathConfirm, setPluginPathConfirm] = useState<{ path: string; resolve: (ok: boolean) => void } | null>(
 		null,
@@ -733,6 +733,7 @@ export function App() {
 					command: def,
 				});
 			}
+			setPluginsOpen(false);
 			setView("terminal");
 		};
 		window.addEventListener("ccui:plugin-run-command", onPluginRunCommand);
@@ -1913,6 +1914,17 @@ export function App() {
 									agentPresets={chat.agentPresets}
 									mcpServers={chat.mcpServers}
 									mcpConfigPath={chat.mcpConfigPath}
+									plugins={chat.plugins}
+									pluginGrants={chat.pluginGrants}
+									pluginPermissions={chat.pluginPermissions}
+									onOpenPluginView={(id) => {
+										setPluginsOpen(false);
+										setView(`plugin:${id}`);
+									}}
+									onOpenTools={() => {
+										setSettingsInitialSection("tools");
+										setSettingsOpen(true);
+									}}
 									send={send}
 								/>
 							)}

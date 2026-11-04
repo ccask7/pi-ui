@@ -40,6 +40,20 @@ function hasVisibleContent(message: UiMessage): boolean {
 	return hasText(message) || !!message.errorMessage || message.content.some(isActivity);
 }
 
+/** 历史折叠只按用户回合计数，避免大量工具结果让短对话过早折叠。 */
+export function findRecentTurnStart(
+	messages: readonly UiMessage[],
+	collapseMinTurns: number,
+	keepRecentTurns: number,
+): number {
+	const userIndexes: number[] = [];
+	for (let i = 0; i < messages.length; i++) {
+		if (messages[i].role === "user") userIndexes.push(i);
+	}
+	if (userIndexes.length <= collapseMinTurns) return 0;
+	return userIndexes[Math.max(0, userIndexes.length - keepRecentTurns)] ?? 0;
+}
+
 /** 将协议上的多条 assistant 消息归并成 UI 上的一个用户回合。
  * 工具结果和附件等穿插消息不会切断回合；只有下一条用户消息会开启新回合。 */
 export function collectTurnActivities(

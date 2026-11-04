@@ -675,7 +675,6 @@ export const Message = memo(function Message({
 						toolStatuses={toolStatuses}
 						streaming={turnActivity?.streaming ?? (streaming && isLast)}
 						onKillBash={onKillBash}
-						toolsWrap={toolsWrap}
 						toolImages={toolImages}
 						thinkingWrap={thinkingWrap}
 						forceOpen={searchActive || exportForceThinking || exportForceTools}

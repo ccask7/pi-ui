@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UiMessage } from "../../web/src/types.js";
-import { collectTurnActivities } from "../../web/src/activity-turns.js";
+import { collectTurnActivities, findRecentTurnStart } from "../../web/src/activity-turns.js";
 
 function message(id: string, role: string, content: UiMessage["content"], timestamp = 1000): UiMessage {
 	return { id, role, content, timestamp };
@@ -76,6 +76,22 @@ describe("按用户回合聚合工作记录", () => {
 		expect(turn?.headerId).toBe("a1");
 		expect(turn?.finalTextId).toBe("a3");
 		expect(turn?.summary.content[0]).toEqual({ type: "text", text: "修复完成" });
+	});
+
+	it("历史折叠只按用户回合计数，不受工具结果数量影响", () => {
+		const messages: UiMessage[] = [];
+		for (let turn = 0; turn < 20; turn++) {
+			messages.push(message(`u${turn}`, "user", [{ type: "text", text: `问题 ${turn}` }]));
+			messages.push(message(`a${turn}`, "assistant", [{ type: "text", text: `回答 ${turn}` }]));
+			for (let result = 0; result < 5; result++) {
+				messages.push(message(`r${turn}-${result}`, "toolResult", [{ type: "text", text: "结果" }]));
+			}
+		}
+		expect(messages.length).toBe(140);
+		expect(findRecentTurnStart(messages, 20, 10)).toBe(0);
+		messages.push(message("u20", "user", [{ type: "text", text: "第 21 问" }]));
+		expect(findRecentTurnStart(messages, 20, 10)).toBe(77);
+		expect(messages[77].id).toBe("u11");
 	});
 
 	it("没有过程块的消息不创建工作记录", () => {

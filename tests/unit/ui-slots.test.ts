@@ -134,7 +134,7 @@ describe("BUILTIN_UI_ITEMS（宿主默认）", () => {
 			expect.arrayContaining(["host:ctx", "host:cost", "host:cache", "host:msg-count", "host:cwd"]),
 		);
 		expect(bySlot("bottombar")).not.toContain("host:host-metrics");
-		expect(bySlot("contextmenu.session").length).toBeGreaterThan(0);
+		expect(bySlot("contextmenu.session")).toContain("host:conv-delete");
 		expect(bySlot("contextmenu.file").length).toBeGreaterThan(0);
 		// 消息区今天没有右键菜单 → 一条都不登记（宁缺勿造）；设置页是插件专属。
 		expect(bySlot("contextmenu.message")).toEqual([]);

@@ -29,19 +29,17 @@ import { renderSlotToolbar } from "../slot-toolbar";
 import { useT } from "../i18n";
 import { isExportableMessage, setExportMessageCatalog, useExportImage } from "../export-image-state";
 import { SaveImageDialog } from "./SaveImageDialog";
-import { collectTurnActivities } from "../activity-turns";
+import { collectTurnActivities, findRecentTurnStart } from "../activity-turns";
 
 /** Stable shared empty map — passing this (instead of a fresh Map) lets
  *  React.memo skip messages that have no live tool output to show. */
 const EMPTY_LIVE = new Map<string, { toolName: string; text: string }>();
 
-/**
- * Messages beyond the most recent KEEP_RECENT are rendered as cheap collapsed
- * summary rows (no Markdown / thinking / tool output) until clicked. Only kicks
- * in once the chat grows past COLLAPSE_MIN, so short conversations are untouched.
- */
-const KEEP_RECENT = 15;
-const COLLAPSE_MIN = 30;
+/** 超过 20 个用户回合后，最近 10 个完整回合之前的消息渲染为轻量摘要。
+ * 惰性窗口化仍沿用协议消息阈值，与历史折叠策略相互独立。 */
+const KEEP_RECENT_TURNS = 10;
+const COLLAPSE_MIN_TURNS = 20;
+const VIRTUAL_MIN_MESSAGES = 30;
 /** Grace window after a programmatic scroll during which onScroll ignores
  *  negative scrollTop jumps from our own snap() re-asserts.
  *
@@ -260,9 +258,8 @@ export function MessageList({
 	// system 消息不进渲染(见 serialize.ts)：去掉后再取末尾，否则空 SYSTEM 占住 isLast。
 	const lastVisible = [...messages].reverse().find((m) => m.role !== "system");
 	const lastId = lastVisible ? lastVisible.id : null;
-	// Only the last KEEP_RECENT persisted messages are fully rendered; older
-	// ones collapse to summary rows (unless the user expanded them).
-	const recentStart = state.messages.length > COLLAPSE_MIN ? Math.max(0, state.messages.length - KEEP_RECENT) : 0;
+	// 只按用户回合计算历史折叠；工具调用和结果不会改变保留的回合数量。
+	const recentStart = findRecentTurnStart(state.messages, COLLAPSE_MIN_TURNS, KEEP_RECENT_TURNS);
 	/** 最近回合可能始于折叠分界线之前：整回合保持展开，避免阶段说明或唯一工作记录被旧消息摘要吞掉。 */
 	const visibleTurnMessageIds = useMemo(() => {
 		const ids = new Set<string>();
@@ -315,7 +312,7 @@ export function MessageList({
 	const hiddenRef = useRef(hidden);
 	hiddenRef.current = hidden;
 	/** 短会话与搜索打开期间不做窗口化（全量渲染，行为与旧版一致）。 */
-	const virtualOn = state.messages.length > COLLAPSE_MIN && !searchOpen;
+	const virtualOn = state.messages.length > VIRTUAL_MIN_MESSAGES && !searchOpen;
 	const virtualOnRef = useRef(virtualOn);
 	virtualOnRef.current = virtualOn;
 	// 底部常驻区（永不占位）：随每次渲染按预算重算（读取最新实测高度），
