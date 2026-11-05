@@ -1587,6 +1587,31 @@ function extractAssistantTextFromContent(content: unknown): string {
 }
 
 export { workspacePath };
+
+/** serialize.ts 里带 `<prefix>-<ts>-<seq>` 后序号的角色（toolResult 用 toolCallId、
+ *  system 不渲染）。这些角色各自按「角色 + 时间戳」做 1-based 计数，
+ *  resolveMessageEntry() 按同一规则把 id 还原回会话节点——两边必须一致。 */
+const UID_SEQ_ROLES = new Set(["user", "assistant", "bashExecution", "custom", "branchSummary", "compactionSummary"]);
+
+/** 上面这些角色的 id 前缀（与 server/serialize.ts 的 serializeMessage 对应）。 */
+function uidPrefixOf(role: string): string | null {
+	switch (role) {
+		case "user":
+			return "u";
+		case "assistant":
+			return "a";
+		case "bashExecution":
+			return "b";
+		case "custom":
+			return "c";
+		case "branchSummary":
+			return "bs";
+		case "compactionSummary":
+			return "cs";
+		default:
+			return null;
+	}
+}
 // ---------------------------------------------------------------------------
 // Per-client persisted UI state (<dataDir>/client-state.json)
 // ---------------------------------------------------------------------------
@@ -1686,8 +1711,9 @@ export interface Conversation {
 	// these must never be shared across conversations.
 	msgIds: Map<string, number>;
 	nextMsgId: number;
-	/** Per-timestamp 1-based user-message seq (drives the `u-<ts>-<seq>` id suffix). */
-	userSeqByTs: Map<number, number>;
+	/** `role:timestamp` → 1-based seq（驱动 `u-/a-/b-/c-/bs-/cs-<ts>-<seq>` 的后序号）。
+	 *  每个带 id 后序号的角色各自独立计数，见 UID_SEQ_ROLES。 */
+	idSeqByRoleTs: Map<string, number>;
 	uiMessageCache: Map<string, UiMessage>;
 	lastMessagesSig: string;
 	lastMessagesArray: UiMessage[];
@@ -3903,7 +3929,7 @@ export class ClientSession {
 			terminals,
 			msgIds: new Map(),
 			nextMsgId: 1,
-			userSeqByTs: new Map(),
+			idSeqByRoleTs: new Map(),
 			uiMessageCache: new Map(),
 			lastMessagesSig: "",
 			lastMessagesArray: [],
@@ -5038,16 +5064,14 @@ export class ClientSession {
 		const k = key ?? this.uiMessageKey(conv, m);
 		const cached = conv.uiMessageCache.get(k.cacheKey);
 		if (cached) return cached;
-		// User-message id suffix is a 1-based count of user messages sharing
-		// this timestamp (that's what resolveUserMessageEntryId() expects). n is
-		// a global per-conversation counter across ALL roles, so it can't be
-		// reused as the seq — otherwise editing anything but the first question
-		// fails to resolve ("找不到要编辑的消息").
+		// `<prefix>-<ts>-<seq>` 的 seq 是「角色 + 时间戳」的 1-based 计数，
+		// resolveMessageEntry() 按同一规则还原。n 是跨角色的全局缓存序号，拿它当
+		// 后序号（旧实现）会让消息反查不到会话节点（派生分支/回滚失败）。
 		let seq = k.n;
-		if (m.role === "user") {
-			const ts = m.timestamp ?? 0;
-			seq = (conv.userSeqByTs.get(ts) ?? 0) + 1;
-			conv.userSeqByTs.set(ts, seq);
+		if (UID_SEQ_ROLES.has(m.role)) {
+			const counterKey = `${m.role}:${m.timestamp ?? 0}`;
+			seq = (conv.idSeqByRoleTs.get(counterKey) ?? 0) + 1;
+			conv.idSeqByRoleTs.set(counterKey, seq);
 		}
 		const msg = serializeMessage(m, seq);
 		// 上界在 messagesOf 的 pruneMessageCache 里按 live 集合处理：见那里的注释
@@ -9162,6 +9186,25 @@ export class ClientSession {
 			});
 			return;
 		}
+		// 压缩中与运行中同等对待：removeConversation 会 dispose 运行时而 abort 压缩
+		// （见 shouldRetainActive 的 compacting 注释）。自动压缩紧跟在 agent_end 之后，
+		// 此时 isStreaming 已是 false，必须单独看 isCompacting。
+		const selfCompacting = (() => {
+			try {
+				return conv.session.isCompacting;
+			} catch {
+				return true;
+			}
+		})();
+		if (selfCompacting) {
+			this.emit({
+				type: "notice",
+				level: "warning",
+				text: `对话「${conv.title}」正在压缩上下文，请稍后再移出`,
+				textEn: `Conversation "${conv.title}" is compacting its context — wait for it to finish before removing`,
+			});
+			return;
+		}
 		// issue #181：只看用户终端——AI bash（agentBash）是 agent 的内部执行记录，
 		// 随对话一起释放（removeConversation 里 killAll），不得阻断移出；否则残留的
 		// ai-bash-98/99 会把会话永久钉在列表里。用户亲手开且用过的终端仍拦截。
@@ -9182,8 +9225,10 @@ export class ClientSession {
 				wizardRunning: conv.wizardRunning,
 				streaming: false,
 				openTerminals: 0,
-				listed: conv.listed,
-				promptedSinceActive: conv.promptedSinceActive,
+				// listed / promptedSinceActive 只用于切走时自动保留标签；用户显式点 ✕
+				// 就是要求移出，不能把“本次发送过消息”误报成后台任务/审查。
+				listed: false,
+				promptedSinceActive: false,
 				hasActiveSubagentRun: () => hasActiveSubagentRun({ sessionId: conv.session.sessionFile }),
 				hasPendingWake: () => hasPendingWaitSubscription({ sessionId: conv.session.sessionFile }),
 			})
@@ -9639,46 +9684,54 @@ export class ClientSession {
 	}
 
 	/**
-	 * Map any rendered message id (u-*, a-*, t-*, b-*, c-*, or raw entry id)
-	 * back to its append-only session entry in the given conversation.
+	 * Map any rendered message id (u-*, a-*, t-*, b-*, c-*, bs-*, cs-*, or raw
+	 * entry id) back to its append-only session entry in the given conversation.
+	 *
+	 * 带后序号的 id 一律按「角色 + 时间戳」重新计数还原 —— 与 serializeCachedFor()
+	 * 的计数规则一致。绝不能拿条目下标（旧实现的 globalSeq）：路径里的
+	 * thinking_level_change / model_change 等条目不是消息，偏移会让 id 永久对不上。
 	 */
 	private resolveMessageEntry(
 		conv: Conversation,
 		messageId: string,
 	): import("@earendil-works/pi-coding-agent").SessionEntry | null {
-		const userSeqByTs = new Map<number, number>();
-		const assistantSeqByTs = new Map<number, number>();
-		let globalSeq = 0;
+		const seqByRoleTs = new Map<string, number>();
+		const nextSeq = (role: string, ts: number): number => {
+			const key = `${role}:${ts}`;
+			const seq = (seqByRoleTs.get(key) ?? 0) + 1;
+			seqByRoleTs.set(key, seq);
+			return seq;
+		};
+		/** 条目时间戳可能是 ISO 字符串（custom_message / branch_summary / compaction），
+		 *  与 SDK 合成的消息 timestamp（`new Date(...).getTime()`）对齐。 */
+		const tsOf = (value: unknown): number =>
+			typeof value === "number" ? value : value ? new Date(String(value)).getTime() : 0;
 
 		const entries = conv.session.sessionManager.buildContextEntries();
 		for (const entry of entries) {
-			globalSeq += 1;
 			if (entry.id === messageId) return entry;
+			let uiId = "";
 			if (entry.type === "message") {
 				const m = (entry as unknown as { message?: AgentMessage }).message;
 				if (!m) continue;
-				let uiId = "";
-				if (m.role === "user") {
+				const prefix = uidPrefixOf(m.role);
+				if (prefix) {
 					const ts = m.timestamp ?? 0;
-					const seq = (userSeqByTs.get(ts) ?? 0) + 1;
-					userSeqByTs.set(ts, seq);
-					uiId = `u-${ts}-${seq}`;
-				} else if (m.role === "assistant") {
-					const ts = m.timestamp ?? 0;
-					const seq = (assistantSeqByTs.get(ts) ?? 0) + 1;
-					assistantSeqByTs.set(ts, seq);
-					uiId = `a-${ts}-${seq}`;
+					uiId = `${prefix}-${ts}-${nextSeq(m.role, ts)}`;
 				} else if (m.role === "toolResult") {
 					uiId = `t-${m.toolCallId}`;
-				} else if (m.role === "bashExecution") {
-					uiId = `b-${m.timestamp}-${globalSeq}`;
 				}
-				if (uiId === messageId) return entry;
 			} else if (entry.type === "custom_message") {
-				const ts = entry.timestamp ? new Date(entry.timestamp).getTime() : 0;
-				const uiId = `c-${ts}-${globalSeq}`;
-				if (uiId === messageId) return entry;
+				const ts = tsOf(entry.timestamp);
+				uiId = `c-${ts}-${nextSeq("custom", ts)}`;
+			} else if (entry.type === "branch_summary") {
+				const ts = tsOf(entry.timestamp);
+				uiId = `bs-${ts}-${nextSeq("branchSummary", ts)}`;
+			} else if (entry.type === "compaction") {
+				const ts = tsOf(entry.timestamp);
+				uiId = `cs-${ts}-${nextSeq("compactionSummary", ts)}`;
 			}
+			if (uiId === messageId) return entry;
 		}
 		// 兜底：getEntry 查整棵树
 		return conv.session.sessionManager.getEntry(messageId) ?? null;
@@ -9854,7 +9907,7 @@ export class ClientSession {
 			// 清理该会话的 UI 消息缓存和序列化映射
 			targetConv.uiMessageCache.clear();
 			targetConv.msgIds.clear();
-			targetConv.userSeqByTs.clear();
+			targetConv.idSeqByRoleTs.clear();
 			targetConv.nextMsgId = 1;
 			targetConv.lastMessagesSig = "";
 			targetConv.lastMessagesArray = [];

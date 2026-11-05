@@ -64,7 +64,14 @@ export function CapabilitiesPanel({
 	mcpConfigPath: string;
 	plugins: UiPluginInfo[];
 	pluginGrants: { pluginId: string; paths: string[] }[];
-	pluginPermissions: { pluginId: string; family: "net" | "llm"; hosts?: string[]; models?: string[]; session?: boolean; reason?: string }[];
+	pluginPermissions: {
+		pluginId: string;
+		family: "net" | "llm";
+		hosts?: string[];
+		models?: string[];
+		session?: boolean;
+		reason?: string;
+	}[];
 	onOpenPluginView: (id: string) => void;
 	onOpenTools: () => void;
 	send: (msg: ClientMessage) => boolean;
@@ -117,15 +124,33 @@ export function CapabilitiesPanel({
 					settings ? (
 						<div className="capabilities-plugin-groups">
 							<section className="capabilities-plugin-group capabilities-extension-group">
-								<h2><FiPackage />{t("extensionPackages")}<span className="set-count">{settings.extensions.length}</span></h2>
+								<h2>
+									<FiPackage />
+									{t("extensionPackages")}
+									<span className="set-count">{settings.extensions.length}</span>
+								</h2>
 								<ExtensionsPanel settings={settings} send={send} />
 							</section>
 							<section className="capabilities-plugin-group capabilities-ui-group">
-								<h2><FiBox />{t("settingsUiPlugins")}<span className="set-count">{plugins.length}</span></h2>
-								<PluginsPanel plugins={plugins} settings={settings} pluginGrants={pluginGrants} pluginPermissions={pluginPermissions} send={send} onOpenPluginView={onOpenPluginView} onOpenTools={onOpenTools} />
+								<h2>
+									<FiBox />
+									{t("settingsUiPlugins")}
+									<span className="set-count">{plugins.length}</span>
+								</h2>
+								<PluginsPanel
+									plugins={plugins}
+									settings={settings}
+									pluginGrants={pluginGrants}
+									pluginPermissions={pluginPermissions}
+									send={send}
+									onOpenPluginView={onOpenPluginView}
+									onOpenTools={onOpenTools}
+								/>
 							</section>
 						</div>
-					) : <div className="capabilities-empty">{t("loadingSession")}</div>
+					) : (
+						<div className="capabilities-empty">{t("loadingSession")}</div>
+					)
 				) : tab === "skills" ? (
 					settings ? (
 						<SkillsPanel

@@ -1,12 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import {
-	FiChevronRight,
-	FiFile,
-	FiFolder,
-	FiMaximize2,
-	FiSidebar,
-	FiX,
-} from "react-icons/fi";
+import { FiChevronRight, FiFile, FiFolder, FiMaximize2, FiSidebar, FiX } from "react-icons/fi";
 import type { ClientMessage, FileListing, UiPluginInfo } from "../types";
 import { useT } from "../i18n";
 import { useAppField } from "../app-globals";
@@ -216,22 +209,7 @@ export const RightPanel = memo(function RightPanel({
 		if (el) el.scrollTop = bodyScrollRef.current;
 	}, []);
 
-	// ---- 复制名称 / 复制路径（hover 显示，点后 ✓ 1.2s 回显） ----
-	const [copiedKey, setCopiedKey] = useState<string | null>(null);
-	const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-	useEffect(() => {
-		// 卸载时清掉回显 timer，避免 setState 落到已卸载组件。
-		return () => {
-			if (copyTimer.current) clearTimeout(copyTimer.current);
-		};
-	}, []);
-
-	const markCopied = useCallback((key: string) => {
-		setCopiedKey(key);
-		if (copyTimer.current) clearTimeout(copyTimer.current);
-		copyTimer.current = setTimeout(() => setCopiedKey(null), 1200);
-	}, []);
-
+	// ---- 复制名称 / 复制路径 ----
 	/** 非安全上下文（http）下 navigator.clipboard 可能缺失，走 textarea 兜底。 */
 	const fallbackCopy = (text: string): boolean => {
 		try {
@@ -250,20 +228,17 @@ export const RightPanel = memo(function RightPanel({
 	};
 
 	const copyText = useCallback(
-		(text: string, key: string) => {
+		(text: string) => {
 			if (!text) return;
-			const done = () => markCopied(key);
 			const fail = () => onNotice("error", t("slashCopyFailed"));
 			const nav = navigator as Navigator & { clipboard?: Clipboard };
 			if (nav.clipboard?.writeText) {
-				void nav.clipboard.writeText(text).then(done, () => {
-					if (fallbackCopy(text)) done();
-					else fail();
+				void nav.clipboard.writeText(text).catch(() => {
+					if (!fallbackCopy(text)) fail();
 				});
-			} else if (fallbackCopy(text)) done();
-			else fail();
+			} else if (!fallbackCopy(text)) fail();
 		},
-		[markCopied, onNotice, t],
+		[onNotice, t],
 	);
 
 	/** 复制用的绝对路径：机器浏览已是绝对路径直接用；工作区相对路径拼上 cwd。 */
@@ -585,13 +560,13 @@ export const RightPanel = memo(function RightPanel({
 					markClipboard(false);
 					break;
 				case "host:file-copy-name":
-					if (tg && tg.kind !== "list") copyText(tg.label, `name:${tg.id}`);
+					if (tg && tg.kind !== "list") copyText(tg.label);
 					break;
 				case "host:file-copy-path":
-					if (tg && tg.kind !== "list") copyText(absPathOf(tg.id), `path:${tg.id}`);
+					if (tg && tg.kind !== "list") copyText(absPathOf(tg.id));
 					break;
 				case "host:file-copy-rel":
-					if (tg && tg.kind !== "list") copyText(tg.id, `rel:${tg.id}`);
+					if (tg && tg.kind !== "list") copyText(tg.id);
 					break;
 				case "host:file-refresh":
 					refreshList();
@@ -1142,9 +1117,6 @@ export const RightPanel = memo(function RightPanel({
 																				<span className="file-name">{e.name}</span>
 																			</button>
 																		)}
-
-
-
 																	</div>
 																) : (
 																	<div
@@ -1171,9 +1143,7 @@ export const RightPanel = memo(function RightPanel({
 																				<span className="file-name-text">{e.name}</span>
 																			</button>
 																		)}
-
-
-																		</div>
+																	</div>
 																),
 															)}
 															{files.truncated && (

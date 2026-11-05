@@ -47,7 +47,15 @@ function mount() {
 					agentPresets: null,
 					mcpServers: servers,
 					mcpConfigPath: "/tmp/mcp.json",
-					plugins: [{ id: "demo-ui", name: "Demo UI Plugin", description: "A short plugin summary", view: true, agentTools: [] }] as never,
+					plugins: [
+						{
+							id: "demo-ui",
+							name: "Demo UI Plugin",
+							description: "A short plugin summary",
+							view: true,
+							agentTools: [],
+						},
+					] as never,
 					pluginGrants: [],
 					pluginPermissions: [],
 					onOpenPluginView: vi.fn(),

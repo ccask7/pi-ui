@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ClientSession } from "../../server/agent-service.js";
 
-function makeConversation(messageCount: number) {
+function makeConversation(messageCount: number, opts: { compacting?: boolean } = {}) {
 	return {
 		id: "conv-1",
 		title: "新对话",
@@ -14,10 +14,10 @@ function makeConversation(messageCount: number) {
 		session: {
 			sessionFile: null,
 			isStreaming: false,
-			isCompacting: false,
+			isCompacting: opts.compacting ?? false,
 			getSessionStats: () => ({ totalMessages: messageCount }),
 		},
-		terminals: { countBlockingLive: () => 0 },
+		terminals: { countBlockingLive: () => 0, countUserBlockingLive: () => 0 },
 	};
 }
 
@@ -56,6 +56,24 @@ async function switchConversation(
 	await Reflect.apply(ClientSession.prototype["switchConversation"], context, [target.id]);
 }
 
+async function dismissConversation(conversation: ReturnType<typeof makeConversation>) {
+	const notices: string[] = [];
+	const context = {
+		convs: new Map([[conversation.id, conversation]]),
+		activeId: "another-conversation",
+		shownInRunningList: () => true,
+		isDismissableFinishedSubagent: () => false,
+		removeConversation: vi.fn(),
+		emit: (event: { text?: string }) => {
+			if (event.text) notices.push(event.text);
+		},
+		emitConversations: () => {},
+		flushSnapshot: () => {},
+	};
+	await Reflect.apply(ClientSession.prototype["dismissConversation"], context, [conversation.id]);
+	return { notices, removeConversation: context.removeConversation };
+}
+
 describe("会话标签切换保留", () => {
 	it("只打开历史但本次没有新发言，切走后自动关闭", () => {
 		const conversation = makeConversation(2);
@@ -75,6 +93,29 @@ describe("会话标签切换保留", () => {
 		await switchConversation(active, used);
 		expect(used.promptedSinceActive).toBe(true);
 		expect(displace(used)).toBeNull();
+	});
+
+	it("发送过消息不阻止用户显式关闭标签", async () => {
+		const conversation = {
+			...makeConversation(2),
+			listed: true,
+			promptedSinceActive: true,
+		};
+		const result = await dismissConversation(conversation);
+		expect(result.notices).toEqual([]);
+		expect(result.removeConversation).toHaveBeenCalledWith(conversation.id);
+	});
+
+	it("压缩上下文进行中时不允许移出（dispose 会 abort 压缩）", async () => {
+		const conversation = {
+			...makeConversation(2, { compacting: true }),
+			listed: true,
+			promptedSinceActive: true,
+		};
+		const result = await dismissConversation(conversation);
+		expect(result.notices).toHaveLength(1);
+		expect(result.notices[0]).toContain("压缩");
+		expect(result.removeConversation).not.toHaveBeenCalled();
 	});
 
 	it("空白新会话仍可自动清理，避免堆出空标签", () => {
