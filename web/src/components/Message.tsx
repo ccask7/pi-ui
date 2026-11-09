@@ -677,6 +677,7 @@ export const Message = memo(function Message({
 						onKillBash={onKillBash}
 						toolImages={toolImages}
 						thinkingWrap={thinkingWrap}
+						toolsWrap={toolsWrap}
 						forceOpen={searchActive || exportForceThinking || exportForceTools}
 						uiContextToolCall={uiContextToolCall}
 						onUiAction={onUiAction}

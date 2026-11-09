@@ -43,14 +43,25 @@ describe("normalizeWallpaperSettings", () => {
 		expect(normalizeWallpaperSettings("x")).toEqual(DEFAULT_WALLPAPER_SETTINGS);
 	});
 
-	it("合法值保留（dim/blur 取整 + 钳制）", () => {
-		expect(normalizeWallpaperSettings({ url: "https://e.com/a.png", dim: 50, blur: 4 })).toEqual({
+	it("合法值保留（dim/blur/panelOpacity 取整 + 钳制）", () => {
+		expect(normalizeWallpaperSettings({ url: "https://e.com/a.png", dim: 50, blur: 4, panelOpacity: 35 })).toEqual({
 			url: "https://e.com/a.png",
 			dim: 50,
 			blur: 4,
+			panelOpacity: 35,
 		});
-		expect(normalizeWallpaperSettings({ url: "", dim: 99, blur: -3 })).toEqual({ url: "", dim: 95, blur: 0 });
-		expect(normalizeWallpaperSettings({ url: "", dim: 12.6, blur: 2.4 })).toEqual({ url: "", dim: 13, blur: 2 });
+		expect(normalizeWallpaperSettings({ url: "", dim: 99, blur: -3, panelOpacity: 120 })).toEqual({
+			url: "",
+			dim: 95,
+			blur: 0,
+			panelOpacity: 100,
+		});
+		expect(normalizeWallpaperSettings({ url: "", dim: 12.6, blur: 2.4, panelOpacity: 61.6 })).toEqual({
+			url: "",
+			dim: 13,
+			blur: 2,
+			panelOpacity: 62,
+		});
 	});
 
 	it("坏地址按空处理、坏数字回退默认", () => {
@@ -58,11 +69,13 @@ describe("normalizeWallpaperSettings", () => {
 			url: "",
 			dim: 10,
 			blur: 0,
+			panelOpacity: 62,
 		});
-		expect(normalizeWallpaperSettings({ url: "", dim: "high", blur: NaN })).toEqual({
+		expect(normalizeWallpaperSettings({ url: "", dim: "high", blur: NaN, panelOpacity: "clear" })).toEqual({
 			...DEFAULT_WALLPAPER_SETTINGS,
 		});
 		expect(normalizeWallpaperSettings({})).toEqual(DEFAULT_WALLPAPER_SETTINGS);
+		expect(DEFAULT_WALLPAPER_SETTINGS.panelOpacity).toBe(62);
 	});
 });
 

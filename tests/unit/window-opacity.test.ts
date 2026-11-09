@@ -56,11 +56,12 @@ describe("内置 VS Code 主题的整体不透明度", () => {
 	];
 
 	for (const id of ["vs-code-dark", "vs-code-light"]) {
-		it(`${id} 的大面积背景跟随 --window-opacity`, () => {
+		it(`${id} 的大面积背景叠加窗口透明度与界面底板不透明度`, () => {
 			const css = readFileSync(new URL(`../../themes/${id}.css`, import.meta.url), "utf8");
 			for (const token of surfaces) {
 				const declaration = css.match(new RegExp(`${token}:\\s*([^;]+);`))?.[1];
 				expect(declaration, token).toContain("var(--window-opacity, 100%)");
+				expect(declaration, token).toContain("var(--wallpaper-panel-alpha, 62%)");
 			}
 		});
 	}

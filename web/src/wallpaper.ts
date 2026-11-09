@@ -22,9 +22,11 @@ export interface WallpaperSettings {
 	dim: number;
 	/** 模糊半径 0–24（px）。 */
 	blur: number;
+	/** 前景 UI 底板不透明度 0–100；不改变背景图、压暗或模糊。 */
+	panelOpacity: number;
 }
 
-export const DEFAULT_WALLPAPER_SETTINGS: WallpaperSettings = { url: "", dim: 78, blur: 0 };
+export const DEFAULT_WALLPAPER_SETTINGS: WallpaperSettings = { url: "", dim: 78, blur: 0, panelOpacity: 62 };
 
 const MAX_HTTP_URL_LENGTH = 2000;
 /** data: 图存 localStorage：图片管线按 2MB 二进制封顶，base64 后约 2.7M 字符。 */
@@ -58,6 +60,7 @@ export function normalizeWallpaperSettings(raw: unknown): WallpaperSettings {
 		url: sanitizeWallpaperUrl(o.url),
 		dim: clampInt(o.dim, 0, 95, DEFAULT_WALLPAPER_SETTINGS.dim),
 		blur: clampInt(o.blur, 0, 24, DEFAULT_WALLPAPER_SETTINGS.blur),
+		panelOpacity: clampInt(o.panelOpacity, 0, 100, DEFAULT_WALLPAPER_SETTINGS.panelOpacity),
 	};
 }
 
@@ -101,6 +104,7 @@ export async function fileToWallpaperUrl(file: File): Promise<string | null> {
 export function applyWallpaper(): void {
 	const s = cached ?? loadWallpaperSettings();
 	const root = document.documentElement;
+	root.style.setProperty("--wallpaper-panel-alpha", `${s.panelOpacity}%`);
 	if (s.url) {
 		root.style.setProperty("--bg-image", `url("${cssEscapeUrl(s.url)}")`);
 		root.style.setProperty("--bg-image-dim", String(s.dim / 100));

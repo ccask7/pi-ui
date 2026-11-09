@@ -1626,14 +1626,14 @@ export function SettingsModal({
 								<ToggleRow
 									title={t("thinkingWrap")}
 									tip={t("thinkingWrapDesc")}
-									enabled={settings.thinkingWrap ?? true}
-									onToggle={() => setPartial({ thinkingWrap: !(settings.thinkingWrap ?? true) })}
+									enabled={settings.thinkingWrap ?? false}
+									onToggle={() => setPartial({ thinkingWrap: !(settings.thinkingWrap ?? false) })}
 								/>
 								<ToggleRow
 									title={t("toolsWrap")}
 									tip={t("toolsWrapDesc")}
-									enabled={settings.toolsWrap ?? true}
-									onToggle={() => setPartial({ toolsWrap: !(settings.toolsWrap ?? true) })}
+									enabled={settings.toolsWrap ?? false}
+									onToggle={() => setPartial({ toolsWrap: !(settings.toolsWrap ?? false) })}
 								/>
 								<ToggleRow
 									title={t("toolImages")}
@@ -1731,6 +1731,20 @@ export function SettingsModal({
 										</div>
 										{wallpaperUploadError && <p className="set-hint">{t("wallpaperUploadFailed")}</p>}
 										<div className="wallpaper-sliders">
+											<label className="wallpaper-slider" title={t("wallpaperPanelOpacityDesc")}>
+												<span>{t("wallpaperPanelOpacity")}</span>
+												<input
+													type="range"
+													min={0}
+													max={100}
+													step={1}
+													value={wallpaper.panelOpacity}
+													onChange={(e) =>
+														saveWallpaperSettings({ ...wallpaper, panelOpacity: Number(e.target.value) })
+													}
+												/>
+												<output>{wallpaper.panelOpacity}%</output>
+											</label>
 											<label className="wallpaper-slider">
 												<span>{t("wallpaperDim")}</span>
 												<input

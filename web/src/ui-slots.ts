@@ -312,17 +312,7 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		group: "tools",
 		align: "end",
 	},
-	// 系统组：设置 → 版本（更新）→ GitHub。声音/语言（设置 → 通用页）与主题（设置 →
-	// 界面设置）已从顶栏搬进设置面板，不再占顶栏位置。
-	//
-	// 缺省收起口径（hidden: true）：低频 / 有替代入口的条目缺省落进顶栏「⋯」溢出菜单。
-	// 这不是「消失」—— App.tsx 的 uiOverflow 会把 hidden 的 topbar.primary 条目当成常驻溢出项
-	// 塞进那个菜单，且声音/语言/主题/版本/浏览器操作在菜单里是**整块搬组件**
-	// （TopBar 的 OVERFLOW_AS_NODE_IDS），下拉/面板/更新红点一个不少；用户随时能在
-	// 设置 → 界面布局里勾回来。对比之下 CSS display:none 才是真删（宽度 0 不参与实测溢出，
-	// 也不进菜单，见 topbar-fit.ts），所以别用 CSS 做这件事。
-	// 常驻只留「切视图 / 起新活 / 看运行态 / 进设置」四类：实测溢出丢的是**尾部**，
-	// 常驻项越多，核心动作越容易被挤进 ⋯。
+	// 设置入口位于顶栏右侧，必须保留为用户找回其他布局入口的通道。
 	{
 		id: "host:settings",
 		slot: "topbar.primary",

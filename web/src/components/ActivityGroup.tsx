@@ -42,6 +42,7 @@ interface ActivityGroupProps {
 	onKillBash?: () => void;
 	toolImages?: boolean;
 	thinkingWrap?: boolean;
+	toolsWrap?: boolean;
 	forceOpen?: boolean;
 	uiContextToolCall?: UiSlotEntry[];
 	onUiAction?: (item: UiSlotEntry, value?: string) => void;
@@ -59,6 +60,7 @@ export const ActivityGroup = memo(function ActivityGroup({
 	onKillBash,
 	toolImages,
 	thinkingWrap,
+	toolsWrap,
 	forceOpen = false,
 	uiContextToolCall,
 	onUiAction,
@@ -141,7 +143,7 @@ export const ActivityGroup = memo(function ActivityGroup({
 								block={tool}
 								view={view}
 								onKillBash={onKillBash}
-								wrap={false}
+								wrap={toolsWrap}
 								showImages={toolImages ?? true}
 								forceOpen={forceOpen}
 								uiContextToolCall={uiContextToolCall}

@@ -237,8 +237,7 @@ export function TopBar({
 		),
 	};
 
-	/** 桌面工具 chips 的可见性历史口径（不扩大）：只有 search / tasks / settings 这几个成员
-	 *  的显隐还受 PI_WEB_TABS 白名单管（服务端会拒绝对应的消息，画出来只会给一个点了没反应用的按钮）。 */
+	/** 桌面工具 chips 的可见性历史口径（不扩大）：tasks / settings 的显隐还受白名单管。 */
 	const TABS_GATED_IDS = new Set(["host:tasks", "host:settings"]);
 	/** TABS 白名单门禁（历史口径，不扩大）：tasks/settings 的显隐还受白名单管，
 	 *  其余宿主入口只看 slot（各节点工厂内部自行判断，见 hostNodes）。 */

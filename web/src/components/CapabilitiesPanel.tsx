@@ -52,8 +52,6 @@ export function CapabilitiesPanel({
 	mcpServers,
 	mcpConfigPath,
 	plugins,
-	pluginGrants,
-	pluginPermissions,
 	onOpenPluginView,
 	onOpenTools,
 	send,
@@ -63,15 +61,6 @@ export function CapabilitiesPanel({
 	mcpServers: UiMcpServerInfo[];
 	mcpConfigPath: string;
 	plugins: UiPluginInfo[];
-	pluginGrants: { pluginId: string; paths: string[] }[];
-	pluginPermissions: {
-		pluginId: string;
-		family: "net" | "llm";
-		hosts?: string[];
-		models?: string[];
-		session?: boolean;
-		reason?: string;
-	}[];
 	onOpenPluginView: (id: string) => void;
 	onOpenTools: () => void;
 	send: (msg: ClientMessage) => boolean;
@@ -140,8 +129,6 @@ export function CapabilitiesPanel({
 								<PluginsPanel
 									plugins={plugins}
 									settings={settings}
-									pluginGrants={pluginGrants}
-									pluginPermissions={pluginPermissions}
 									send={send}
 									onOpenPluginView={onOpenPluginView}
 									onOpenTools={onOpenTools}

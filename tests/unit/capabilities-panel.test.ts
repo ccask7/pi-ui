@@ -56,8 +56,6 @@ function mount() {
 							agentTools: [],
 						},
 					] as never,
-					pluginGrants: [],
-					pluginPermissions: [],
 					onOpenPluginView: vi.fn(),
 					onOpenTools: vi.fn(),
 					send,
@@ -94,12 +92,10 @@ describe("插件 / 技能 / MCP 面板", () => {
 		const uiToggle = container.querySelector<HTMLButtonElement>('.capabilities-ui-group [role="switch"]');
 		act(() => uiToggle!.click());
 		expect(send).toHaveBeenCalledWith({ type: "set_settings", disabledPlugins: ["demo-ui"] });
-		const summary = container.querySelector<HTMLButtonElement>(".plugin-compact-main");
-		expect(summary?.textContent).toContain("A short plugin summary");
-		act(() => summary!.click());
-		const dialog = document.body.querySelector('[role="dialog"]');
-		expect(dialog?.textContent).toContain("Demo UI Plugin");
-		expect(dialog?.textContent).toContain("demo-ui");
+		expect(container.textContent).toContain("A short plugin summary");
+		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+		expect(container.querySelector(".plugin-secondary-section")).toBeNull();
+		expect(container.querySelector<HTMLButtonElement>(".plugin-rescan")).not.toBeNull();
 	});
 
 	it("插件页打开时隐藏对话布局，并让插件页占满剩余高度", () => {

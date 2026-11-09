@@ -1498,8 +1498,8 @@ export function App() {
 												}}
 												onRemoveQueued={onRemoveQueued}
 												onRecallQueued={onRecallQueued}
-												thinkingWrap={chat.settings?.thinkingWrap ?? true}
-												toolsWrap={chat.settings?.toolsWrap ?? true}
+												thinkingWrap={chat.settings?.thinkingWrap ?? false}
+												toolsWrap={chat.settings?.toolsWrap ?? false}
 												toolImages={chat.settings?.toolImagesEnabled ?? true}
 												jumpTarget={searchJump}
 												onJumpDone={() => setSearchJump(null)}
@@ -1915,8 +1915,6 @@ export function App() {
 									mcpServers={chat.mcpServers}
 									mcpConfigPath={chat.mcpConfigPath}
 									plugins={chat.plugins}
-									pluginGrants={chat.pluginGrants}
-									pluginPermissions={chat.pluginPermissions}
 									onOpenPluginView={(id) => {
 										setPluginsOpen(false);
 										setView(`plugin:${id}`);
