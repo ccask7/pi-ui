@@ -109,7 +109,7 @@ export function UpdateSettings({ appVersion }: { appVersion: string | null | und
 				(phase === "available" || phase === "downloading" || phase === "ready") &&
 				createPortal(
 					<div
-						className="modal-overlay update-overlay"
+						className="modal-backdrop update-overlay"
 						role="presentation"
 						onMouseDown={(event) => {
 							if (event.target === event.currentTarget && phase !== "downloading") {

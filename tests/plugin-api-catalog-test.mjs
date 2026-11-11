@@ -3,7 +3,7 @@
  *
  * 单测（`tests/unit/plugin-api-catalog.test.ts`）只覆盖装配 + 静态表 + 占位计数，
  * 这里覆盖的是**接线**：浏览器发 `plugin_api_catalog` → 服务端回
- * `plugin_api_catalog_result`（22 slot + 别名 + 工具表 + 方法表 + 当前占用者）。
+ * `plugin_api_catalog_result`（24 slot + 别名 + 工具表 + 方法表 + 当前占用者）。
  *
  * 运行：npm run build && node tests/plugin-api-catalog-test.mjs（已进 tests/run-smoke.mjs）
  */
@@ -46,6 +46,33 @@ const check = (name, ok, extra = "") => {
 let proc = null;
 let sock = null;
 
+/** 收到的消息先缓冲：ready 之后插件清单（plugins，含 ensureLoaded 结果）才会到，
+ *  查目录必须在它之后 —— 否则 occupants 读到的是「还没扫描」的空表（竞态）。 */
+const inbox = [];
+
+const waitForType = (type, timeoutMs = 20_000) =>
+	new Promise((res, rej) => {
+		const hit = inbox.find((m) => m.type === type);
+		if (hit) return res(hit);
+		const timer = setTimeout(() => {
+			sock?.off("message", onMsg);
+			rej(new Error(`timeout waiting for ${type}`));
+		}, timeoutMs);
+		const onMsg = (raw) => {
+			let m;
+			try {
+				m = JSON.parse(raw.toString());
+			} catch {
+				return;
+			}
+			if (m.type !== type) return;
+			clearTimeout(timer);
+			sock.off("message", onMsg);
+			res(m);
+		};
+		sock.on("message", onMsg);
+	});
+
 const connect = (clientId) =>
 	new Promise((res, rej) => {
 		const s = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
@@ -59,6 +86,7 @@ const connect = (clientId) =>
 			} catch {
 				return;
 			}
+			inbox.push(m);
 			if (m.type === "ready") {
 				clearTimeout(timer);
 				res(s);
@@ -105,10 +133,12 @@ try {
 	}
 	await sleep(1200);
 	sock = await connect(randomUUID());
+	// attach 后才扫描并激活插件（index.ts 在 attach 的 then 里 ensureLoaded → 推 plugins）。
+	await waitForType("plugins");
 
 	const catalog = await queryCatalog();
 	check("回包带 catalog", !!catalog && catalog.version === 1);
-	check("22 个 slot", catalog?.slots?.length === 22, String(catalog?.slots?.length));
+	check("24 个 slot", catalog?.slots?.length === 24, String(catalog?.slots?.length));
 	const top = catalog?.slots?.find((s) => s.slot === "topbar.primary");
 	check("topbar.primary 别名含 topbar", top?.aliases?.includes("topbar") ?? false, JSON.stringify(top?.aliases));
 	check("例子可抄（非空）", (top?.example ?? "").includes("topbar"));

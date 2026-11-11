@@ -123,6 +123,8 @@ const SLOT_IDS: UiSlotId[] = [
 	"topbar.overflow",
 	"notice.actions",
 	"leftpanel.sessions",
+	"leftpanel.nav",
+	"main.panel",
 	"chat.header",
 	"chat.empty",
 	"message.actions",

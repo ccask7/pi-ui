@@ -263,7 +263,7 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 `syncPluginViews(plugins, epoch)` 统一同步注册表：清单消失/被禁用即卸载视图（调 cleanup）、epoch 变化清 failed 重拉 bundle。
 
-设置面板 ⚙ 有「界面插件」开关区（`set_settings.disabledPlugins`，持久化 client-state、纯 UI 隐藏不触发 runtime reload —— 被禁用插件的贡献与 `arrange` 整份丢弃）+「已授权目录」段（见「目录授权与跨目录 fs」）。**本 fork 已删除插件市场与安装/更新/卸载能力**：插件目录从本地拷入 `<dataDir>/plugins/<id>/`，删除目录即卸载。
+设置面板 ⚙ 有「界面插件」开关区：开关读写每客户端的 `settings.disabledPlugins`（前端靠它隐藏条目与 `arrange`），保存时同时写**全局**停用表 `<dataDir>/plugin-disabled.json`（`server/plugin-disabled.ts`）并 `reload()` —— 停用 = 该插件不激活（AI 工具 / HTTP 路由 / 订阅 / 定时任务全撤），重新打开即重新激活；插件数据在磁盘上不受影响。为什么是全局：插件是这台机器上的 Node 代码，工具与路由都是进程级的，只按浏览器停用等于没停。外加「已授权目录」段（见「目录授权与跨目录 fs」）。**本 fork 已删除插件市场与安装/更新/卸载能力**：插件目录从本地拷入 `<dataDir>/plugins/<id>/`，删除目录即卸载。
 
 ## 静态服务
 
@@ -323,11 +323,11 @@ slot 框架的原则是「插件声明、宿主渲染」——插件碰不到宿
 > `withPluginViewItems` 合成 `kind="view"` 条目（`<id>:__view`）后走 slot 框架，与宿主三连同流渲染
 > （报错插件的 tab 由 TopBar 兜底置灰保留，因合并引擎会整份丢弃它的贡献）。
 
-### 22 个挂载点
+### 24 个挂载点
 
 每个挂载点都有宿主定义的 `UiSlotSpec`：`cardinality` 为 `list` 时多个条目并列渲染，
 为 `single` 时合并引擎按最终排序选出第一个可见条目，其余可见候选会被置为隐藏并产出布局诊断。
-当前这 22 个已有挂载点全部是 `list`，因为它们都表达工具栏、菜单、tab 或页面入口的并列集合；
+当前这 24 个已有挂载点全部是 `list`，因为它们都表达工具栏、菜单、tab 或页面入口的并列集合；
 `modal.dialog` 的“同一时刻只开一个”是打开状态机约束，不是 slot cardinality。未来新增独占挂载点只需
 在 `web/src/ui-slots.ts` 的 `UI_SLOT_SPECS` 标成 `single`，无需改变插件 manifest 形状。
 
@@ -347,6 +347,8 @@ slot 框架的原则是「插件声明、宿主渲染」——插件碰不到宿
 | `contextmenu.toolcall` | 工具调用卡片的**工具名**右键菜单（宿主唯一菜单；内置一条「显示工具详细信息」，见 `ToolInfoDialog.tsx`）      |
 | `settings.pages`       | 设置面板里的一整页（插件用 `mount()` 自己渲染）                                                              |
 | `leftpanel.sessions`   | 左栏会话行内嵌区（会话标题旁的徽标 / 快捷按钮）                                                              |
+| `leftpanel.nav`        | 左栏主导航（「新建任务」「插件」下面的插件导航；`kind=view` 切视图，`action` 交回插件） |
+| `main.panel`           | 对话区内的插件主面板（只换对话区，左右栏不动；条目点击 = 打开/收起该插件视图） |
 | `chat.header`          | 对话头部条（标题旁的操作区）                                                                                 |
 | `chat.empty`           | 空对话占位区（新对话的快捷入口）                                                                             |
 | `file.preview.toolbar` | 文件预览工具条                                                                                               |
@@ -358,7 +360,7 @@ slot 框架的原则是「插件声明、宿主渲染」——插件碰不到宿
 
 **自然简写**（`UI_SLOT_ALIASES`：解析时映射成完整名，让作者少踩坑）：`topbar`→`topbar.primary`、
 `topbar.more`→`topbar.overflow`、`composer`→`composer.actions`、`message`→`message.actions`、`modal`→`modal.dialog`、
-`rightpanel`→`rightpanel.tabs`、`settings`→`settings.pages`。没有别名的（`bottombar`、`composer.leading` 与四个
+`rightpanel`→`rightpanel.tabs`、`settings`→`settings.pages`、`leftnav`→`leftpanel.nav`、`mainpanel`→`main.panel`。没有别名的（`bottombar`、`composer.leading` 与四个
 `contextmenu.*`）必须写完整名；认不出的 slot 直接丢掉该条目（不报错、不崩）。`arrange` 的目标 slot
 只接受完整名（不走别名）。
 
@@ -446,7 +448,7 @@ Message(List) / RightPanel / LeftPanel / SettingsModal）共用 `buildUiSlots()`
 只有**顶栏**有溢出概念：主栏本身不限量（与底栏同款直排，窄屏横滑/桌面端换行），被 `hidden` 的条目、
 以及直接声明在 `topbar.overflow` 的常驻条目进「⋯」溢出菜单 —— 也就是说插件能把宿主内置入口从主栏挪走，
 但它在溢出菜单与布局页里都还在，用户点一下布局页的「恢复」就能拿回原位（插件能整理一切，却锁不死用户）。
-其它槽位没有溢出：`hidden === true` 就是不显示（右键菜单连菜单项都不生成）。布局页按 22 个挂载点全量分组
+其它槽位没有溢出：`hidden === true` 就是不显示（右键菜单连菜单项都不生成）。布局页按 24 个挂载点全量分组
 （`SettingsModal.tsx` 的 `uiLayoutSections`，与 `SLOT_IDS` 同顺序——两边都严格按实际界面的 DOM/视觉顺序排：
 顶栏 → 通知 → 左栏 → 主列 → 右栏 → 终端/Git 视图 → 底栏 → 悬浮层 → 右键菜单 → 设置页 → 对话框；搜索框可过滤，
 搜索时 ↑↓ 禁用）。顶栏 / 底栏 / 输入框动作区在界面上按对齐段（左 start → 中 center → 右 end）分段渲染，
@@ -501,7 +503,7 @@ App 只分发**插件**动作（`triggerPluginUiAction`：先找该插件名下�
 
 ### 弹窗（`modal.dialog`）
 
-第 22 个槽位：插件声明 `kind="view"` 的条目，经宿主桥按需弹成弹窗（`PluginModal.tsx`）。
+第 24 个槽位：插件声明 `kind="view"` 的条目，经宿主桥按需弹成弹窗（`PluginModal.tsx`）。
 
 ```json
 {
@@ -708,6 +710,7 @@ const res = await host.openSession({ roots: ["/repo/a", "/repo/b"], prompt: "先
 | wechat-ilink  | `plugins/wechat-ilink/`          | 💬 微信通道：扫码登录直连微信 ilink 后端（openclaw-weixin 同源协议），出站长轮询收消息 + `host.chat` 无头驱动 agent + run_end 回包，无需公网 IP；陌生人配对 + `wechat_send` 工具；设置可配默认工作空间 / 模型（下拉）/ 思考强度（下拉）/ 投递到网页当前会话（issue #226）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | image-toolkit | `plugins/image-toolkit/`         | 🖼 图片工作台：压缩（目标体积二分逼近）/裁剪/缩放/旋转翻转/格式转换/批量 ZIP/水印/滤镜调色/信息与 EXIF/剪贴板与拖放导入，可读写工作区图片（`/ws/list\|image\|probe\|save\|settings`，走 `host.fs` 越界拒绝，原始字节不经 base64）+ 四个 AI 工具（`image_info`/`image_transform`/`image_compress`/`image_watermark`，PNG/BMP 用自带纯 JS 编解码、JPEG 经 `ensureDeps` 装纯 JS 的 jpeg-js）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | notes         | `plugins/notes/`                 | 📌 笔记 · 待办 · 提醒三合一：笔记（Markdown+标签+搜索）/待办（优先级/截止/重复）/提醒（一次性·每天·每周·每月·间隔·cron；定时只挂**一条** `host.schedule("* * * * *")` 每分钟巡检，每条提醒自己带 `nextDue` 落盘 —— 远期 cron 不交给宿主，避开它的 setTimeout 24.8 天溢出，见该插件 README）；顶栏 📌 开**可拖拽全局浮窗**（`dom:anchor` 免授权，位置/尺寸/最小化记忆，设置是窗口内的覆盖层；`view:false` + `preload:true` —— 没有独立视图 tab，但每次进页预加载 bundle 让提醒轮询/快捷键常驻）；数据在 `<dataDir>/notes/store.json`（原子写，删插件不删数据）；通道只用 HTTP（`/plugins-api/notes/store|wait|op|export`，长轮询推送，不依赖 mount 时的 ctx）；5 个 AI 工具 + `/note` `/todo` `/remind`。回归：`tests/notes-test.mjs` / `tests/notes-ui-test.mjs` / `tests/unit/notes-plugin.test.ts` |
+| memory        | `plugins/memory/`        | 🧠 长期记忆：AI 记坑/决定/约定/事实/术语/偏好（4 个工具 `memory_search`/`memory_write`/`memory_update`/`memory_forget` + `/remember` `/recall` `/forget`），强度衰减（半衰期只看重要度）+ 冲突换代 + 检索/工具命中/用户反馈三路加权；操作点提醒只在 AI 正要读某个文件或跑某条命令时附一小段历史数据（`injectHint`，默认开），用户说「记住」而模型没调工具时本轮结束自动补记一条进隔离区（`autoRemember`，默认开）；视图是手写力导向图（左栏「记忆」→ `main.panel`，再点收起），数据在 `<dataDir>/memory/`（与插件目录平级：`memories.jsonl`/`blacklist.json`/`audit.jsonl`/`trash.jsonl`/`backups/`，原子写 + 删除前快照 + 30 天回收站），通道 `GET /plugins-api/memory/store|export` + `POST /plugins-api/memory/op`。回归：`tests/unit/memory-plugin-activate.test.ts` / `plugins/memory/test/*.mjs` |
 | page-picker   | `plugins/page-picker/extension/` | 🎯 网页元素拾取（**浏览器扩展**，不是 ccui 插件）：在开发网页上点选元素 → 采集定位串 / 命中的 CSS（Vite dev 下含源文件行号）/ React fiber 里的组件文件:行号 / 计算样式差异 → 渲染 Markdown → 经宿主动作桥 `compose()` 注入 ccui 输入框（`world:"MAIN"` 注入 + 闭合 Shadow DOM overlay；esbuild 打包 4 个入口 background/picker/bind/options，`npm run build:extension`）。点图标**先认页面**：是 ccui（宿主动作桥 `__piWebUiHost`，老版本退一步探同源 `/api/health`）→ 注入 `bind.js` 浮条问「要不要把这页绑成服务地址」（远程/局域网部署不用手打地址；缺授权则引导到带 `?bind=` 的选项页 —— `permissions.request` 要扩展自己页面里的手势），否则注入拾取器（拾取态底部常驻一条**细条**：本页 AI 授权状态 + 「让 AI 操作本页…」/「与另一页配对…」/「退出」—— AI 授权入口不再需要先点一个元素才从确认条里露出来；状态经 `page-picker:page-state` 查，授权表变化时自刷）。「发哪几类信息」是**多选**（页面上下文/定位/XPath+DOM/源码/文本/命中 CSS/计算样式/骨架 + 截图，另配 6 个预设），**没勾的在采集层就不采**（不是渲染时再删） |
 
 ## 回归测试

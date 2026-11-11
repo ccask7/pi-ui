@@ -2123,6 +2123,9 @@ export class ClientSession {
 	onConversationChanged: (() => void) | undefined = undefined;
 	/** index.ts 注入：读取插件当前注册的 AI 工具（attach 时拷贝到每个新会话）。 */
 	pluginToolsProvider: (() => PluginAgentTool[]) | undefined = undefined;
+	/** index.ts 注入：把「界面插件」停用名单落到全局表并让插件真正停下/起来
+	 *  （见 server/plugin-disabled.ts）。没注入 = 只当 UI 偏好，行为与旧版一致。 */
+	pluginsDisabledWriter?: (ids: string[]) => void;
 	/** index.ts 经 AgentService 注入：内置调度存储（定时任务 Agent 工具用；未注入时工具直接报错）。 */
 	schedulerStore: SchedulerStore | undefined = undefined;
 	/** index.ts 注入：读取插件当前注册的斜杠命令（目录展示 + prompt 拦截执行）。 */
@@ -3337,6 +3340,10 @@ export class ClientSession {
 					markers: this.markerSvc.listForUi(),
 				}),
 				getApprovalPolicy: () => this.approvalPolicyState(),
+				// 「界面插件」停用开关 → index.ts 注入的写入器（写全局停用表 + 让插件真停/真起）。
+				setPluginsDisabled: (ids) => {
+					this.pluginsDisabledWriter?.(ids);
+				},
 			},
 			this.subagentTemplates,
 			this.approvalRules,
@@ -8811,6 +8818,7 @@ export class ClientSession {
 				messageCount: s.messageCount,
 				modified: s.modified.getTime(),
 				source: "web",
+				...(s.parentSessionPath ? { isBranch: true } : {}),
 			});
 		}
 		return [...sessions.values()].sort((a, b) => b.modified - a.modified).slice(0, 200);

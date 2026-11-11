@@ -54,7 +54,7 @@ const ids = (entries: { id: string }[]) => entries.map((e) => e.id);
 
 describe("UI slot cardinality（P1-4）", () => {
 	it("所有现有挂载点都有显式 list 规格，新增 single 不会改变现有入口语义", () => {
-		expect(UI_SLOT_SPECS).toHaveLength(22);
+		expect(UI_SLOT_SPECS).toHaveLength(24);
 		expect(UI_SLOT_SPECS.every((spec) => spec.cardinality === "list")).toBe(true);
 		expect(new Set(UI_SLOT_SPECS.map((spec) => spec.slot)).size).toBe(UI_SLOT_SPECS.length);
 	});
@@ -175,7 +175,7 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 		expect(settings?.hidden).toBe(false);
 		expect(settings?.order).toBe(60);
 		// 没用到的槽位是空数组（渲染层不必判空），且全部槽位都在（21 个 + modal.dialog）
-		expect(Object.keys(slots)).toHaveLength(22);
+		expect(Object.keys(slots)).toHaveLength(24);
 		expect(slots["composer.leading"]).toEqual([]);
 		// 输入框动作区有 7 个宿主内置（上传/模板/模型/思考/权限/预设/发送），发送簇 align=end
 		expect(ids(slots["composer.actions"])).toEqual([
@@ -222,6 +222,8 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"topbar.overflow",
 			"notice.actions",
 			"leftpanel.sessions",
+			"leftpanel.nav",
+			"main.panel",
 			"chat.header",
 			"chat.empty",
 			"message.actions",
@@ -379,7 +381,7 @@ describe("buildUiSlots / 第 2 层：插件贡献", () => {
 			arrange: [],
 		});
 		const slots = build([dirty]);
-		expect(Object.keys(slots)).toHaveLength(22);
+		expect(Object.keys(slots)).toHaveLength(24);
 		expect(ids(Object.values(slots).flat()).some((id) => id === "dirty:bad")).toBe(false);
 	});
 });

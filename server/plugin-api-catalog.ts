@@ -34,6 +34,8 @@ export const SLOT_EXAMPLES: Readonly<Record<string, string>> = {
 	"contextmenu.toolcall": `{ "ui": { "contextmenu.toolcall": [{ "id": "m", "label": "工具菜单", "kind": "action", "action": "my:m" }] } }`,
 	"settings.pages": `{ "settings": [{ "id": "conf", "label": "邮箱设置", "kind": "page" }] }`,
 	"leftpanel.sessions": `{ "ui": { "leftpanel.sessions": [{ "id": "m", "label": "会话区", "kind": "action", "action": "my:m" }] } }`,
+	"leftpanel.nav": `{ "ui": { "leftpanel.nav": [{ "id": "m", "label": "记忆", "icon": "🧠", "kind": "view", "view": "plugin:my" }] } }`,
+	"main.panel": `{ "ui": { "main.panel": [{ "id": "m", "label": "记忆", "kind": "action", "action": "my:open" }] } }`,
 	"chat.header": `{ "ui": { "chat.header": [{ "id": "m", "label": "会话题头", "kind": "action", "action": "my:m" }] } }`,
 	"chat.empty": `{ "ui": { "chat.empty": [{ "id": "m", "label": "空态", "kind": "action", "action": "my:m" }] } }`,
 	"file.preview.toolbar": `{ "ui": { "file.preview.toolbar": [{ "id": "m", "label": "预览工具", "kind": "action", "action": "my:m" }] } }`,

@@ -56,6 +56,11 @@ function mount() {
 							agentTools: [],
 						},
 					] as never,
+					pluginGrants: [{ pluginId: "demo-ui", paths: ["/tmp/shared"] }],
+					pluginPermissions: [
+						{ pluginId: "demo-ui", family: "net", hosts: ["api.example.com"] },
+						{ pluginId: "demo-ui", family: "llm", models: ["gpt-demo"] },
+					],
 					onOpenPluginView: vi.fn(),
 					onOpenTools: vi.fn(),
 					send,
@@ -92,6 +97,21 @@ describe("插件 / 技能 / MCP 面板", () => {
 		const uiToggle = container.querySelector<HTMLButtonElement>('.capabilities-ui-group [role="switch"]');
 		act(() => uiToggle!.click());
 		expect(send).toHaveBeenCalledWith({ type: "set_settings", disabledPlugins: ["demo-ui"] });
+		// 授权撤销是插件页里唯一入口（设置页旧插件页签已收）：目录 / 网络 / 模型三类都在。
+		const auth = container.querySelectorAll(".plugin-auth-section");
+		expect(auth).toHaveLength(3);
+		expect(container.textContent).toContain("/tmp/shared");
+		expect(container.textContent).toContain("api.example.com");
+		const revoke = [...container.querySelectorAll<HTMLButtonElement>(".plugin-auth-row .set-uninstall")];
+		act(() => revoke[0].click());
+		expect(send).toHaveBeenCalledWith({ type: "plugin_path_revoke", pluginId: "demo-ui", path: "/tmp/shared" });
+		act(() => revoke[1].click());
+		expect(send).toHaveBeenCalledWith({
+			type: "plugin_permission_revoke",
+			pluginId: "demo-ui",
+			family: "net",
+			host: "api.example.com",
+		});
 		expect(container.textContent).toContain("A short plugin summary");
 		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
 		expect(container.querySelector(".plugin-secondary-section")).toBeNull();

@@ -40,4 +40,43 @@ describe("会话标签", () => {
 		act(() => tab.click());
 		expect(panelSend).toHaveBeenCalledWith({ type: "switch_conversation", id: "c1" });
 	});
+
+	it("派生会话显示分支小标识，但不增加悬浮提示", () => {
+		const container = document.createElement("div");
+		document.body.appendChild(container);
+		root = createRoot(container);
+		const source = {
+			id: "c1",
+			title: "原会话",
+			cwd: "/project",
+			// 即使来源自身也是更早的分支，产生新分支后也不应继续显示标识。
+			forkFrom: { conversationId: "c0", title: "更早会话" },
+		} as ConversationSummary;
+		const conversation = {
+			id: "c2",
+			title: "分支会话",
+			cwd: "/project",
+			forkFrom: { conversationId: "c1", title: "原会话" },
+		} as ConversationSummary;
+		act(() => {
+			root!.render(
+				createElement(
+					LanguageProvider,
+					null,
+					createElement(ChatTabBar, {
+						conversations: [source, conversation],
+						elsewhere: [],
+						activeConversationId: "c2",
+						panelSend: vi.fn(() => true),
+					}),
+				),
+			);
+		});
+		const tabs = container.querySelectorAll(".chat-tab");
+		expect(tabs).toHaveLength(2);
+		expect(tabs[0].querySelector(".chat-tab-flag")).toBeNull();
+		const badge = tabs[1].querySelector(".chat-tab-flag");
+		expect(badge?.textContent).toBeTruthy();
+		expect(badge?.getAttribute("title")).toBeNull();
+	});
 });

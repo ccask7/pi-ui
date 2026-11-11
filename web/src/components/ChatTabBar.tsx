@@ -90,6 +90,12 @@ function subagentCount(conversations: ConversationSummary[], id: string): number
 export function ChatTabBar({ conversations, elsewhere, activeConversationId, panelSend }: ChatTabBarProps) {
 	const t = useT();
 	const rows = useMemo(() => flattenTabs(conversations, elsewhere), [conversations, elsewhere]);
+	// 已产生新分支的会话是当前操作的来源，不再与刚派生的会话同时显示「分支」。
+	// 标识只落在分支链最新会话上；较早的分支源即使自身也有 forkFrom 也不标记。
+	const forkedParentIds = useMemo(
+		() => new Set(conversations.map((c) => c.forkFrom?.conversationId).filter((id): id is string => Boolean(id))),
+		[conversations],
+	);
 	/** 已「点过一次」的标签（关闭/过户的两段确认）。 */
 	const [armed, setArmed] = useState<string | null>(null);
 	const [renaming, setRenaming] = useState<string | null>(null);
@@ -197,6 +203,7 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 						>
 							{row.depth > 0 && <span className="chat-tab-indent">↳</span>}
 							{c.isSubagent && <span className="chat-tab-flag">{t("subagentBadge")}</span>}
+							{c.forkFrom && !forkedParentIds.has(c.id) && <span className="chat-tab-flag">{t("forkBadge")}</span>}
 							{renaming === row.key ? (
 								<input
 									autoFocus

@@ -15,13 +15,14 @@ npm run build        # build:web (vite) + build:server (tsc) + build:mermaid-ven
 npm start            # 跑编译产物 dist/server/index.js（生产）
 npm test             # vitest 纯函数单测（tests/unit/，毫秒级零 token）
 npm run test:smoke   # 零 token 协议冒烟聚合跑器（tests/run-smoke.mjs，62 个自包含测试）
+npm run test:plugins # 仓库内插件的 node:test 单测（plugins/memory/test/，52 个）
 npm run test:freeze  # 冻结/重连回归测试（Playwright，需要本机 chromium headless）
 ```
 
 ## 提交前检查
 
 本 fork 没有 CI（`.github/workflows/` 已删）：这些检查全靠本地手动跑，顺序建议
-`format:check → lint → check:protocol → typecheck → build → build:extension → vitest → test:smoke`。
+`format:check → lint → check:protocol → typecheck → build → build:extension → vitest → test:plugins → test:smoke`。
 
 冒烟清单（tests/run-smoke.mjs 的 ALL，62 个）只收**自包含、零 token、跨平台**的测试；attach 型（需外部 server）、需真模型、平台相关的脚本不进默认冒烟，本地手动跑（分类见 run-smoke.mjs 头部注释）。
 

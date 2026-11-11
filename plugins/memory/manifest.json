@@ -1,0 +1,48 @@
+{
+	"id": "memory",
+	"name": "记忆",
+	"nameEn": "Memory",
+	"version": "0.1.0",
+	"icon": "🧠",
+	"description": "长期记忆：AI 记下踩过的坑、有理由的决定、项目约定、环境事实和术语，用到就亮、长期不用就淡下去、被推翻就变灰。点「记忆」看一张会变模糊的图：节点大小是强度，颜色是类型，灰点是作废；可搜索、可钉住、可作废、可删除（删掉的不会再被自动记回来）。不往对话里塞任何常驻内容——记忆只在 AI 主动查、或它正要读某个文件/跑某条命令时靠过来。",
+	"descriptionEn": "Long-term memory: the agent records pitfalls, reasoned decisions, conventions, environment facts and project jargon. Used memories brighten, unused ones fade, refuted ones turn grey. Open Memory to see a graph that blurs over time — node size is strength, colour is type, grey dot means invalidated. Search, pin, invalidate or delete; deleted entries are not re-captured automatically. Nothing is injected permanently into the conversation.",
+	"apiVersion": 2,
+	"view": true,
+	"permissions": ["tools", "http", "ui"],
+	"ui": {
+		"items": [
+			{
+				"id": "nav",
+				"slot": "main.panel",
+				"label": "记忆",
+				"labelEn": "Memory",
+				"icon": "🧠",
+				"iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"5\" r=\"2.5\"/><circle cx=\"5\" cy=\"17.5\" r=\"2.5\"/><circle cx=\"19\" cy=\"17.5\" r=\"2.5\"/><path d=\"M10.9 7.2 6.4 15.2\"/><path d=\"m13.1 7.2 4.5 8\"/><path d=\"M7.5 17.5h9\"/></svg>",
+				"kind": "action",
+				"action": "memory:open",
+				"hint": "在对话区打开记忆图谱（左右栏不动；再点一次收起）",
+				"hintEn": "Open the memory graph inside the conversation area (panels stay; click again to close)"
+			}
+		]
+	},
+	"settings": [
+		{
+			"key": "injectHint",
+			"type": "boolean",
+			"label": "操作点提醒",
+			"labelEn": "Inline hints",
+			"default": true,
+			"hint": "AI 要读某个文件、或跑某条命令时，若库里有相关记忆，就把它们附在这次工具结果后面（一小段，标明是历史数据而非指令）。关掉就只剩 AI 主动查这一条路。"
+		},
+		{
+			"key": "autoRemember",
+			"type": "boolean",
+			"label": "漏记时自动补一条",
+			"labelEn": "Backfill missed “remember this”",
+			"default": true,
+			"hint": "你说「记住……」之后，如果模型没调用记忆工具，就在这一轮结束时自动把这句话记下来（进隔离区，用得上才升级），并弹一条提示。关掉就完全按模型自己的判断。",
+			"hintEn": "If the model answers “got it” without calling the memory tool, record your request at the end of the run (quarantined) and show a notice."
+		}
+	],
+	"iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"5\" r=\"2.5\"/><circle cx=\"5\" cy=\"17.5\" r=\"2.5\"/><circle cx=\"19\" cy=\"17.5\" r=\"2.5\"/><path d=\"M10.9 7.2 6.4 15.2\"/><path d=\"m13.1 7.2 4.5 8\"/><path d=\"M7.5 17.5h9\"/></svg>"
+}

@@ -1408,7 +1408,8 @@ export const zh = {
 		"给整个窗口加一张背景图（左右面板、顶栏、底栏也会透出）：主题自带的图会自动生效，上传图片后优先使用你的图片；用压暗与模糊保证文字清晰。",
 	wallpaperUrlPh: "图片地址（https://…，留空关闭）",
 	wallpaperPanelOpacity: "界面底板不透明度",
-	wallpaperPanelOpacityDesc: "只调整面板、消息区、输入框和卡片等前景背景；越低背景图越清楚。背景图、压暗和模糊不变，文字与图标不透明。",
+	wallpaperPanelOpacityDesc:
+		"只调整面板、消息区、输入框和卡片等前景背景；越低背景图越清楚。背景图、压暗和模糊不变，文字与图标不透明。",
 	wallpaperDim: "压暗",
 	wallpaperBlur: "模糊",
 	wallpaperClear: "清除",
@@ -2940,7 +2941,8 @@ const en: Record<keyof typeof zh, string> = {
 		"Show a full-window background image (side panels, top and bottom bars included): a theme-provided image applies automatically, an uploaded image takes precedence; use dim and blur to keep text readable.",
 	wallpaperUrlPh: "Image URL (https://…, empty = off)",
 	wallpaperPanelOpacity: "UI surface opacity",
-	wallpaperPanelOpacityDesc: "Only changes foreground surfaces such as panels, messages, inputs, and cards. Lower values reveal more of the wallpaper; the image, dimming, blur, text, and icons remain unchanged.",
+	wallpaperPanelOpacityDesc:
+		"Only changes foreground surfaces such as panels, messages, inputs, and cards. Lower values reveal more of the wallpaper; the image, dimming, blur, text, and icons remain unchanged.",
 	wallpaperDim: "Dim",
 	wallpaperBlur: "Blur",
 	wallpaperClear: "Clear",

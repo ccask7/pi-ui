@@ -1188,6 +1188,10 @@ export interface EngineService {
 	pluginCommandsProvider?: (() => unknown[]) | undefined;
 	pluginBgTasksProvider?: (() => BgServer[]) | undefined;
 	pluginStopBgTask?: ((taskId: string) => boolean) | undefined;
+	/** 把「界面插件」停用名单交给引擎侧（pi 引擎写全局停用表，见 plugins 停用语义）。 */
+	pluginsDisabledWriter?: ((ids: string[]) => void) | undefined;
+	/** 当前客户端 UI 语言（插件列表/诊断文案用；dsh 引擎不必有）。 */
+	getLang?: (() => string) | undefined;
 	onClientCwdChanged?: ((cwd: string, roots: string[]) => void) | undefined;
 }
 
@@ -1572,6 +1576,18 @@ service.pluginToolsProvider = () => [...pluginMgr.getAgentTools(), ...mcpBridge.
 pluginMgr.onAgentToolsChanged = () => {
 	service.applyPluginAgentTools();
 	void pluginMgr.pushToAll().catch(() => {});
+};
+// 「界面插件」停用开关：以前只在前端隐藏，插件在服务端照跑（工具照样能用）。
+// 现在写进全局停用表并让插件真正反激活/重新激活——数据都在磁盘上，开关不碰它。
+service.pluginsDisabledWriter = (ids) => {
+	pluginMgr.setDisabled(ids);
+	void pluginMgr
+		.reload(() => service.getLang?.() ?? "en")
+		.then(() => {
+			service.applyPluginAgentTools?.();
+			return pluginMgr.pushToAll();
+		})
+		.catch((err) => console.error("[plugin] 应用停用名单失败：", err));
 };
 // 插件扩展点：插件斜杠命令（registerCommand）→ 命令选择器目录 + prompt 拦截执行。
 pluginMgr.onCommandsChanged = () => service.applyPluginCommandCatalog();

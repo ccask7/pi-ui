@@ -334,6 +334,9 @@ export function App() {
 	const [viewChosen, setView] = useState<ViewName>("chat");
 	// 左栏「插件」只替换对话内容，不注册顶栏视图或改动右栏。
 	const [pluginsOpen, setPluginsOpen] = useState(false);
+	/* 对话区内的插件主面板（slot main.panel，如「记忆」）：只换对话区，左右栏不动 ——
+	   与「插件」能力面板同一形态，不是 view（view 会整块替换布局）。点同一个按钮是开关。 */
+	const [mainPanelId, setMainPanelId] = useState<string | null>(null);
 	/** 新建任务先停留在前端草稿；首条消息由服务端按选中项目原子创建。 */
 	const [newTaskOpen, setNewTaskOpen] = useState(false);
 	const [newTaskCwd, setNewTaskCwd] = useState(cwd);
@@ -341,6 +344,7 @@ export function App() {
 		setNewTaskCwd(cwd);
 		setNewTaskOpen(true);
 		setPluginsOpen(false);
+		setMainPanelId(null);
 		setView("chat");
 	}, [cwd]);
 	/* PI_WEB_TABS: a tab this instance does not offer cannot be shown, even if
@@ -379,6 +383,14 @@ export function App() {
 	const uiPrimary = useMemo(() => uiSlots["topbar.primary"].filter((e) => !e.hidden), [uiSlots]);
 	// 面板槽位（收尾接线）：非 hidden 条目直传面板，空数组时面板返回 null，DOM 与旧版一致。
 	const uiLeftSessions = useMemo(() => uiSlots["leftpanel.sessions"].filter((e) => !e.hidden), [uiSlots]);
+	/* 左栏导航 = `leftpanel.nav`（纯导航条目）+ `main.panel`（点了在对话区开面板的条目，
+	   例如「记忆」）。两者都由左栏画，区别只在点击后发生什么（见 onUiAction）。 */
+	const uiLeftNav = useMemo(
+		() => [...uiSlots["leftpanel.nav"], ...uiSlots["main.panel"]].filter((e) => !e.hidden),
+		[uiSlots],
+	);
+	/* 插件被停用/卸载时面板要自动收起：否则对话区会一直藏着、只剩一块空白。 */
+	const mainPanel = mainPanelId && enabledPlugins.some((p) => p.id === mainPanelId) ? mainPanelId : null;
 	const uiTerminalToolbar = useMemo(() => uiSlots["terminal.toolbar"].filter((e) => !e.hidden), [uiSlots]);
 	const uiScmToolbar = useMemo(() => uiSlots["scm.toolbar"].filter((e) => !e.hidden), [uiSlots]);
 	const uiGoalbarActions = useMemo(() => uiSlots["goalbar.actions"].filter((e) => !e.hidden), [uiSlots]);
@@ -405,9 +417,21 @@ export function App() {
 				return;
 			}
 			const action = (item.action ?? "").trim();
+			// slot main.panel：只换对话区（左右栏不动）。再点一次同一个按钮 = 收起。
+			if (item.slot === "main.panel" && item.source.startsWith("plugin:")) {
+				const pid = item.source.slice(7);
+				setPluginsOpen(false);
+				setMainPanelId((cur) => (cur === pid ? null : pid));
+				// 面板画在对话区：停在终端/Git/插件视图时点它必须切回对话，否则看不见任何反馈。
+				setView("chat");
+				return;
+			}
 			// kind="view"（或缺省 action）：宿主自己切视图。
 			if (item.kind === "view" || ((!action || action === "view") && item.source !== "host")) {
-				setView((item.view ?? `plugin:${item.source.startsWith("plugin:") ? item.source.slice(7) : ""}`) as ViewName);
+				const next = (item.view ??
+					`plugin:${item.source.startsWith("plugin:") ? item.source.slice(7) : ""}`) as ViewName;
+				if (next === "chat") setMainPanelId(null);
+				setView(next);
 				return;
 			}
 			if (!action) return;
@@ -481,7 +505,10 @@ export function App() {
 			createPluginHostApi({
 				send,
 				isReady: () => Boolean(chatRefForPlugins.current.state),
-				setView: (v) => setViewRefForPlugins.current(v as ViewName),
+				setView: (v) => {
+					if (v === "chat") setMainPanelId(null);
+					setViewRefForPlugins.current(v as ViewName);
+				},
 				getCwd: () => chatRefForPlugins.current.state?.cwd ?? "",
 				getWorkspaceRoots: () => chatRefForPlugins.current.state?.workspaceRoots ?? [],
 				// host.sessions.list：只报「本会话现在能打开的东西」——运行中的对话 + 当前项目的历史会话。
@@ -740,7 +767,10 @@ export function App() {
 		// 派单卡片的「查看子代理」按钮：切到对应的子代理对话（与左栏点击同效果）。
 		const onSwitchConversation = (e: Event) => {
 			const id = (e as CustomEvent<string>).detail;
-			if (typeof id === "string" && id) send({ type: "switch_conversation", id });
+			if (typeof id === "string" && id) {
+				setMainPanelId(null);
+				send({ type: "switch_conversation", id });
+			}
 		};
 		window.addEventListener("ccui:switch-conversation", onSwitchConversation);
 		return () => {
@@ -1007,6 +1037,7 @@ export function App() {
 			) {
 				setPluginsOpen(false);
 				setNewTaskOpen(false);
+				setMainPanelId(null);
 				setView((prev) => (prev !== "chat" ? "chat" : prev));
 			}
 			return send(msg);
@@ -1310,7 +1341,9 @@ export function App() {
 				uiContextTopbar={uiSlots["contextmenu.topbar"]}
 				onUiAction={onUiAction}
 				onViewChange={(v: ViewName) => {
+					// 回对话 = 收起能力面板；离开对话 = 收起对话区内的插件主面板（它在对话区里）。
 					if (v === "chat") setPluginsOpen(false);
+					else setMainPanelId(null);
 					// The terminal panel stays mounted while hidden. Create the first
 					// shell on the user's terminal-view click, not on initial mount.
 					terminalOpenRequested.current = v === "terminal" && chat.terminals.length === 0;
@@ -1432,13 +1465,18 @@ export function App() {
 								pathCompletions={chat.pathCompletions}
 								activeConversationId={chat.activeConversationId}
 								pluginsActive={pluginsOpen}
-								onOpenPlugins={() => setPluginsOpen(true)}
+								onOpenPlugins={() => {
+									setMainPanelId(null);
+									setPluginsOpen(true);
+								}}
 								onNewTask={openNewTask}
 								onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
 								/* 宿主 UI 扩展点（contextmenu.session）：条目由 buildUiSlots 算好，左栏只管开菜单 +
 								   分派它自己的两条内置项（host:conv-dismiss-subagents / host:conv-force-dismiss）。 */
 								uiContextSession={uiSlots["contextmenu.session"]}
 								uiLeftSessions={uiLeftSessions}
+								uiLeftNav={uiLeftNav}
+								activeMainPanel={mainPanel}
 								onUiAction={onUiAction}
 							/>
 						</div>
@@ -1451,7 +1489,7 @@ export function App() {
 								activeConversationId={chat.activeConversationId}
 								panelSend={panelSend}
 							/>
-							<div className={`conversation-content${pluginsOpen ? " hidden" : ""}`}>
+							<div className={`conversation-content${pluginsOpen || mainPanel ? " hidden" : ""}`}>
 								{/* 对话头部条（chat.header 槽位）：纯插件新增位，无条目时不渲染。 */}
 								{uiChatHeader.length > 0 && (
 									<div className="chat-header" role="toolbar">
@@ -1908,6 +1946,23 @@ export function App() {
 									sessionId={newTaskOpen ? "" : (chat.state?.sessionId ?? "")}
 								/>
 							</div>
+							{mainPanel && view === "chat" && (
+								<div className="main-panel">
+									{(() => {
+										const entry = pluginViews.find((v) => v.info.id === mainPanel);
+										return entry ? (
+											<PluginView entry={entry} />
+										) : (
+											<PluginViewFallback
+												pluginId={mainPanel}
+												info={chat.plugins.find((p) => p.id === mainPanel)}
+												epoch={chat.pluginsEpoch}
+												failed={failedPluginViews.includes(mainPanel)}
+											/>
+										);
+									})()}
+								</div>
+							)}
 							{pluginsOpen && (
 								<CapabilitiesPanel
 									settings={chat.settings}
@@ -1915,6 +1970,8 @@ export function App() {
 									mcpServers={chat.mcpServers}
 									mcpConfigPath={chat.mcpConfigPath}
 									plugins={chat.plugins}
+									pluginGrants={chat.pluginGrants}
+									pluginPermissions={chat.pluginPermissions}
 									onOpenPluginView={(id) => {
 										setPluginsOpen(false);
 										setView(`plugin:${id}`);
@@ -1927,7 +1984,7 @@ export function App() {
 								/>
 							)}
 						</main>
-						<ResizeHandle side="right" width={rightWidth} onResize={resizeRight} />
+						{!rightCollapsed && <ResizeHandle side="right" width={rightWidth} onResize={resizeRight} />}
 						<div className={`panel-drawer drawer-right${rightCollapsed ? " hidden" : ""}`}>
 							<RightPanel
 								collapsible

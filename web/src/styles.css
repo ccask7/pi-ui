@@ -381,6 +381,56 @@ body {
 .plugin-inline-body {
 	margin-top: 10px;
 }
+/* 插件页的授权区（目录 / 网络与模型 / 浏览器控制）：折叠收起，平时不占地方。 */
+.plugin-auth-section {
+	margin-top: 10px;
+	border-top: 1px solid var(--border-soft);
+}
+.plugin-auth-section > summary {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 12px 2px;
+	color: var(--text-dim);
+	cursor: pointer;
+	list-style: none;
+}
+.plugin-auth-section > summary::-webkit-details-marker {
+	display: none;
+}
+.plugin-auth-section > summary::after {
+	content: "›";
+	margin-left: auto;
+	transition: transform 0.15s;
+}
+.plugin-auth-section[open] > summary::after {
+	transform: rotate(90deg);
+}
+.plugin-auth-hint {
+	font-size: 12px;
+	line-height: 1.7;
+	color: var(--text-dim);
+	margin: 2px 0 8px;
+}
+.plugin-auth-grant {
+	display: grid;
+	gap: 6px;
+	padding: 4px 2px 12px;
+}
+.plugin-auth-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	font-size: 13.5px;
+	font-weight: 600;
+}
+.plugin-auth-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
 .capabilities-empty {
 	display: flex;
 	flex-direction: column;
@@ -1150,7 +1200,8 @@ button.session-item.elsewhere-item.confirm {
 	white-space: nowrap;
 }
 
-.subagent-badge {
+.subagent-badge,
+.session-fork-badge {
 	display: inline-block;
 	vertical-align: 1px;
 	margin-right: 6px;
@@ -1436,6 +1487,34 @@ button.session-item.elsewhere-item.confirm {
 .lp-primary-action:focus-visible {
 	outline: 1px solid var(--accent);
 	outline-offset: -1px;
+}
+/* 插件贡献的左栏导航（leftpanel.nav）：宿主内置两条用 react-icons，插件的 iconSvg
+   走 currentColor（无颜色，跟文字色一起变），跟宿主图标同尺寸同列宽。 */
+.lp-primary-svg {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 16px;
+	width: 16px;
+	height: 16px;
+	color: inherit;
+}
+.lp-primary-svg svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+/* 对话区内的插件主面板（slot main.panel）：只占对话区，左右栏照旧（与能力面板同形态）。 */
+.main-panel {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
+	position: relative;
+}
+.main-panel > .mem-root,
+.main-panel > * {
+	min-height: 0;
 }
 .lp-tree-project-row {
 	min-height: 32px;

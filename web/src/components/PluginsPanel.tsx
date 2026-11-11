@@ -1,19 +1,36 @@
-import { FiRefreshCw } from "react-icons/fi";
+import { FiFolder, FiKey, FiMonitor, FiRefreshCw } from "react-icons/fi";
 import type { UiPluginInfo, UiSettingsState, ClientMessage } from "../types";
 import { useT } from "../i18n";
 import { PluginIcon } from "../plugin-icon";
 import { PluginSettingsForm } from "./PluginSettingsForm";
 import { ToggleRow } from "./SettingsControls";
+import { BrowserControlSettings } from "./BrowserControl";
+
+/** 目录授权 / 能力授权（网络、模型）——插件页里唯一能撤销它们的地方（设置页的旧插件页签已收），
+ *  放在列表下方折叠区，平时不占地方。 */
+type PluginGrants = { pluginId: string; paths: string[] }[];
+type PluginPermissions = {
+	pluginId: string;
+	family: "net" | "llm";
+	hosts?: string[];
+	models?: string[];
+	session?: boolean;
+	reason?: string;
+}[];
 
 export function PluginsPanel({
 	plugins,
 	settings,
+	pluginGrants,
+	pluginPermissions,
 	send,
 	onOpenPluginView,
 	onOpenTools,
 }: {
 	plugins: UiPluginInfo[];
 	settings: UiSettingsState | null;
+	pluginGrants: PluginGrants;
+	pluginPermissions: PluginPermissions;
 	send: (msg: ClientMessage) => boolean;
 	onOpenPluginView: (id: string) => void;
 	onOpenTools: () => void;
@@ -27,6 +44,7 @@ export function PluginsPanel({
 		else next.add(plugin.id);
 		send({ type: "set_settings", disabledPlugins: [...next] });
 	};
+	const grantCount = pluginGrants.reduce((count, grant) => count + grant.paths.length, 0);
 
 	return (
 		<div className="capabilities-plugins">
@@ -117,6 +135,119 @@ export function PluginsPanel({
 					})}
 				</div>
 			)}
+
+			<details className="plugin-auth-section">
+				<summary>
+					<FiFolder />
+					{t("pluginGrantsTitle")}
+					<span className="set-count">{grantCount}</span>
+				</summary>
+				<p className="plugin-auth-hint">{t("pluginGrantsHint")}</p>
+				{pluginGrants.length === 0 ? (
+					<p className="set-empty">{t("pluginGrantsEmpty")}</p>
+				) : (
+					pluginGrants.map((grant) => (
+						<div key={grant.pluginId} className="plugin-auth-grant">
+							<div className="plugin-auth-title">
+								<span>{grant.pluginId}</span>
+							</div>
+							{grant.paths.map((path) => (
+								<div key={path} className="plugin-auth-row">
+									<span className="set-catalog-source">{path}</span>
+									<button
+										type="button"
+										className="set-uninstall"
+										onClick={() => send({ type: "plugin_path_revoke", pluginId: grant.pluginId, path })}
+									>
+										{t("pluginGrantsRevoke")}
+									</button>
+								</div>
+							))}
+						</div>
+					))
+				)}
+			</details>
+
+			<details className="plugin-auth-section">
+				<summary>
+					<FiKey />
+					{t("pluginPermsTitle")}
+					<span className="set-count">{pluginPermissions.length}</span>
+				</summary>
+				<p className="plugin-auth-hint">{t("pluginPermsHint")}</p>
+				{pluginPermissions.length === 0 ? (
+					<p className="set-empty">{t("pluginPermsEmpty")}</p>
+				) : (
+					pluginPermissions.map((grant, index) => {
+						const hosts = grant.hosts ?? [];
+						const models = grant.models ?? [];
+						return (
+							<div key={`${grant.pluginId}|${grant.family}|${index}`} className="plugin-auth-grant">
+								<div className="plugin-auth-title">
+									<span>{grant.pluginId}</span>
+									<span className="set-catalog-source">
+										{grant.family === "net" ? t("pluginPermNet") : t("pluginPermLlm")}
+										{grant.session ? ` · ${t("pluginPermSession")}` : ""}
+									</span>
+								</div>
+								{hosts.map((host) => (
+									<div key={host} className="plugin-auth-row">
+										<span className="set-catalog-source">{host}</span>
+										<button
+											type="button"
+											className="set-uninstall"
+											onClick={() =>
+												send({ type: "plugin_permission_revoke", pluginId: grant.pluginId, family: "net", host })
+											}
+										>
+											{t("pluginGrantsRevoke")}
+										</button>
+									</div>
+								))}
+								{models.map((model) => (
+									<div key={model} className="plugin-auth-row">
+										<span className="set-catalog-source">{model}</span>
+										<button
+											type="button"
+											className="set-uninstall"
+											onClick={() =>
+												send({ type: "plugin_permission_revoke", pluginId: grant.pluginId, family: "llm", model })
+											}
+										>
+											{t("pluginGrantsRevoke")}
+										</button>
+									</div>
+								))}
+								{hosts.length === 0 && models.length === 0 && (
+									<div className="plugin-auth-row">
+										<span className="set-catalog-source">{grant.reason ?? t("pluginPermUnscoped")}</span>
+										<button
+											type="button"
+											className="set-uninstall"
+											onClick={() =>
+												send({ type: "plugin_permission_revoke", pluginId: grant.pluginId, family: grant.family })
+											}
+										>
+											{t("pluginGrantsRevoke")}
+										</button>
+									</div>
+								)}
+								{grant.reason && (hosts.length > 0 || models.length > 0) && (
+									<p className="plugin-auth-hint">{grant.reason}</p>
+								)}
+							</div>
+						);
+					})
+				)}
+			</details>
+
+			<details className="plugin-auth-section">
+				<summary>
+					<FiMonitor />
+					{t("browserControl")}
+				</summary>
+				<BrowserControlSettings />
+			</details>
 		</div>
 	);
 }

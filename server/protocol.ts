@@ -972,6 +972,8 @@ export interface SessionSummary {
 	modified: number;
 	/** Where the session lives: this UI's per-client dir, or the pi CLI/TUI dir. */
 	source?: "web" | "tui";
+	/** 从另一会话派生而来；历史列表仅显示小标识，不改变分支链收纳规则。 */
+	isBranch?: boolean;
 }
 
 /** 会话转录中一条命中消息的定位锚点：会话载入后按 role + timestamp 在
@@ -1590,6 +1592,10 @@ export type UiSlotId =
 	| "settings.pages"
 	/** 左栏会话行内嵌区（会话标题旁的徽标/快捷按钮）。 */
 	| "leftpanel.sessions"
+	/** 左栏主导航（「新建任务」「插件」旁边的插件入口，如「记忆」）。 */
+	| "leftpanel.nav"
+	/** 对话区内的插件主面板（只换对话区，左栏/右栏照旧——与「插件」能力面板同形态）。 */
+	| "main.panel"
 	/** 对话头部条（标题旁的操作区）。 */
 	| "chat.header"
 	/** 空对话占位区（新对话的快捷入口）。 */

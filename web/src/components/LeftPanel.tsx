@@ -21,6 +21,7 @@ import { ProjectPicker } from "./ProjectPicker.js";
 import { LP_SECTION_ENTRY_IDS, type UiSlotEntry } from "../ui-slots";
 import { contextMenuItems, openContextMenu, type ContextMenuRequest } from "../context-menu-state";
 import { composeToComposer, focusComposer } from "../composer-bridge";
+import { PluginIcon } from "../plugin-icon";
 
 /** Props are deliberately NARROW (no whole-ChatState object): every field is
  *  stable while tokens stream in, so the shallow-compared memo() below skips
@@ -76,6 +77,11 @@ interface LeftPanelProps {
 	/** `leftpanel.sessions` 槽位的最终条目（host 内置 + 插件贡献，由 App 算好）。
 	 *  不传/空数组 = 不画，会话行 DOM 与旧版一字不差。 */
 	uiLeftSessions?: UiSlotEntry[];
+	/** `leftpanel.nav` 槽位的最终条目（由 App 算好）：插在「新建任务」「插件」下面的插件
+	 *  导航（如「记忆」）。不传/空数组 = 一个都不画，左栏 DOM 与旧版一字不差。 */
+	uiLeftNav?: UiSlotEntry[];
+	/** 当前展开的对话区插件主面板（slot main.panel）的插件 id——用来给对应导航项加 active。 */
+	activeMainPanel?: string | null;
 	/** 点击一条会话行内嵌条目：交回 App 分发给贡献它的插件（与顶栏 onUiAction 同通道）。 */
 	onUiAction?: (item: UiSlotEntry, value?: string) => void;
 	/** DSH Agent 预设名录（id → 显示名；左栏会话徽标用，缺省显示 id）。 */
@@ -134,6 +140,8 @@ export const LeftPanel = memo(function LeftPanel({
 	pathCompletions,
 	uiContextSession,
 	uiLeftSessions,
+	uiLeftNav,
+	activeMainPanel,
 	onUiAction,
 }: LeftPanelProps) {
 	const t = useT();
@@ -605,6 +613,7 @@ export const LeftPanel = memo(function LeftPanel({
 						if (!active) panelSend({ type: "switch_session", path: s.path });
 					}}
 				>
+					{s.isBranch && <span className="session-fork-badge">{t("forkBadge")}</span>}
 					<span className="session-info">
 						{renaming === s.path ? (
 							<input
@@ -698,6 +707,23 @@ export const LeftPanel = memo(function LeftPanel({
 					<FiPackage />
 					<span>{t("pluginEntry")}</span>
 				</button>
+				{(uiLeftNav ?? []).map((entry) => {
+					const active = !!activeMainPanel && entry.source === `plugin:${activeMainPanel}`;
+					return (
+						<button
+							key={entry.id}
+							type="button"
+							className={`lp-primary-action${active ? " active" : ""}`}
+							aria-pressed={active}
+							title={entry.hint ?? entry.label}
+							data-slot-item={entry.id}
+							onClick={() => onUiAction?.(entry)}
+						>
+							<PluginIcon icon={entry.icon} iconSvg={entry.iconSvg} className="lp-primary-svg" />
+							<span>{entry.label}</span>
+						</button>
+					);
+				})}
 			</nav>
 			<div className="lp-section project-tree-section panel-projects">
 				<div className="lp-section-header">

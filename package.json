@@ -1,6 +1,6 @@
 {
 	"name": "ccui",
-	"version": "0.0.7",
+	"version": "0.0.8",
 	"description": "Just open your browser to get all your work done — browser cockpit for AI coding agents (chat, code, files, terminal, Git in one tab)",
 	"license": "MIT",
 	"type": "module",
@@ -57,6 +57,7 @@
 		"test": "vitest run",
 		"test:unit": "vitest run",
 		"test:smoke": "node tests/run-smoke.mjs",
+		"test:plugins": "node --test plugins/memory/test/core.test.mjs plugins/memory/test/plugin.test.mjs plugins/memory/test/eval.test.mjs",
 		"check:protocol": "node scripts/check-protocol-sync.mjs",
 		"i18n:diff": "node scripts/i18n-diff.mjs",
 		"test:freeze": "node tests/freeze-test.mjs",

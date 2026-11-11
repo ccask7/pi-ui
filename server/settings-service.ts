@@ -80,6 +80,9 @@ export interface SettingsHost {
 	/** 可选：当前对话的审批放行策略（「本对话全部允许 / 允许同类」的撤销区用；
 	 *  纯内存态，见 server/tool-approval.ts 的 ApprovalPolicy）。 */
 	getApprovalPolicy?: () => UiApprovalPolicyState;
+	/** 可选：把「界面插件」停用名单落到全局停用表并让插件真正停下/起来
+	 *  （见 server/plugin-disabled.ts 与 PluginManager.setDisabled）。 */
+	setPluginsDisabled?: (ids: string[]) => void;
 }
 
 export class SettingsService {
@@ -507,6 +510,7 @@ export class SettingsService {
 			partial.disabledSkills !== undefined ||
 			partial.disabledExtensions !== undefined;
 		// 统一工具开关 live 生效（ActiveSet 加减，无需 reload），见末尾 applyToolGating。
+		let pluginsDisabledChanged = false;
 		const toolGatingChanged =
 			partial.disabledAgentTools !== undefined ||
 			partial.disabledPluginTools !== undefined ||
@@ -535,8 +539,14 @@ export class SettingsService {
 		if (partial.disabledExtensions !== undefined) {
 			this.settings.disabledExtensions = partial.disabledExtensions;
 		}
-		// 插件开关是纯 UI 隐藏（不进 needsReload——运行时无需重载）。
+		// 插件开关：改的是**进程级**的停用名单（全局表，见 server/plugin-disabled.ts）——
+		// 停用 = 该插件不激活（AI 工具/HTTP 路由/订阅/定时任务全撤），数据留在磁盘上；
+		// 重新打开 = 重新激活。以前这里只是前端隐藏 UI，插件照跑（工具照样能用）。
+		// 只在名单真的变了才 reload（插件 reload 会重 import 全部模块、丢内存状态）。
 		if (partial.disabledPlugins !== undefined) {
+			const before = [...(this.settings.disabledPlugins ?? [])].sort().join("\u0000");
+			const after = [...partial.disabledPlugins].sort().join("\u0000");
+			pluginsDisabledChanged = before !== after;
 			this.settings.disabledPlugins = partial.disabledPlugins;
 		}
 		// UI 布局偏好只是渲染层的事（顶栏/底栏/右键菜单由前端拼），同样不需 reload。
@@ -678,6 +688,7 @@ export class SettingsService {
 		this.push();
 		// 统一工具开关 live 生效（ActiveSet 加减；失败静默，下次创建/reload 重放）。
 		if (toolGatingChanged) this.host.applyToolGating();
+		if (pluginsDisabledChanged) this.host.setPluginsDisabled?.([...(this.settings.disabledPlugins ?? [])]);
 		if (needsReload) await this.applyRuntime();
 	}
 

@@ -71,6 +71,7 @@ import {
 // 工作区根的归一化与 client-state 共用一份（同一份语义：只收绝对路径 / 去重 / 上限）。
 import { normalizeWorkspaceRoots } from "./client-state.js";
 import { createProject, type ProjectCreateSpec, type ProjectCreateResult } from "./plugin-project.js";
+import { PluginDisabledStore } from "./plugin-disabled.js";
 import type { Request, Response } from "express";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -861,6 +862,8 @@ export const UI_SLOTS: ReadonlySet<string> = new Set([
 	"contextmenu.toolcall",
 	"settings.pages",
 	"leftpanel.sessions",
+	"leftpanel.nav",
+	"main.panel",
 	"chat.header",
 	"chat.empty",
 	"file.preview.toolbar",
@@ -878,6 +881,8 @@ export const UI_SLOT_ALIASES: Readonly<Record<string, string>> = {
 	composer: "composer.actions",
 	message: "message.actions",
 	rightpanel: "rightpanel.tabs",
+	leftnav: "leftpanel.nav",
+	mainpanel: "main.panel",
 	settings: "settings.pages",
 	modal: "modal.dialog",
 };
@@ -1583,6 +1588,10 @@ export class PluginManager {
 	readonly grants: PluginGrantsStore;
 	/** 特权 DOM 授权表（<dataDir>/plugin-dom.json）：wantsDom 插件的 bundle 门禁。 */
 	private readonly domConsentStore: PluginDomConsent;
+	/** 全局停用表（<dataDir>/plugin-disabled.json）：停用 = 不激活（工具/路由/订阅/定时器全撤）。
+	 *  设置面板的「界面插件」开关写它（见 SettingsService.setSettings）—— 以前那只是前端隐藏。 */
+	private readonly disabledStore: PluginDisabledStore;
+	private disabled: Set<string>;
 	/** scan() 顺手维护的 wantsDom 快照：静态门禁查它，不必每次 readdir。未知 id = 不拦。 */
 	private readonly domWants = new Map<string, boolean>();
 	/** 由 index.ts 注入：向浏览器请求「插件要访问这个目录」的用户确认。 */
@@ -1615,6 +1624,8 @@ export class PluginManager {
 		this.grants = new PluginGrantsStore(dataDir);
 		this.permGrants = new PluginPermissionStore(dataDir);
 		this.domConsentStore = new PluginDomConsent(dataDir);
+		this.disabledStore = new PluginDisabledStore(dataDir);
+		this.disabled = new Set(this.disabledStore.read());
 	}
 
 	/** index.ts 在客户端 set_cwd 成功后调用：更新全局工作区并扇出给
@@ -1925,6 +1936,17 @@ export class PluginManager {
 		this.epochCounter += 1;
 		void this.pushToAll().catch(() => {});
 		return { changed: true };
+	}
+
+	/** 设置面板「界面插件」开关落库：写全局停用表并让名单生效。
+	 *  只改内存不动运行时（调用方随后 reload()），便于批量改一次。 */
+	setDisabled(ids: readonly string[]): void {
+		this.disabled = new Set(this.disabledStore.write(ids));
+	}
+
+	/** 当前停用名单（诊断/单测用）。 */
+	disabledIds(): string[] {
+		return [...this.disabled];
 	}
 
 	/** 服务端热重载：反激活全部 → 清缓存 → 重扫重激活 → epoch+1。
@@ -2532,13 +2554,14 @@ export class PluginManager {
 		for (const id of order) {
 			const info = byId.get(id)!;
 			if (this.loaded.has(info.id) || this.attempted.has(info.id)) continue;
+			if (this.disabled.has(info.id)) continue; // 停用 = 不激活（数据留在磁盘上）
 			if (!existsSync(join(this.pluginsDir, info.id, "index.mjs"))) continue; // 纯前端插件
 			await this.activate(info, lang);
 		}
 		// 已被删除的插件：调用 deactivate 并移出缓存
 		// eslint-disable-next-line unicorn/no-useless-spread -- snapshot: handlers may unsubscribe mid-emit
 		for (const [id, p] of [...this.loaded]) {
-			if (!found.some((f) => f.id === id)) {
+			if (!found.some((f) => f.id === id) || this.disabled.has(id)) {
 				this.deactivateEntry(id, p);
 			}
 		}

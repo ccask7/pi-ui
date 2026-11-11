@@ -51,6 +51,8 @@ describe("设置 → 通用 → 软件更新", () => {
 		expect(updater.check).toHaveBeenCalledTimes(1);
 		expect(updater.download).not.toHaveBeenCalled();
 		expect(document.querySelector(".update-modal")?.textContent).toContain("v0.1.0");
+		// 必须复用全屏弹窗容器；裸 update-overlay 会在 portal 中排到应用下方，造成点击后无可见反馈。
+		expect(document.querySelector(".update-overlay")?.classList.contains("modal-backdrop")).toBe(true);
 		const update = document.querySelector<HTMLButtonElement>(".update-modal .update-actions .primary")!;
 		await act(async () => {
 			update.click();

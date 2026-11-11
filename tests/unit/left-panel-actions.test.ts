@@ -96,6 +96,24 @@ afterEach(() => {
 });
 
 describe("LeftPanel 标题栏操作与项目管理", () => {
+	it("历史分支会话显示分支小标识，但不增加悬浮提示", () => {
+		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
+		const sessions = [
+			{
+				path: "branch.jsonl",
+				name: "分支会话",
+				firstMessage: "Hello",
+				modified: Date.now(),
+				messageCount: 1,
+				isBranch: true,
+			},
+		];
+		const { container } = mountLeftPanel({ sessions, projectSessions: { "/test": sessions } });
+		const badge = container.querySelector(".session-fork-badge");
+		expect(badge?.textContent).toBe("分支");
+		expect(badge?.getAttribute("title")).toBeNull();
+	});
+
 	it("projects=[] 时仍渲染“项目”标题栏和项目管理按钮，并保留统一树滚动区", () => {
 		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
 		const { container } = mountLeftPanel({ projects: [] });

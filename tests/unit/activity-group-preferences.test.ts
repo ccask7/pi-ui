@@ -12,7 +12,7 @@ let container: HTMLDivElement | null = null;
 
 const blocks: UiContentBlock[] = [
 	{ type: "thinking", thinking: "考虑实现方式" },
-	{ type: "toolCall", id: "tool-1", name: "read", argumentsText: "{\"path\":\"README.md\"}" },
+	{ type: "toolCall", id: "tool-1", name: "read", argumentsText: '{"path":"README.md"}' },
 ];
 
 function render(toolsWrap = false, thinkingWrap = false) {
