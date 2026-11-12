@@ -31,7 +31,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve, sep } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { UiApprovalCategory } from "./protocol.js";
 
 /** 工具调用审批命中动作：需审批 / 直接拒绝 / 直接放行（白名单）。 */
@@ -144,6 +144,25 @@ export function extractRuleFieldValue(field: ApprovalRuleField, toolName: string
 }
 
 /**
+ * 统一权限预设与审批规则的工作区归属判断。
+ * Windows 下绝对路径也必须经 resolve 规范化，否则 D:/ 与 D:\\ 混用会被 startsWith 误判；
+ * relative 同时处理盘符大小写、尾随分隔符、.. 越界及不同盘符，避免手工拼接前缀。
+ */
+export function isInsideWorkspaceRoots(targetPath: string, cwd: string, workspaceRoots: string[] = []): boolean {
+	let target = targetPath;
+	if (process.platform === "win32") {
+		// 与 SDK/edit_soft 的 shell 路径口径一致：/d/...、/mnt/d/...、/cygdrive/d/...
+		const shellPath = target.match(/^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/(.*))?$/i);
+		if (shellPath) target = `${shellPath[1].toUpperCase()}:/${shellPath[2] ?? ""}`;
+	}
+	const abs = resolve(cwd, target);
+	return [cwd, ...workspaceRoots].some((root) => {
+		const rel = relative(resolve(root), abs);
+		return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+	});
+}
+
+/**
  * 单条规则针对具体工具调用的匹配判定（纯函数）。
  */
 export function matchApprovalRule(
@@ -164,10 +183,7 @@ export function matchApprovalRule(
 	if (rule.match === "outside_workspace") {
 		const targetPath = extractRuleFieldValue("path", toolName, params);
 		if (!targetPath) return false;
-		const abs = isAbsolute(targetPath) ? targetPath : resolve(cwd, targetPath);
-		const allRoots = [resolve(cwd), ...workspaceRoots.map((r) => resolve(r))];
-		const inside = allRoots.some((r) => abs === r || abs.startsWith(r + sep));
-		return !inside;
+		return !isInsideWorkspaceRoots(targetPath, cwd, workspaceRoots);
 	}
 
 	// 3. 提取字段文本

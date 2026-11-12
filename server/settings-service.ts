@@ -83,6 +83,8 @@ export interface SettingsHost {
 	/** 可选：把「界面插件」停用名单落到全局停用表并让插件真正停下/起来
 	 *  （见 server/plugin-disabled.ts 与 PluginManager.setDisabled）。 */
 	setPluginsDisabled?: (ids: string[]) => void;
+	/** 读全局停用表：与客户端设置里的 disabledPlugins 取并集再下发。 */
+	getPluginsDisabled?: () => string[];
 }
 
 export class SettingsService {
@@ -370,7 +372,10 @@ export class SettingsService {
 				scmCommitMsgPrompt: this.settings.scmCommitMsgPrompt,
 				reviewPrompt: this.settings.reviewPrompt,
 				reviewDisabledSkills: [...this.settings.reviewDisabledSkills],
-				disabledPlugins: [...(this.settings.disabledPlugins ?? [])],
+				// 并集：客户端设置（可能落后）+ 全局停用表（唯一真源，插件激活按它走）
+				disabledPlugins: [
+					...new Set([...(this.settings.disabledPlugins ?? []), ...(this.host.getPluginsDisabled?.() ?? [])]),
+				],
 				uiLayout: normalizeUiLayout(this.settings.uiLayout),
 				skillsFullText: [...normalizeSkillList(this.settings.skillsFullText)],
 				// The composed system prompt actually in effect (read-only view).

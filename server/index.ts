@@ -39,6 +39,7 @@ import { startControlServer } from "./control-socket.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { windowsBashDir } from "./ensure-bash.js";
 import { listThemes, resolveThemeFile } from "./themes.js";
+import { seedBundledPlugins } from "./plugin-seed.js";
 import { parseTabs, tabsRefusal } from "./tabs.js";
 import { recordUnknownWsType } from "./ws-unknown-types.js";
 import { isKnownPack, listPacks, loadServerStrings, readPackFile, removePack, unloadServerStrings } from "./locales.js";
@@ -1190,6 +1191,8 @@ export interface EngineService {
 	pluginStopBgTask?: ((taskId: string) => boolean) | undefined;
 	/** 把「界面插件」停用名单交给引擎侧（pi 引擎写全局停用表，见 plugins 停用语义）。 */
 	pluginsDisabledWriter?: ((ids: string[]) => void) | undefined;
+	/** 读全局停用表（设置快照里与客户端设置取并集，保证开关显示 = 实际激活状态）。 */
+	pluginsDisabledReader?: (() => string[]) | undefined;
 	/** 当前客户端 UI 语言（插件列表/诊断文案用；dsh 引擎不必有）。 */
 	getLang?: (() => string) | undefined;
 	onClientCwdChanged?: ((cwd: string, roots: string[]) => void) | undefined;
@@ -1202,6 +1205,9 @@ const service: EngineService = new AgentService(
 );
 initAttachmentStore(DATA_DIR);
 loadServerStrings(DATA_DIR);
+// 内置插件播种：首次启动把随包发行的那几个拷进 <dataDir>/plugins/（默认停用）。
+// 必须在 new PluginManager 之前 —— 它构造时就要读停用表。
+seedBundledPlugins(DATA_DIR);
 // Optional UI plugins (<dataDir>/plugins/<id>/): scanned on every client
 // attach so freshly dropped plugins appear without a server restart.
 const pluginMgr = new PluginManager(DATA_DIR, CWD);
@@ -1579,6 +1585,7 @@ pluginMgr.onAgentToolsChanged = () => {
 };
 // 「界面插件」停用开关：以前只在前端隐藏，插件在服务端照跑（工具照样能用）。
 // 现在写进全局停用表并让插件真正反激活/重新激活——数据都在磁盘上，开关不碰它。
+service.pluginsDisabledReader = () => pluginMgr.disabledIds();
 service.pluginsDisabledWriter = (ids) => {
 	pluginMgr.setDisabled(ids);
 	void pluginMgr

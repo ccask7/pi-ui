@@ -94,7 +94,7 @@ import {
 } from "./client-state.js";
 import { bilingual, pick, resolveServerLang, type ServerLang } from "./i18n.js";
 import { SubagentTemplatesStore, pickTemplatePrompt, type SubagentTemplate } from "./subagent-templates.js";
-import { ApprovalRulesStore, type ApprovalRule } from "./approval-rules.js";
+import { ApprovalRulesStore, isInsideWorkspaceRoots, type ApprovalRule } from "./approval-rules.js";
 import { ComposerDraftsStore } from "./composer-drafts.js";
 import { createWorkspaceSnapshot, restoreWorkspaceSnapshot } from "./workspace-snapshot.js";
 import {
@@ -611,13 +611,6 @@ export function withToolGuard(
 			return result as never;
 		}) as never,
 	} as ToolDefinition;
-}
-
-/** 校验目标路径是否在工作区（或多根工作区）内。 */
-function isInsideWorkspaceRoots(targetPath: string, cwd: string, roots: string[] = []): boolean {
-	const abs = isAbsolute(targetPath) ? targetPath : resolve(cwd, targetPath);
-	const allRoots = [resolve(cwd), ...roots.map((r) => resolve(r))];
-	return allRoots.some((r) => abs === r || abs.startsWith(r + sep));
 }
 
 /** 为 write 工具包装会话级权限沙箱与人机协同审批。 */
@@ -2126,6 +2119,9 @@ export class ClientSession {
 	/** index.ts 注入：把「界面插件」停用名单落到全局表并让插件真正停下/起来
 	 *  （见 server/plugin-disabled.ts）。没注入 = 只当 UI 偏好，行为与旧版一致。 */
 	pluginsDisabledWriter?: (ids: string[]) => void;
+	/** index.ts 注入：读全局停用表。「界面插件」开关的显示状态以它为准 —— 否则
+	 *  「服务端停用 + 客户端设置里没有」会显示成已开启（首次播种默认停用就是这种）。 */
+	pluginsDisabledReader?: () => string[];
 	/** index.ts 经 AgentService 注入：内置调度存储（定时任务 Agent 工具用；未注入时工具直接报错）。 */
 	schedulerStore: SchedulerStore | undefined = undefined;
 	/** index.ts 注入：读取插件当前注册的斜杠命令（目录展示 + prompt 拦截执行）。 */
@@ -3344,6 +3340,7 @@ export class ClientSession {
 				setPluginsDisabled: (ids) => {
 					this.pluginsDisabledWriter?.(ids);
 				},
+				getPluginsDisabled: () => this.pluginsDisabledReader?.() ?? [],
 			},
 			this.subagentTemplates,
 			this.approvalRules,

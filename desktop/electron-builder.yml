@@ -9,6 +9,7 @@ directories:
 files:
   - dist/desktop
   - dist/server
+  - dist/plugins
   - web/dist
   - themes
   - package.json

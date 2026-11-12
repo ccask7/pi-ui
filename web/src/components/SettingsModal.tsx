@@ -58,6 +58,7 @@ import { NotifyToggle } from "./NotifyToggle";
 import { ToggleRow } from "./SettingsControls";
 import { SkillsPanel } from "./SkillsPanel";
 import { LanguageSettings } from "./LanguageSettings";
+import { FontSettings } from "./FontSettings";
 import { UpdateSettings } from "./UpdateSettings";
 import { BrowserControlSettings } from "./BrowserControl";
 import type { SoundSettings } from "../sounds";
@@ -880,6 +881,7 @@ export function SettingsModal({
 									</div>
 									<LanguageSettings />
 								</div>
+								<FontSettings />
 								<UpdateSettings appVersion={appVersion} />
 							</>
 						)}

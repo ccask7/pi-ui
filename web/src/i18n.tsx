@@ -28,6 +28,10 @@ export const zh = {
 	connecting: "连接中…",
 	reconnecting: "重连中…",
 	language: "语言",
+	interfaceFont: "界面字体",
+	interfaceFontDesc: "仅切换界面与对话正文，代码和终端保持等宽字体",
+	interfaceFontSystem: "系统默认",
+	interfaceFontSarasa: "更纱黑体（简中）",
 	copy: "复制",
 
 	/* topbar */
@@ -1513,6 +1517,10 @@ const en: Record<keyof typeof zh, string> = {
 	connecting: "Connecting…",
 	reconnecting: "Reconnecting…",
 	language: "Language",
+	interfaceFont: "Interface Font",
+	interfaceFontDesc: "Changes interface and conversation text only; code and terminals stay monospaced",
+	interfaceFontSystem: "System Default",
+	interfaceFontSarasa: "Sarasa UI SC",
 	copy: "Copy",
 
 	/* topbar */

@@ -207,6 +207,11 @@ html {
 	background: transparent;
 }
 
+/* 用户正文字体优先于各主题的 --sans；等宽代码与终端不受影响。 */
+:root[data-interface-font="sarasa-ui-sc"] {
+	--sans: "SarasaUiSC-Regular", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
 body {
 	/* 整体不透明度：100% 时等于原来的实色 --bg，调小则连桌面一起透出。 */
 	background: color-mix(in srgb, var(--bg) var(--window-opacity), transparent);

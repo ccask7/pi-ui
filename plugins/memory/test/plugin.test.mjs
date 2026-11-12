@@ -492,6 +492,18 @@ describe("隔离区升降 + 批量操作", () => {
 		assert.equal(p.store().trash.length, 3);
 	});
 
+	it("未知批量动作直接 400，不静默回“已完成 0 条”", async () => {
+		const p = await open();
+		let status = 0;
+		let body = {};
+		p.routes.get("POST /op")(
+			{ body: { op: "bulk", action: "explode", ids: ["m1"] } },
+			{ status: (c) => ((status = c), { json: (d) => (body = d) }) },
+		);
+		assert.equal(status, 400);
+		assert.match(String(body.error), /未知的批量动作/);
+	});
+
 	it("批量接口拒绝空 ids", async () => {
 		const p = await open();
 		let status = 0;

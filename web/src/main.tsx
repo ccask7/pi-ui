@@ -10,6 +10,7 @@ import { WINDOW_OPACITY_CHANGE_EVENT, applyWindowOpacity } from "./window-opacit
 import { initAuthToken } from "./auth-token";
 import { installScrollbarGutterVar } from "./scrollbar-gutter";
 import { appBase } from "./base-url";
+import { applyInterfaceFont } from "./font-settings";
 
 // 吸收地址栏 ?token=（PI_WEB_TOKEN 鉴权入口）并持久化，须在首次请求前执行
 initAuthToken();
@@ -20,6 +21,7 @@ applyTheme(loadTheme());
 // 整体不透明度（styles.css 的 --window-opacity）同样要在首帧前到位，
 // 否则半透明窗口会先闪一帧实心底色。
 applyWindowOpacity();
+applyInterfaceFont();
 // 桌面壳（Electron WCO）：顶栏兼任标题栏——挂根 class（styles.css 里有对应的
 // 拖拽 / 右侧让位规则），主题切换时同步右上角系统按钮条颜色。浏览器全跳过。
 if (isDesktopShell()) {

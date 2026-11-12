@@ -8,6 +8,7 @@ import {
 	evaluateApprovalRules,
 	extractRuleFieldValue,
 	globToRegex,
+	isInsideWorkspaceRoots,
 	matchApprovalRule,
 	normalizeApprovalRule,
 	type ApprovalRule,
@@ -51,6 +52,27 @@ describe("审批规则引擎纯函数与匹配逻辑 (Approval Rules Engine)", (
 			const json = extractRuleFieldValue("params", "custom", { a: 1, b: "test" });
 			expect(json).toContain('"a":1');
 			expect(json).toContain('"b":"test"');
+		});
+	});
+
+	describe("工作区路径归属", () => {
+		it.runIf(process.platform === "win32")("Windows 正斜杠、混合分隔符与盘符大小写均视为工作区内", () => {
+			const root = "D:\\AIagent\\PI-WEB\\app";
+			expect(isInsideWorkspaceRoots("D:/AIagent/PI-WEB/app/a.txt", root)).toBe(true);
+			expect(isInsideWorkspaceRoots("D:/AIagent\\PI-WEB/app/sub\\a.txt", root)).toBe(true);
+			expect(isInsideWorkspaceRoots("d:/AIagent/PI-WEB/app/a.txt", root)).toBe(true);
+			expect(isInsideWorkspaceRoots("/d/AIagent/PI-WEB/app/a.txt", root)).toBe(true);
+			expect(isInsideWorkspaceRoots("/mnt/d/AIagent/PI-WEB/app/a.txt", root)).toBe(true);
+			expect(isInsideWorkspaceRoots("D:/AIagent/PI-WEB/app-other/a.txt", root)).toBe(false);
+			expect(isInsideWorkspaceRoots("D:/AIagent/PI-WEB/app/../external.txt", root)).toBe(false);
+			expect(isInsideWorkspaceRoots("E:/external.txt", root)).toBe(false);
+		});
+
+		it("额外工作区根与普通相对路径保持有效", () => {
+			expect(isInsideWorkspaceRoots("src/a.txt", cwd)).toBe(true);
+			expect(isInsideWorkspaceRoots("../external.txt", cwd)).toBe(false);
+			expect(isInsideWorkspaceRoots(join(cwd, "extra", "a.txt"), cwd)).toBe(true);
+			expect(isInsideWorkspaceRoots(join(cwd, "..", "shared", "a.txt"), cwd, [join(cwd, "..", "shared")])).toBe(true);
 		});
 	});
 

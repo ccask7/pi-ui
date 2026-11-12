@@ -2,7 +2,7 @@
 	"id": "memory",
 	"name": "记忆",
 	"nameEn": "Memory",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"icon": "🧠",
 	"description": "长期记忆：AI 记下踩过的坑、有理由的决定、项目约定、环境事实和术语，用到就亮、长期不用就淡下去、被推翻就变灰。点「记忆」看一张会变模糊的图：节点大小是强度，颜色是类型，灰点是作废；可搜索、可钉住、可作废、可删除（删掉的不会再被自动记回来）。不往对话里塞任何常驻内容——记忆只在 AI 主动查、或它正要读某个文件/跑某条命令时靠过来。",
 	"descriptionEn": "Long-term memory: the agent records pitfalls, reasoned decisions, conventions, environment facts and project jargon. Used memories brighten, unused ones fade, refuted ones turn grey. Open Memory to see a graph that blurs over time — node size is strength, colour is type, grey dot means invalidated. Search, pin, invalidate or delete; deleted entries are not re-captured automatically. Nothing is injected permanently into the conversation.",

@@ -323,6 +323,9 @@ export default {
 		 * 写一条记忆（工具与自动抽取共用）。返回人类可读的一句话（同时给模型看）。
 		 * 顺序：脱敏 → 黑名单 → 相似判定（>=0.85 视为重复，0.6~0.85 更新旧的）→ 落库。
 		 */
+		/** 批量操作允许的动作白名单（未知动作直接 400，别静默回“已完成 0 条”）。 */
+		const BULK_ACTIONS = ["invalidate", "delete", "restore", "pin", "unpin", "quarantine", "unquarantine"];
+
 		async function writeMemory(input, { sourceKind = "agent" } = {}) {
 			const now = Date.now();
 			const rec = C.normalizeRecord(input, now);
@@ -1014,6 +1017,10 @@ export default {
 				const action = String(body.action ?? "");
 				if (!ids.length) {
 					res.status(400).json({ ok: false, error: "ids 为空" });
+					return;
+				}
+				if (!BULK_ACTIONS.includes(action)) {
+					res.status(400).json({ ok: false, error: `未知的批量动作：${action || "(空)"}` });
 					return;
 				}
 				void serialize(async () => {

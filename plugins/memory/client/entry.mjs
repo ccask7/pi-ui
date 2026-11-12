@@ -232,8 +232,12 @@ export default {
 				state.records = Array.isArray(data.records) ? data.records : [];
 				state.trash = Array.isArray(data.trash) ? data.trash : [];
 				state.now = data.now ?? Date.now();
+				// 选中的条目可能刚被删除/作废：先剔掉失效 id，免得批量条还显示“已选 3”
+				if (state.picked.size) {
+					const alive = new Set(state.records.map((r) => r.id));
+					for (const id of [...state.picked]) if (!alive.has(id)) state.picked.delete(id);
+				}
 				rebuild();
-				updateTrashButton();
 				updateListButtons();
 				if (state.listMode) renderList();
 				updateBatchBar();
