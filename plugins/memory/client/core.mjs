@@ -101,7 +101,12 @@ export function buildIndex(records) {
 	const list = Array.isArray(records) ? records : [];
 	for (const rec of list) {
 		if (!rec || !rec.id) continue;
-		const terms = new Set(tokenize(`${rec.content ?? ""} ${rec.excerpt ?? ""} ${(rec.tags ?? []).join(" ")}`));
+		// topics 只进召回（搜"部署"能找到挂了这个主题的记忆），权重表不动
+		const terms = new Set(
+			tokenize(
+				`${rec.content ?? ""} ${rec.excerpt ?? ""} ${(rec.tags ?? []).join(" ")} ${(rec.topics ?? []).join(" ")}`,
+			),
+		);
 		termsById.set(rec.id, terms);
 		for (const t of terms) {
 			let bucket = postings.get(t);
@@ -306,6 +311,28 @@ export function hitsBlacklist(entry, list, threshold = 0.8) {
 	return false;
 }
 
+/** 主题：0–3 个短标签，纯给人看的分组；不参与打分（只进召回索引）。
+ *  规则：去掉开头的 #、空白折叠、按小写去重、单条 ≤ 24 字符、最多 3 个。 */
+export function normalizeTopics(raw) {
+	const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/[,，;；]/) : [];
+	const out = [];
+	const seen = new Set();
+	for (const item of list) {
+		const text = String(item ?? "")
+			.replace(/^#+/, "")
+			.replace(/\s+/g, " ")
+			.trim()
+			.slice(0, 24);
+		if (!text) continue;
+		const key = text.toLowerCase();
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(text);
+		if (out.length >= 3) break;
+	}
+	return out;
+}
+
 /** 写入归一化：把工具/界面传来的对象修成一条合法记录（未给 id 时由调用方补）。 */
 export function normalizeRecord(raw, nowMs = Date.now()) {
 	const r = raw && typeof raw === "object" ? raw : {};
@@ -322,10 +349,13 @@ export function normalizeRecord(raw, nowMs = Date.now()) {
 		.map((t) =>
 			String(t ?? "")
 				.trim()
-				.slice(0, 24),
+				// 120：文件路径要塞得下。以前截到 24 会把 `plugins/memory/manifest.` 这种半截
+				// 路名写进库，按文件归类时就归到假名字下。
+				.slice(0, 120),
 		)
 		.filter(Boolean)
 		.slice(0, 8);
+	const topics = normalizeTopics(r.topics);
 	const created = Number(r.createdAt) || nowMs;
 	return {
 		id: String(r.id ?? ""),
@@ -335,6 +365,7 @@ export function normalizeRecord(raw, nowMs = Date.now()) {
 		content,
 		excerpt,
 		tags,
+		topics,
 		importance: clampInt(r.importance, 1, 5, type === "pitfall" || type === "decision" ? 4 : 3),
 		source: {
 			conversationId: r.source?.conversationId ? String(r.source.conversationId).slice(0, 80) : undefined,

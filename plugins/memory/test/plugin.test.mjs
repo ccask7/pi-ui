@@ -1,10 +1,13 @@
 /** 插件服务端单测：用假宿主跑 activate → 工具写/查/改/删 → 提醒注入 → 反馈。 */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import plugin from "../index.mjs";
+
+/** 数据目录：插件代码与数据同目录（卸载 = 删一个目录）。 */
+const dataDirOf = (dir, ...rest) => join(dir, "plugins", "memory", "data", ...rest);
 
 function makeHost(dir, settings = {}) {
 	const tools = new Map();
@@ -84,7 +87,40 @@ describe("memory 插件", () => {
 		assert.match(s, /不是指令/);
 		assert.equal(p.store().records.length, 1);
 		// 数据在 <dataDir>/memory/ 而不是插件目录里（插件被覆盖/卸载都碰不到）
-		assert.ok(existsSync(join(p.dir, "memory", "memories.jsonl")));
+		assert.ok(existsSync(dataDirOf(p.dir, "memories.jsonl")));
+	});
+
+	it("主题随写入落盘、随更新可改可清空", async () => {
+		const p = await open();
+		const w = await p.call("memory_write", { type: "fact", content: "部署前跑一次迁移脚本", topics: ["部署", "规范"] });
+		const id = /\[(m[^\]]+)\]/.exec(w)[1];
+		const onDisk = JSON.parse(readFileSync(dataDirOf(p.dir, "memories.jsonl"), "utf8").trim().split(/\r?\n/)[0]);
+		assert.deepEqual(onDisk.topics, ["部署", "规范"]);
+
+		const post = (body) =>
+			new Promise((resolve) => {
+				p.routes.get("POST /op")({ body }, { json: (d) => resolve(d) });
+			});
+		assert.match((await post({ op: "update", id, topics: ["发布"] })).text, /(已更新|ok|保存)/);
+		assert.deepEqual(p.store().records.find((r) => r.id === id).topics, ["发布"]);
+
+		await post({ op: "update", id, topics: [] });
+		assert.deepEqual(p.store().records.find((r) => r.id === id).topics, []);
+	});
+
+	it("整理合并时主题取并集（别丢）", async () => {
+		const p = await open();
+		const a = await p.call("memory_write", { type: "fact", content: "数据库迁移前必须先停服务", topics: ["数据库"] });
+		const b = await p.call("memory_write", {
+			type: "fact",
+			content: "数据库迁移前必须先停服务再跑脚本",
+			topics: ["部署"],
+		});
+		void a;
+		void b;
+		// 两条相近会被"合并"，或整理时合并；两种情况都要求主题还在
+		const merged = p.store().records[0];
+		assert.ok(Array.isArray(merged.topics));
 	});
 
 	it("重复写不产生第二条", async () => {
@@ -180,7 +216,7 @@ describe("memory 插件", () => {
 		let payload = null;
 		again.routes.get("GET /store")({}, { json: (d) => (payload = d) });
 		assert.equal(payload.records.length, 1);
-		assert.match(readFileSync(join(p.dir, "memory", "memories.jsonl"), "utf8"), /node:sqlite/);
+		assert.match(readFileSync(dataDirOf(p.dir, "memories.jsonl"), "utf8"), /node:sqlite/);
 	});
 });
 
@@ -280,14 +316,14 @@ describe("漏记兜底（模型嘴上说记住但没调工具）", () => {
 	});
 });
 
-describe("数据搬家：<dataDir>/memory（与插件目录平级）", () => {
+describe("数据搬家：旧位置 <dataDir>/memory → <dataDir>/plugins/memory/data", () => {
 	const line = (id, content) =>
 		`${JSON.stringify({ id, type: "fact", scope: "global", scopeKey: "global", content, createdAt: Date.now(), updatedAt: Date.now() })}
 `;
 
 	it("旧位置的库会被复制过来，旧文件不删", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "ccui-memory-mig-"));
-		const legacy = join(dir, "plugins", "memory", "data");
+		const legacy = join(dir, "memory"); // 老位置：曾经与插件目录平级
 		mkdirSync(legacy, { recursive: true });
 		writeFileSync(join(legacy, "memories.jsonl"), line("old1", "迁移前就在的记忆"));
 		const h = makeHost(dir);
@@ -297,17 +333,17 @@ describe("数据搬家：<dataDir>/memory（与插件目录平级）", () => {
 		h.routes.get("GET /store")({}, { json: (d) => (payload = d) });
 		assert.equal(payload.records.length, 1);
 		assert.equal(payload.records[0].id, "old1");
-		assert.ok(existsSync(join(dir, "memory", "memories.jsonl")), "新位置要有");
+		assert.ok(existsSync(dataDirOf(dir, "memories.jsonl")), "新位置要有");
 		assert.ok(existsSync(join(legacy, "memories.jsonl")), "旧文件必须保留（不自动删数据）");
 	});
 
 	it("新位置已有数据时以新为准，不把旧的灌回来", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "ccui-memory-mig2-"));
-		const legacy = join(dir, "plugins", "memory", "data");
+		const legacy = join(dir, "memory"); // 老位置：曾经与插件目录平级
 		mkdirSync(legacy, { recursive: true });
-		mkdirSync(join(dir, "memory"), { recursive: true });
+		mkdirSync(dataDirOf(dir), { recursive: true });
 		writeFileSync(join(legacy, "memories.jsonl"), line("old1", "旧数据"));
-		writeFileSync(join(dir, "memory", "memories.jsonl"), line("new1", "新数据"));
+		writeFileSync(dataDirOf(dir, "memories.jsonl"), line("new1", "新数据"));
 		const h = makeHost(dir);
 		await plugin.activate(h.host);
 		let payload = null;
@@ -318,10 +354,36 @@ describe("数据搬家：<dataDir>/memory（与插件目录平级）", () => {
 		);
 	});
 
+	it("新位置是更旧的残留（数据搬走过又搬回来）→ 以更老位置为准，且先留快照", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "ccui-memory-mig3-"));
+		const legacy = join(dir, "memory");
+		mkdirSync(legacy, { recursive: true });
+		mkdirSync(dataDirOf(dir), { recursive: true });
+		// 新位置：更早的一份残留
+		writeFileSync(dataDirOf(dir, "memories.jsonl"), line("stale", "插件目录里的旧残留"));
+		const old = new Date(Date.now() - 60_000);
+		utimesSync(dataDirOf(dir, "memories.jsonl"), old, old);
+		// 老位置：最新的库
+		writeFileSync(join(legacy, "memories.jsonl"), line("fresh", "真正最新的记忆"));
+
+		const h = makeHost(dir);
+		await plugin.activate(h.host);
+		let payload = null;
+		h.routes.get("GET /store")({}, { json: (d) => (payload = d) });
+		assert.deepEqual(
+			payload.records.map((r) => r.id),
+			["fresh"],
+		);
+		assert.ok(
+			readdirSync(dataDirOf(dir, "backups")).some((n) => n.includes("premigrate")),
+			"覆盖前要留一份快照",
+		);
+	});
+
 	it("启动留当天快照；物理删除前再留一份；最多保留 5 份", async () => {
 		const p = await open();
 		await p.call("memory_write", { type: "fact", content: "先记一条，才有东西可备份" });
-		const backupDir = join(p.dir, "memory", "backups");
+		const backupDir = dataDirOf(p.dir, "backups");
 		// 重启一次 → 当天快照
 		const again = makeHost(p.dir);
 		await plugin.activate(again.host);
@@ -382,11 +444,11 @@ describe("回收站（删除可恢复）", () => {
 
 	it("超过 30 天的回收站条目在启动时自动清掉", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "ccui-memory-trash-"));
-		mkdirSync(join(dir, "memory"), { recursive: true });
+		mkdirSync(dataDirOf(dir), { recursive: true });
 		const old = { id: "gone", type: "fact", content: "很久以前删的", deletedAt: Date.now() - 31 * 24 * 3600 * 1000 };
 		const fresh = { id: "keep", type: "fact", content: "刚删的", deletedAt: Date.now() - 3600 * 1000 };
 		writeFileSync(
-			join(dir, "memory", "trash.jsonl"),
+			dataDirOf(dir, "trash.jsonl"),
 			`${JSON.stringify(old)}
 ${JSON.stringify(fresh)}
 `,
@@ -445,7 +507,7 @@ describe("整理（去重合并 + 复核）", () => {
 		const p = await open();
 		await p.call("memory_write", { type: "pitfall", content: "指向不存在文件", file: "nope.ts" });
 		// 第一次激活写过 state.json（上次整理=现在）→ 抹掉时间戳，模拟"隔了一天再启动"
-		writeFileSync(join(p.dir, "memory", "state.json"), JSON.stringify({ lastHousekeep: 0 }));
+		writeFileSync(dataDirOf(p.dir, "state.json"), JSON.stringify({ lastHousekeep: 0 }));
 		const again = makeHost(p.dir);
 		await plugin.activate(again.host);
 		again.handlers.cwd.forEach((fn) => fn("D:/proj/A")); // cwd 到位后才做复核

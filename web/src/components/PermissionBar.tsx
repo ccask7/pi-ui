@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from "react";
 import { FiAlertTriangle, FiShield } from "react-icons/fi";
 import type { PermissionOption } from "../types";
 import { useT } from "../i18n";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { appSend } from "../app-globals";
 import { Dropdown, DropdownItem } from "./Dropdown";
 
@@ -63,57 +64,72 @@ export const PermissionBar = memo(function PermissionBar({
 	const isCustom = !!current && !offered.includes(current);
 
 	const pick = (value: string) => {
-		if (value === "danger-full-access" && value !== effective && !confirmFull) {
+		if (value === "danger-full-access" && value !== effective) {
 			setConfirmFull(true);
 			return;
 		}
-		setConfirmFull(false);
 		setOpen(false);
 		if (value !== effective) appSend({ type: "permission_set", preset: value });
 	};
+	const confirmDialog = confirmFull ? (
+		<ConfirmDialog
+			title={t("permFullAccess")}
+			confirmLabel={t("ok")}
+			danger
+			onClose={() => setConfirmFull(false)}
+			onConfirm={() => {
+				setOpen(false);
+				appSend({ type: "permission_set", preset: "danger-full-access" });
+			}}
+		>
+			{t("permConfirmFull")}
+		</ConfirmDialog>
+	) : null;
 
 	if (compact) {
 		const label = isCustom ? t("permCustom") : t(permLabelKey(effective));
 		const title = isCustom ? (current ?? label) : t(permDescKey(effective));
 		return (
-			<Dropdown
-				trigger={
-					<>
-						<FiShield />
-						<span className="chip-sub" title={title}>
-							{label}
-							{effective === "danger-full-access" && <FiAlertTriangle style={{ marginLeft: 3 }} />}
-						</span>
-					</>
-				}
-				open={open}
-				onOpenChange={(v) => {
-					setOpen(v);
-					if (!v) setConfirmFull(false);
-				}}
-				direction="up"
-				align="left"
-			>
-				{offered.map((v) => {
-					const opt = options.find((o) => o.value === v);
-					return (
-						<DropdownItem
-							key={v}
-							active={v === effective}
-							title={opt?.description ?? t(permDescKey(v))}
-							onClick={() => pick(v)}
-						>
-							<span className="dd-preset-name">
-								{t(permLabelKey(v))}
-								{v === defaultPreset && <span className="dd-preset-tag">{t("agentPresetDefaultTag")}</span>}
-								{v === "danger-full-access" && <span className="dd-preset-tag warn">{t("permFullAccessTag")}</span>}
+			<>
+				<Dropdown
+					trigger={
+						<>
+							<FiShield />
+							<span className="chip-sub" title={title}>
+								{label}
+								{effective === "danger-full-access" && <FiAlertTriangle style={{ marginLeft: 3 }} />}
 							</span>
-							<span className="dd-preset-desc">{t(permDescKey(v))}</span>
-						</DropdownItem>
-					);
-				})}
-				{confirmFull && <div className="dd-note warn">{t("permConfirmFull")}</div>}
-			</Dropdown>
+						</>
+					}
+					open={open}
+					onOpenChange={(v) => {
+						setOpen(v);
+						if (!v) setConfirmFull(false);
+					}}
+					direction="up"
+					align="left"
+				>
+					{offered.map((v) => {
+						const opt = options.find((o) => o.value === v);
+						return (
+							<DropdownItem
+								key={v}
+								active={v === effective}
+								title={opt?.description ?? t(permDescKey(v))}
+								onClick={() => pick(v)}
+							>
+								<span className="dd-preset-name">
+									{t(permLabelKey(v))}
+									{v === defaultPreset && <span className="dd-preset-tag">{t("agentPresetDefaultTag")}</span>}
+									{v === "danger-full-access" && <span className="dd-preset-tag warn">{t("permFullAccessTag")}</span>}
+								</span>
+								<span className="dd-preset-desc">{t(permDescKey(v))}</span>
+							</DropdownItem>
+						);
+					})}
+				</Dropdown>
+				{confirmDialog}
+			</>
 		);
 	}
 
@@ -159,7 +175,7 @@ export const PermissionBar = memo(function PermissionBar({
 					);
 				})}
 			</Dropdown>
-			{confirmFull && <span className="preset-bar-hint warn">{t("permConfirmFull")}</span>}
+			{confirmDialog}
 		</div>
 	);
 });

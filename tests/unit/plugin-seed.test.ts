@@ -1,11 +1,11 @@
 /**
- * 内置插件播种：首次启动拷到 <dataDir>/plugins/、默认停用、删了不塞回。
+ * 内置插件播种：首次启动拷到 <dataDir>/plugins/、默认启用、删了/卸载了不塞回。
  */
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { seedBundledPlugins } from "../../server/plugin-seed.js";
+import { forgetSeeded, markSeeded, seedBundledPlugins } from "../../server/plugin-seed.js";
 
 let dir: string;
 let src: string;
@@ -47,13 +47,14 @@ describe("seedBundledPlugins", () => {
 		expect(existsSync(join(dest(), "eval"))).toBe(false);
 	});
 
-	it("默认停用：写进全局停用表，且保留用户已有的停用项", () => {
+	it("默认启用：不写停用表（装完即用，关闭走开关）", () => {
 		mkdirSync(dataDir(), { recursive: true });
 		writeFileSync(join(dataDir(), "plugin-disabled.json"), JSON.stringify({ ids: ["notes"] }));
 		const r = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
-		expect(r.disabled).toEqual(["memory"]);
+		expect(r.installed).toEqual(["memory"]);
+		expect(r.disabled).toEqual([]);
 		const ids = JSON.parse(readFileSync(join(dataDir(), "plugin-disabled.json"), "utf8")).ids;
-		expect(ids.sort()).toEqual(["memory", "notes"]);
+		expect(ids).toEqual(["notes"]); // 只保留用户自己关掉的，不新增
 	});
 
 	it("重复调用幂等（不会重复装、不会重复改停用表）", () => {
@@ -62,6 +63,19 @@ describe("seedBundledPlugins", () => {
 		expect(again.installed).toEqual([]);
 		expect(again.skipped[0]).toMatch(/已存在/);
 		expect(again.disabled).toEqual([]);
+	});
+
+	it("升级安装（数据目录已在使用）不自动塞新插件，并记下不再考虑", () => {
+		mkdirSync(dataDir(), { recursive: true });
+		writeFileSync(join(dataDir(), "client-state.json"), "{}");
+		const r = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		expect(r.installed).toEqual([]);
+		expect(r.skipped[0]).toMatch(/升级安装/);
+		expect(existsSync(dest())).toBe(false);
+		// 之后再启动也不会装：标记里已经记过
+		const again = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		expect(again.installed).toEqual([]);
+		expect(again.skipped[0]).toMatch(/用户删过/);
 	});
 
 	it("用户删掉之后不再塞回来", () => {
@@ -79,6 +93,22 @@ describe("seedBundledPlugins", () => {
 		const r = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
 		expect(r.installed).toEqual([]);
 		expect(JSON.parse(readFileSync(join(dest(), "manifest.json"), "utf8")).version).toBe("9.9.9");
+	});
+
+	it("卸载后再启动不会装回来（markSeeded 生效）", () => {
+		seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		rmSync(dest(), { recursive: true, force: true });
+		markSeeded(dataDir(), "memory");
+		const r = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		expect(r.installed).toEqual([]);
+		expect(existsSync(dest())).toBe(false);
+	});
+
+	it("forgetSeeded 后可以重新装（「重新安装」路径）", () => {
+		markSeeded(dataDir(), "memory");
+		expect(seedBundledPlugins(dataDir(), { sourceDir: src, log: silent }).installed).toEqual([]);
+		forgetSeeded(dataDir(), "memory");
+		expect(seedBundledPlugins(dataDir(), { sourceDir: src, log: silent }).installed).toEqual(["memory"]);
 	});
 
 	it("包里没有出厂副本时安静跳过（源码运行/裁剪包）", () => {

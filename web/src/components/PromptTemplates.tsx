@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FiEdit2, FiPlus, FiRotateCcw, FiSend, FiTrash2, FiX } from "react-icons/fi";
 import { useT, type Translate } from "../i18n";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { randomUuid } from "../uuid";
 import { appSend } from "../app-globals";
 import { recordModelUsage } from "../model-usage";
@@ -280,7 +281,7 @@ interface TemplateApi {
 	openPicker: () => void;
 	/** 打开某个模板的编辑弹窗；无参 = 新建。 */
 	openEdit: (tpl?: Template) => void;
-	/** 「恢复默认模板」两步确认状态。 */
+	/** 「恢复默认模板」确认弹窗状态。 */
 	resetConfirm: boolean;
 	/** 「恢复默认模板」：第一次点进入确认态，确认态下再点清空自定义/覆盖/移出。 */
 	toggleReset: () => void;
@@ -317,7 +318,7 @@ export function TemplateProvider({
 	const [editing, setEditing] = useState<Template | null>(null);
 	/** 是否「新建」模式（区别于编辑已有模板）。 */
 	const [isNew, setIsNew] = useState(false);
-	/** 「恢复默认模板」两步确认。 */
+	/** 「恢复默认模板」确认弹窗。 */
 	const [resetConfirm, setResetConfirm] = useState(false);
 	/** 编辑弹窗是否由模板库发起（保存/删除后应回到列表）。 */
 	const [fromPicker, setFromPicker] = useState(false);
@@ -388,15 +389,7 @@ export function TemplateProvider({
 		setEditing(null);
 		setFromPicker(false);
 	}, []);
-	const toggleReset = useCallback(() => {
-		if (resetConfirm) {
-			setStored([]);
-			setResetConfirm(false);
-		} else {
-			setResetConfirm(true);
-			setTimeout(() => setResetConfirm(false), 5000);
-		}
-	}, [resetConfirm]);
+	const toggleReset = useCallback(() => setResetConfirm(true), []);
 
 	// 选择器里：点卡片 = 直接填入输入框；点 ✏️ = 进编辑弹窗；点「新建」= 新建。
 	const pickFill = useCallback(
@@ -501,6 +494,18 @@ export function TemplateProvider({
 				/>
 			)}
 
+			{resetConfirm && (
+				<ConfirmDialog
+					title={t("tpl.reset")}
+					confirmLabel={t("tpl.resetConfirm")}
+					danger
+					onClose={() => setResetConfirm(false)}
+					onConfirm={() => setStored([])}
+				>
+					{t("tpl.reset")}
+				</ConfirmDialog>
+			)}
+
 			{editing && (
 				<EditModal
 					editing={editing}
@@ -567,7 +572,7 @@ export function EmptyTemplateCards() {
 			<div className="empty-templates-foot">
 				<button type="button" className="empty-templates-reset" onClick={toggleReset}>
 					<FiRotateCcw />
-					{resetConfirm ? t("tpl.resetConfirm") : t("tpl.reset")}
+					{t("tpl.reset")}
 				</button>
 			</div>
 		</div>
@@ -683,7 +688,7 @@ function PickerModal({
 				<div className="template-picker-foot">
 					<button type="button" className="empty-templates-reset" onClick={onResetToggle}>
 						<FiRotateCcw />
-						{resetConfirm ? t("tpl.resetConfirm") : t("tpl.reset")}
+						{t("tpl.reset")}
 					</button>
 				</div>
 			</div>

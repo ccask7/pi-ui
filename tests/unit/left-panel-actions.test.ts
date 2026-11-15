@@ -165,7 +165,7 @@ describe("LeftPanel 标题栏操作与项目管理", () => {
 		expect(onToggleCollapse).toHaveBeenCalledOnce();
 	});
 
-	it("会话删除只保留在右键菜单中，并在菜单内二次确认", () => {
+	it("会话归档和删除在右键菜单中通过弹窗确认", () => {
 		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
 		const slots = buildUiSlots([], { locale: "zh", t: (key) => key });
 		const { container, sent } = mountLeftPanel({ uiContextSession: slots["contextmenu.session"] });
@@ -176,17 +176,19 @@ describe("LeftPanel 标题栏操作与项目管理", () => {
 		const menu = getContextMenu()!;
 		const entry = menu.entries.find((item) => item.id === "host:conv-delete")!;
 		expect(entry.hidden).not.toBe(true);
-		let keepOpen: void | boolean = undefined;
-		act(() => {
-			keepOpen = menu.onHostAction?.(entry, menu.target);
-		});
-		expect(keepOpen).toBe(true);
+		act(() => menu.onHostAction?.(entry, menu.target));
 		expect(sent.some((msg: any) => msg.type === "delete_session")).toBe(false);
-		const confirmation = getContextMenu()!;
-		const confirmEntry = confirmation.entries.find((item) => item.id === "host:conv-delete")!;
-		expect(confirmEntry.label).toBe("确认删除");
-		act(() => confirmation.onHostAction?.(confirmEntry, confirmation.target));
+		expect(document.querySelector(".confirm-dialog")?.textContent).toContain("此操作不可恢复");
+		act(() => document.querySelector<HTMLButtonElement>(".confirm-dialog .btn.danger")!.click());
 		expect(sent).toContainEqual({ type: "delete_session", path: "session-1.jsonl" });
+
+		act(() => row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 20, clientY: 30 })));
+		const archiveMenu = getContextMenu()!;
+		const archive = archiveMenu.entries.find((item) => item.id === "host:conv-archive")!;
+		act(() => archiveMenu.onHostAction?.(archive, archiveMenu.target));
+		expect(sent.some((msg: any) => msg.type === "archive_session")).toBe(false);
+		act(() => document.querySelector<HTMLButtonElement>(".confirm-dialog .btn.primary")!.click());
+		expect(sent).toContainEqual({ type: "archive_session", path: "session-1.jsonl", archived: true });
 	});
 
 	it("目录默认显示最近 5 个会话，点击查看更多后显示全部", () => {

@@ -70,3 +70,30 @@ test("守卫本身有效：已知的坏样本必须被抓到", () => {
 	const missing = [...collectCalled(sample)].filter((name) => !declared.has(name));
 	assert.deepEqual(missing, ["updateTrashButton"]);
 });
+
+test("每个 querySelector('[data-act=…]') 在工具条标记里都有对应元素", () => {
+	// 曾经把「← 对话」按钮从工具条删掉、handler 留着 → querySelector 返回 null，
+	// `.onclick =` 直接抛错，整个视图挂不上。这条守卫就是盯这种"删了 UI 忘了删绑定"。
+	const from = SRC.indexOf("root.innerHTML = `");
+	const to = SRC.indexOf("`;", from);
+	assert.ok(from > 0 && to > from, "找不到 root.innerHTML 模板");
+	const markup = SRC.slice(from, to);
+	const ids = [...SRC.matchAll(/querySelector\('\[data-act="([^"]+)"\]'\)/g)].map((m) => m[1]);
+	const missing = [...new Set(ids)].filter((id) => !markup.includes(`data-act="${id}"`));
+	assert.deepEqual(missing, [], `工具条里没有这些 data-act 元素：${missing.join(", ")}`);
+});
+
+test("守卫自身有效：拿掉标记里的按钮必须被抓到", () => {
+	const sample = stripComments(
+		[
+			'root.innerHTML = `<div><button data-act="keep"></button></div>`;',
+			String.raw`root.querySelector('[data-act="gone"]').onclick = () => {};`,
+		].join(" "),
+	);
+	const from = sample.indexOf("root.innerHTML = `");
+	const to = sample.indexOf("`;", from);
+	const markup = sample.slice(from, to);
+	const ids = [...sample.matchAll(/querySelector\('\[data-act="([^"]+)"\]'\)/g)].map((m) => m[1]);
+	const missing = [...new Set(ids)].filter((id) => !markup.includes(`data-act="${id}"`));
+	assert.deepEqual(missing, ["gone"]);
+});

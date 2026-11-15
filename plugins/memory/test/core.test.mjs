@@ -123,3 +123,41 @@ describe("guessType（手写 /remember 的兜底）", () => {
 		assert.equal(C.guessType("回答尽量简短，别客套"), "preference");
 	});
 });
+
+describe("主题（topics）", () => {
+	it("归一化：去 #、按小写去重、最多 3 个、单条 24 字", () => {
+		assert.deepEqual(C.normalizeTopics(["#部署", "部署", "数据库", "个人偏好", "多余"]), [
+			"部署",
+			"数据库",
+			"个人偏好",
+		]);
+		assert.deepEqual(C.normalizeTopics("部署, 数据库；测试"), ["部署", "数据库", "测试"]);
+		assert.deepEqual(C.normalizeTopics(["   "]), []);
+		assert.equal(C.normalizeTopics(["x".repeat(60)])[0].length, 24);
+		assert.deepEqual(C.normalizeTopics(undefined), []);
+	});
+
+	it("normalizeRecord 保留主题（新增字段不能被丢掉）", () => {
+		const rec = C.normalizeRecord({ type: "fact", content: "后端端口 8765", topics: ["部署", "#数据库"] });
+		assert.deepEqual(rec.topics, ["部署", "数据库"]);
+		// 老数据没有 topics 也不能报错
+		assert.deepEqual(C.normalizeRecord({ content: "x" }).topics, []);
+	});
+
+	it("标签不再截断成 24 字（路径要完整）", () => {
+		const path = "plugins/memory/client/entry.mjs";
+		assert.equal(C.normalizeRecord({ content: "x", tags: [path] }).tags[0], path);
+	});
+
+	it("主题进索引：搜主题名能找到成员（只加召回，不改权重）", () => {
+		const now = Date.now();
+		const recs = [
+			C.normalizeRecord({ id: "a", type: "fact", content: "后端端口是 8765", topics: ["部署"], createdAt: now }),
+			C.normalizeRecord({ id: "b", type: "fact", content: "前端跑 5173", topics: ["部署"], createdAt: now }),
+			C.normalizeRecord({ id: "c", type: "fact", content: "别的无关内容", createdAt: now }),
+		];
+		const index = C.buildIndex(recs);
+		const hits = C.search(recs, index, "部署", { nowMs: now });
+		assert.deepEqual(hits.map((h) => h.rec.id).sort(), ["a", "b"]);
+	});
+});

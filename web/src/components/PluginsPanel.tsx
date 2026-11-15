@@ -1,10 +1,12 @@
-import { FiFolder, FiKey, FiMonitor, FiRefreshCw } from "react-icons/fi";
+import { useState } from "react";
+import { FiFolder, FiKey, FiMonitor, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import type { UiPluginInfo, UiSettingsState, ClientMessage } from "../types";
 import { useT } from "../i18n";
 import { PluginIcon } from "../plugin-icon";
 import { PluginSettingsForm } from "./PluginSettingsForm";
 import { ToggleRow } from "./SettingsControls";
 import { BrowserControlSettings } from "./BrowserControl";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 /** 目录授权 / 能力授权（网络、模型）——插件页里唯一能撤销它们的地方（设置页的旧插件页签已收），
  *  放在列表下方折叠区，平时不占地方。 */
@@ -36,6 +38,7 @@ export function PluginsPanel({
 	onOpenTools: () => void;
 }) {
 	const t = useT();
+	const [uninstalling, setUninstalling] = useState<UiPluginInfo | null>(null);
 	const disabledPlugins = new Set(settings?.disabledPlugins ?? []);
 	const disabledPluginTools = new Set(settings?.disabledPluginTools ?? []);
 	const togglePlugin = (plugin: UiPluginInfo) => {
@@ -80,16 +83,27 @@ export function PluginsPanel({
 									disabled={Boolean(plugin.error)}
 									onToggle={() => togglePlugin(plugin)}
 									action={
-										plugin.view !== false ? (
+										<>
+											{plugin.view !== false && (
+												<button
+													type="button"
+													className="set-uninstall"
+													disabled={Boolean(plugin.error)}
+													onClick={() => onOpenPluginView(plugin.id)}
+												>
+													{t("pluginViewOpen")}
+												</button>
+											)}
 											<button
 												type="button"
-												className="set-uninstall"
-												disabled={Boolean(plugin.error)}
-												onClick={() => onOpenPluginView(plugin.id)}
+												className="set-icon-btn danger"
+												title={t("uninstallExt")}
+												aria-label={`${t("uninstallExt")} ${plugin.name}`}
+												onClick={() => setUninstalling(plugin)}
 											>
-												{t("pluginViewOpen")}
+												<FiTrash2 />
 											</button>
-										) : undefined
+										</>
 									}
 								/>
 								{plugin.error && <p className="mcp-error">{plugin.error}</p>}
@@ -240,6 +254,18 @@ export function PluginsPanel({
 					})
 				)}
 			</details>
+
+			{uninstalling && (
+				<ConfirmDialog
+					title={t("uninstallExt")}
+					confirmLabel={t("uninstallConfirm")}
+					danger
+					onClose={() => setUninstalling(null)}
+					onConfirm={() => send({ type: "plugins_uninstall", id: uninstalling.id })}
+				>
+					{t("pluginUninstallBody", { name: uninstalling.name })}
+				</ConfirmDialog>
+			)}
 
 			<details className="plugin-auth-section">
 				<summary>

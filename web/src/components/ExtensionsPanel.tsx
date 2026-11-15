@@ -3,6 +3,7 @@ import { FiTrash2 } from "react-icons/fi";
 import type { ClientMessage, UiExtensionInfo, UiSettingsState } from "../types";
 import { useT } from "../i18n";
 import { ToggleRow } from "./SettingsControls";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 export function ExtensionsPanel({
 	settings,
@@ -46,32 +47,32 @@ export function ExtensionsPanel({
 								onToggle={() => toggleExtension(extension)}
 								action={
 									pkgName ? (
-										confirmUninstall === extension.id ? (
-											<button
-												type="button"
-												className="set-uninstall confirm"
-												title={t("uninstallConfirmHint")}
-												onClick={() => runUninstall(pkgName)}
-											>
-												{t("uninstallConfirm")}
-											</button>
-										) : (
-											<button
-												type="button"
-												className="set-uninstall"
-												title={t("uninstallHint")}
-												onClick={() => setConfirmUninstall(extension.id)}
-											>
-												<FiTrash2 />
-												{t("uninstallExt")}
-											</button>
-										)
+										<button
+											type="button"
+											className="set-uninstall"
+											title={t("uninstallHint")}
+											onClick={() => setConfirmUninstall(extension.id)}
+										>
+											<FiTrash2 />
+											{t("uninstallExt")}
+										</button>
 									) : undefined
 								}
 							/>
 						);
 					})}
 				</div>
+			)}
+			{confirmUninstall && (
+				<ConfirmDialog
+					title={t("uninstallExt")}
+					confirmLabel={t("uninstallConfirm")}
+					danger
+					onClose={() => setConfirmUninstall(null)}
+					onConfirm={() => runUninstall(confirmUninstall.replace(/^npm:/, ""))}
+				>
+					{confirmUninstall}
+				</ConfirmDialog>
 			)}
 		</div>
 	);

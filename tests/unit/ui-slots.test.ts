@@ -152,6 +152,7 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:terminal",
 			"host:git",
 			"host:tasks",
+			"host:history",
 			"host:settings",
 			"host:new-ephemeral-chat",
 			// 尾部条目 = 实测溢出的第一顺位被收起者（见 BUILTIN_UI_ITEMS 注释）
@@ -193,7 +194,7 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 
 	/** 这条断言是「顶栏默认长什么样」的唯一入口 —— 想改默认口径就改这里与 BUILTIN_UI_ITEMS。
 	 *  「⋯」溢出菜单删除后不再有「缺省收进菜单」的条目：默认全常驻，放不下就横向滚动。 */
-	it("默认没有隐藏条目，常驻 8 条", () => {
+	it("默认没有隐藏条目，常驻 9 条", () => {
 		const slots = build([]);
 		const top = slots["topbar.primary"];
 		expect(top.filter((e) => e.hidden).map((e) => e.id)).toEqual([]);
@@ -207,6 +208,7 @@ describe("buildUiSlots / 第 1 层：宿主默认", () => {
 			"host:terminal",
 			"host:git",
 			"host:tasks",
+			"host:history",
 			"host:settings",
 			"host:new-ephemeral-chat",
 		]);
@@ -538,8 +540,8 @@ describe("buildUiSlots / 第 4 层：用户偏好（最高）", () => {
 	});
 
 	it("order 列表里的历史 id（条目已不存在）被忽略", () => {
-		// host:files / host:history 都曾是真条目、现已删除 → 与幽灵 id 一样被忽略，不能顶到第一位
-		const slots = build([], { layout: { order: ["ghost:gone", "host:files", "host:history"] } });
+		// 已删除的历史 id 与幽灵 id 一样被忽略，不能顶到第一位。
+		const slots = build([], { layout: { order: ["ghost:gone", "host:files", "host:old-history"] } });
 		expect(ids(slots["topbar.primary"])[0]).toBe("host:brand");
 		expect(slots["topbar.primary"]).toHaveLength(BUILTIN_UI_ITEMS.filter((i) => i.slot === "topbar.primary").length);
 	});

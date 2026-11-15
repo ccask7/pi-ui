@@ -15,7 +15,7 @@ npm run build        # build:web (vite) + build:server (tsc) + build:mermaid-ven
 npm start            # 跑编译产物 dist/server/index.js（生产）
 npm test             # vitest 纯函数单测（tests/unit/，毫秒级零 token）
 npm run test:smoke   # 零 token 协议冒烟聚合跑器（tests/run-smoke.mjs，62 个自包含测试）
-npm run test:plugins # 仓库内插件的 node:test 单测（plugins/memory/test/，52 个）
+npm run test:plugins # 仓库内插件的 node:test 单测（plugins/memory/test/，64 个）
 npm run test:freeze  # 冻结/重连回归测试（Playwright，需要本机 chromium headless）
 ```
 

@@ -263,7 +263,7 @@ App 按 chat.plugins 动态 import 各插件的 client bundle（`/* @vite-ignore
 
 `syncPluginViews(plugins, epoch)` 统一同步注册表：清单消失/被禁用即卸载视图（调 cleanup）、epoch 变化清 failed 重拉 bundle。
 
-设置面板 ⚙ 有「界面插件」开关区：开关读写每客户端的 `settings.disabledPlugins`（前端靠它隐藏条目与 `arrange`），保存时同时写**全局**停用表 `<dataDir>/plugin-disabled.json`（`server/plugin-disabled.ts`）并 `reload()` —— 停用 = 该插件不激活（AI 工具 / HTTP 路由 / 订阅 / 定时任务全撤），重新打开即重新激活；插件数据在磁盘上不受影响。为什么是全局：插件是这台机器上的 Node 代码，工具与路由都是进程级的，只按浏览器停用等于没停。外加「已授权目录」段（见「目录授权与跨目录 fs」）。**本 fork 已删除插件市场与安装/更新/卸载能力**：插件目录从本地拷入 `<dataDir>/plugins/<id>/`，删除目录即卸载。
+设置面板 ⚙ 有「界面插件」开关区：开关读写每客户端的 `settings.disabledPlugins`（前端靠它隐藏条目与 `arrange`），保存时同时写**全局**停用表 `<dataDir>/plugin-disabled.json`（`server/plugin-disabled.ts`）并 `reload()` —— 停用 = 该插件不激活（AI 工具 / HTTP 路由 / 订阅 / 定时任务全撤），重新打开即重新激活；插件数据在磁盘上不受影响。为什么是全局：插件是这台机器上的 Node 代码，工具与路由都是进程级的，只按浏览器停用等于没停。外加「已授权目录」段（见「目录授权与跨目录 fs」）。每行的垃圾桶按钮是**卸载**：反激活 → 删 `<dataDir>/plugins/<id>/`（含插件自己的数据）→ 写 `plugin-seeded.json` 记住「不再装回」；确认框会写明会连数据一起删。**本 fork 没有插件市场 / 在线安装**：插件目录从本地拷入 `<dataDir>/plugins/<id>/`，或由内置播种带入。内置插件（当前只有 memory）由 `server/plugin-seed.ts` 在**首次启动**时把 `dist/plugins/<id>/` 拷过去：默认启用；数据目录已在用（`client-state.json` 存在）的升级安装不塞新插件；用户删过 / 卸载过的不会回来。
 
 ## 静态服务
 

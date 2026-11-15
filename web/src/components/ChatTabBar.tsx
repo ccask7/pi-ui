@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { FiEdit2, FiMessageSquare, FiX } from "react-icons/fi";
 import type { ConversationSummary, ElsewhereRunning } from "../types";
 import { useT } from "../i18n";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 /**
  * 顶部标签栏（VS Code 式）：显示「运行的对话」，替代原先左栏的
@@ -14,7 +15,7 @@ import { useT } from "../i18n";
  * 交互对齐编辑器标签的习惯：
  * - 单击 → 切换（`switch_conversation`）
  * - 双击标题 → 就地重命名
- * - X → 关闭（`dismiss_conversation`）；运行中/带子代理时两段确认
+ * - X → 关闭（`dismiss_conversation`）；运行中/带子代理时弹窗确认
  * - 中键 → 同 X
  * - 有问卷在等答复 → `?` 角标（别处的会话点它直接抢答）
  */
@@ -96,21 +97,21 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 		() => new Set(conversations.map((c) => c.forkFrom?.conversationId).filter((id): id is string => Boolean(id))),
 		[conversations],
 	);
-	/** 已「点过一次」的标签（关闭/过户的两段确认）。 */
+	/** 已「点过一次」的别处会话标签（过户确认）。 */
 	const [armed, setArmed] = useState<string | null>(null);
+	const [pendingClose, setPendingClose] = useState<ConversationSummary | null>(null);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 
 	if (rows.length === 0) return null;
 
-	const closeTab = (c: ConversationSummary, key: string) => {
+	const closeTab = (c: ConversationSummary) => {
 		const risky = c.isStreaming || subagentCount(conversations, c.id) > 0;
-		if (risky && armed !== key) {
-			setArmed(key);
+		if (risky) {
+			setPendingClose(c);
 			return;
 		}
-		setArmed(null);
-		panelSend({ type: "dismiss_conversation", id: c.id, ...(risky ? { force: true } : {}) });
+		panelSend({ type: "dismiss_conversation", id: c.id });
 	};
 
 	const commitRename = (c: ConversationSummary) => {
@@ -171,18 +172,17 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 				// ---- 本客户端的会话 ----
 				const c = row.conv as ConversationSummary;
 				const active = c.id === activeConversationId;
-				const confirming = armed === row.key;
 				return (
 					<div
 						key={row.key}
-						className={`chat-tab${active ? " active" : ""}${confirming ? " armed" : ""}`}
+						className={`chat-tab${active ? " active" : ""}`}
 						title={`${c.title}${c.cwd ? ` — ${c.cwd}` : ""}`}
 						onMouseLeave={() => setArmed((k) => (k === row.key ? null : k))}
 						onAuxClick={(e) => {
 							// 中键 = 关闭（与编辑器标签一致）
 							if (e.button === 1) {
 								e.preventDefault();
-								closeTab(c, row.key);
+								closeTab(c);
 							}
 						}}
 					>
@@ -223,7 +223,7 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 							) : (
 								<>
 									{c.isEphemeral && <span className="chat-tab-flag">{t("ephemeralBadge")}</span>}
-									<span className="chat-tab-title">{confirming ? t("dismissConversationConfirm") : c.title}</span>
+									<span className="chat-tab-title">{c.title}</span>
 									{c.error && <span className="chat-tab-dot error" title={t("convErrorBadge", { error: c.error })} />}
 									{c.hasQuestion && (
 										<span className="chat-tab-badge question" title={t("waitingQuestionBadge")}>
@@ -254,7 +254,7 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 									title={t("dismissConversation")}
 									onClick={(e) => {
 										e.stopPropagation();
-										closeTab(c, row.key);
+										closeTab(c);
 									}}
 								>
 									<FiX />
@@ -272,6 +272,17 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 			>
 				<FiMessageSquare />
 			</button>
+			{pendingClose && (
+				<ConfirmDialog
+					title={t("dismissConversationConfirm")}
+					confirmLabel={t("dismissConversation")}
+					danger
+					onClose={() => setPendingClose(null)}
+					onConfirm={() => panelSend({ type: "dismiss_conversation", id: pendingClose.id, force: true })}
+				>
+					{pendingClose.title}
+				</ConfirmDialog>
+			)}
 		</div>
 	);
 }

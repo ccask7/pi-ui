@@ -118,6 +118,20 @@ describe("插件 / 技能 / MCP 面板", () => {
 		expect(container.querySelector<HTMLButtonElement>(".plugin-rescan")).not.toBeNull();
 	});
 
+	it("插件行有卸载入口，确认框写明会连数据一起删", () => {
+		const { container, send } = mount();
+		const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+		act(() => tabs[1].click());
+		const trash = container.querySelector<HTMLButtonElement>(".plugin-simple-item .set-icon-btn.danger")!;
+		expect(trash).toBeTruthy();
+		act(() => trash.click());
+		const dialog = document.body.querySelector(".confirm-dialog");
+		expect(dialog?.textContent).toContain("会删除整个插件目录");
+		expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "plugins_uninstall" }));
+		act(() => document.body.querySelector<HTMLButtonElement>(".confirm-dialog .btn.danger")!.click());
+		expect(send).toHaveBeenCalledWith({ type: "plugins_uninstall", id: "demo-ui" });
+	});
+
 	it("插件页打开时隐藏对话布局，并让插件页占满剩余高度", () => {
 		const css = readFileSync(resolve(process.cwd(), "web/src/styles.css"), "utf8");
 		expect(css).toMatch(/\.conversation-content\.hidden\s*\{\s*display:\s*none;/);

@@ -17,7 +17,7 @@
  * - activate 抛错只标记 error 字段并记日志，绝不影响主进程。
  */
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { existsSync, readFileSync, renameSync, watch as fsWatch, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync, watch as fsWatch, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import type {
@@ -1947,6 +1947,34 @@ export class PluginManager {
 	/** 当前停用名单（诊断/单测用）。 */
 	disabledIds(): string[] {
 		return [...this.disabled];
+	}
+
+	/** 卸载插件：反激活 + 删目录 + 从停用表移除。
+	 *
+	 *  界面上没有入口（只有开关），保留它是迭代期"删掉某个内置功能"的正规出口。
+	 *
+	 *  只删 `<dataDir>/plugins/<id>/` 这一个目录 —— 插件的数据放在它自己目录里
+	 *  （memory 插件就是 `plugins/memory/data/`），所以这一刀就是"卸载干净"。
+	 *  出厂副本的播种标记由调用方写（见 plugin-seed 的 markSeeded），否则下次启动会装回来。
+	 */
+	async uninstall(id: string): Promise<{ ok: boolean; error?: string }> {
+		const pluginId = String(id ?? "").trim();
+		if (!ID_RE.test(pluginId)) return { ok: false, error: "非法插件 id" };
+		const dir = join(this.pluginsDir, pluginId);
+		if (!existsSync(dir)) return { ok: false, error: "插件目录不存在" };
+		const loaded = this.loaded.get(pluginId);
+		if (loaded) this.deactivateEntry(pluginId, loaded);
+		try {
+			rmSync(dir, { recursive: true, force: true });
+		} catch (err) {
+			return { ok: false, error: `删除目录失败：${err instanceof Error ? err.message : String(err)}` };
+		}
+		if (this.disabled.has(pluginId)) {
+			this.disabled = new Set(this.disabledStore.write([...this.disabled].filter((x) => x !== pluginId)));
+		}
+		this.epochCounter += 1;
+		console.log(`[plugin:${pluginId}] uninstalled (${dir})`);
+		return { ok: true };
 	}
 
 	/** 服务端热重载：反激活全部 → 清缓存 → 重扫重激活 → epoch+1。

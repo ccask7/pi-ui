@@ -2,6 +2,79 @@
 
 /* ccui — dark theme, pi-flavored */
 
+.confirm-dialog-backdrop {
+	z-index: 400;
+}
+.confirm-dialog {
+	width: min(440px, calc(100vw - 32px));
+	padding: 20px;
+}
+.confirm-dialog-body {
+	margin: 14px 0 22px;
+	color: var(--fg);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+.confirm-dialog .dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+.confirm-dialog .btn.danger {
+	background: var(--red);
+	color: #fff;
+	border-color: var(--red);
+}
+.archived-history-modal {
+	width: min(720px, calc(100vw - 32px));
+	max-height: min(720px, calc(100vh - 48px));
+	padding: 20px;
+}
+.archived-history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 14px;
+	overflow-y: auto;
+}
+.archived-history-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 8px;
+	border-radius: 6px;
+}
+.archived-history-row:hover {
+	background: var(--bg-elev);
+}
+.archived-history-open {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 3px;
+	border: 0;
+	background: transparent;
+	color: var(--fg);
+	text-align: left;
+	cursor: pointer;
+}
+.archived-history-title {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.archived-project {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--muted);
+	font-size: 12px;
+}
+
 /* File manager archive / folder transfer dialog. Native dialog traps focus. */
 .file-transfer-dialog {
 	background: var(--bg-elev);

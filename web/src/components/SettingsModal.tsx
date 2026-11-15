@@ -78,6 +78,7 @@ import { useProjectTitle, saveTitleSettings } from "../title-settings";
 import { sanitizeWallpaperUrl, fileToWallpaperUrl, saveWallpaperSettings, useWallpaperSettings } from "../wallpaper";
 import { saveWindowOpacity, saveWindowTransparent, useWindowOpacity, useWindowTransparent } from "../window-opacity";
 import { useT, useI18n } from "../i18n";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { buildUiSlots, withPluginViewItems, type UiSlotEntry } from "../ui-slots";
 import { appSend, useAppGlobals } from "../app-globals";
 import { countPluginPhases, pluginPhase, type PluginPhase } from "../plugin-phase";
@@ -332,7 +333,7 @@ export function SettingsModal({
 	const [tplDraft, setTplDraft] = useState<UiSubagentTemplate | null>(null);
 	// 弹窗标题用：新建 vs 编辑（draft 本身区分不出来）。
 	const [tplIsNew, setTplIsNew] = useState(false);
-	// 删除子代理模板的两步确认。
+	// 子代理模板删除确认弹窗。
 	const [confirmTplDelete, setConfirmTplDelete] = useState<string | null>(null);
 	// 正在编辑的审批规则草稿。
 	const [ruleDraft, setRuleDraft] = useState<UiApprovalRule | null>(null);
@@ -395,12 +396,7 @@ export function SettingsModal({
 	useEffect(() => {
 		if (tab === "prompt-history") refreshPhCount();
 	}, [tab]);
-	useEffect(() => {
-		if (!phClearConfirm) return;
-		const id = window.setTimeout(() => setPhClearConfirm(false), 3000);
-		return () => window.clearTimeout(id);
-	}, [phClearConfirm]);
-	// Two-step uninstall confirm: which extension id is awaiting confirmation.
+	// Extension id whose uninstall confirmation dialog is open.
 	const [confirmUninstall, setConfirmUninstall] = useState<string | null>(null);
 	/** 界面插件配置展开态（插件 id → 展开；默认折叠）。 */
 	const [settingsOpen, setSettingsOpen] = useState<Record<string, boolean>>({});
@@ -1258,20 +1254,12 @@ export function SettingsModal({
 								<div className="set-field" style={{ marginTop: 12 }}>
 									<button
 										type="button"
-										className={`set-uninstall${phClearConfirm ? " confirm" : ""}`}
+										className="set-uninstall"
 										disabled={phCount === 0}
 										title={phCount === 0 ? t("promptHistoryEmpty") : t("promptHistoryClear")}
-										onClick={() => {
-											if (!phClearConfirm) {
-												setPhClearConfirm(true);
-												return;
-											}
-											clearPromptHistory();
-											setPhClearConfirm(false);
-											refreshPhCount();
-										}}
+										onClick={() => setPhClearConfirm(true)}
 									>
-										<FiTrash2 /> {phClearConfirm ? t("promptHistoryClearConfirm") : t("promptHistoryClear")}
+										<FiTrash2 /> {t("promptHistoryClear")}
 									</button>
 									{phCount > 0 && (
 										<span className="set-hint" style={{ marginLeft: 8 }}>
@@ -2001,26 +1989,15 @@ export function SettingsModal({
 													onToggle={() => toggleExtension(e)}
 													action={
 														pkgName ? (
-															confirmUninstall === e.id ? (
-																<button
-																	type="button"
-																	className="set-uninstall confirm"
-																	title={t("uninstallConfirmHint")}
-																	onClick={() => runUninstall(pkgName)}
-																>
-																	{t("uninstallConfirm")}
-																</button>
-															) : (
-																<button
-																	type="button"
-																	className="set-uninstall"
-																	title={t("uninstallHint")}
-																	onClick={() => setConfirmUninstall(e.id)}
-																>
-																	<FiTrash2 />
-																	{t("uninstallExt")}
-																</button>
-															)
+															<button
+																type="button"
+																className="set-uninstall"
+																title={t("uninstallHint")}
+																onClick={() => setConfirmUninstall(e.id)}
+															>
+																<FiTrash2 />
+																{t("uninstallExt")}
+															</button>
 														) : undefined
 													}
 												/>
@@ -2894,28 +2871,14 @@ export function SettingsModal({
 													>
 														{t("subagentTemplateEdit")}
 													</button>
-													{confirmTplDelete === tp.name ? (
-														<button
-															type="button"
-															className="set-uninstall confirm"
-															title={t("uninstallConfirmHint")}
-															onClick={() => {
-																appSend({ type: "delete_subagent_template", name: tp.name });
-																setConfirmTplDelete(null);
-															}}
-														>
-															{t("uninstallConfirm")}
-														</button>
-													) : (
-														<button
-															type="button"
-															className="set-icon-btn danger"
-															title={t("tplDelete")}
-															onClick={() => setConfirmTplDelete(tp.name)}
-														>
-															<FiTrash2 />
-														</button>
-													)}
+													<button
+														type="button"
+														className="set-icon-btn danger"
+														title={t("tplDelete")}
+														onClick={() => setConfirmTplDelete(tp.name)}
+													>
+														<FiTrash2 />
+													</button>
 												</div>
 											</div>
 										))}
@@ -3216,28 +3179,16 @@ export function SettingsModal({
 																<FiChevronDown />
 															</button>
 														)}
-														{isBuiltin &&
-															(confirmRuleReset === rule.id ? (
-																<button
-																	type="button"
-																	className="set-uninstall confirm"
-																	onClick={() => {
-																		appSend({ type: "reset_builtin_approval_rule", id: rule.id });
-																		setConfirmRuleReset(null);
-																	}}
-																>
-																	{t("uninstallConfirm")}
-																</button>
-															) : (
-																<button
-																	type="button"
-																	className="set-icon-btn"
-																	title={t("approvalRuleReset")}
-																	onClick={() => setConfirmRuleReset(rule.id)}
-																>
-																	<FiRefreshCw />
-																</button>
-															))}
+														{isBuiltin && (
+															<button
+																type="button"
+																className="set-icon-btn"
+																title={t("approvalRuleReset")}
+																onClick={() => setConfirmRuleReset(rule.id)}
+															>
+																<FiRefreshCw />
+															</button>
+														)}
 														<button
 															type="button"
 															className="set-icon-btn"
@@ -3251,28 +3202,16 @@ export function SettingsModal({
 														>
 															<FiEdit3 />
 														</button>
-														{!isBuiltin &&
-															(confirmRuleDelete === rule.id ? (
-																<button
-																	type="button"
-																	className="set-uninstall confirm"
-																	onClick={() => {
-																		appSend({ type: "delete_approval_rule", id: rule.id });
-																		setConfirmRuleDelete(null);
-																	}}
-																>
-																	{t("uninstallConfirm")}
-																</button>
-															) : (
-																<button
-																	type="button"
-																	className="set-icon-btn danger"
-																	title={t("approvalRuleDelete")}
-																	onClick={() => setConfirmRuleDelete(rule.id)}
-																>
-																	<FiTrash2 />
-																</button>
-															))}
+														{!isBuiltin && (
+															<button
+																type="button"
+																className="set-icon-btn danger"
+																title={t("approvalRuleDelete")}
+																onClick={() => setConfirmRuleDelete(rule.id)}
+															>
+																<FiTrash2 />
+															</button>
+														)}
 													</div>
 												</div>
 											);
@@ -3298,6 +3237,63 @@ export function SettingsModal({
 						{t("close")}
 					</button>
 				</div>
+				{confirmUninstall && (
+					<ConfirmDialog
+						title={t("uninstallExt")}
+						confirmLabel={t("uninstallConfirm")}
+						danger
+						onClose={() => setConfirmUninstall(null)}
+						onConfirm={() => runUninstall(confirmUninstall.replace(/^npm:/, ""))}
+					>
+						{confirmUninstall}
+					</ConfirmDialog>
+				)}
+				{phClearConfirm && (
+					<ConfirmDialog
+						title={t("promptHistoryClear")}
+						confirmLabel={t("promptHistoryClearConfirm")}
+						danger
+						onClose={() => setPhClearConfirm(false)}
+						onConfirm={() => {
+							clearPromptHistory();
+							refreshPhCount();
+						}}
+					>
+						{t("promptHistoryClear")}
+					</ConfirmDialog>
+				)}
+				{confirmRuleReset && (
+					<ConfirmDialog
+						title={t("approvalRuleReset")}
+						confirmLabel={t("ok")}
+						onClose={() => setConfirmRuleReset(null)}
+						onConfirm={() => appSend({ type: "reset_builtin_approval_rule", id: confirmRuleReset })}
+					>
+						{confirmRuleReset}
+					</ConfirmDialog>
+				)}
+				{confirmTplDelete && (
+					<ConfirmDialog
+						title={t("tplDelete")}
+						confirmLabel={t("delete")}
+						danger
+						onClose={() => setConfirmTplDelete(null)}
+						onConfirm={() => appSend({ type: "delete_subagent_template", name: confirmTplDelete })}
+					>
+						{confirmTplDelete}
+					</ConfirmDialog>
+				)}
+				{confirmRuleDelete && (
+					<ConfirmDialog
+						title={t("approvalRuleDelete")}
+						confirmLabel={t("delete")}
+						danger
+						onClose={() => setConfirmRuleDelete(null)}
+						onConfirm={() => appSend({ type: "delete_approval_rule", id: confirmRuleDelete })}
+					>
+						{confirmRuleDelete}
+					</ConfirmDialog>
+				)}
 			</div>
 		</div>
 	);

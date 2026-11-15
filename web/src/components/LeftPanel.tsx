@@ -1,6 +1,5 @@
 import { memo, useEffect, useState, useCallback, useRef } from "react";
 import {
-	FiCheck,
 	FiChevronDown,
 	FiChevronRight,
 	FiEdit2,
@@ -22,6 +21,7 @@ import { LP_SECTION_ENTRY_IDS, type UiSlotEntry } from "../ui-slots";
 import { contextMenuItems, openContextMenu, type ContextMenuRequest } from "../context-menu-state";
 import { composeToComposer, focusComposer } from "../composer-bridge";
 import { PluginIcon } from "../plugin-icon";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 /** Props are deliberately NARROW (no whole-ChatState object): every field is
  *  stable while tokens stream in, so the shallow-compared memo() below skips
@@ -46,6 +46,7 @@ interface LeftPanelProps {
 			| { type: "set_cwd"; path: string }
 			| { type: "remove_project"; path: string }
 			| { type: "delete_session"; path: string }
+			| { type: "archive_session"; path: string; archived: boolean }
 			| { type: "rename_session"; path: string; name: string }
 			| { type: "rename_conversation"; id: string; name: string }
 			| { type: "dismiss_conversation"; id: string; withFinishedSubagents?: boolean; force?: boolean }
@@ -160,7 +161,13 @@ export const LeftPanel = memo(function LeftPanel({
 	const workspaceRoots = useAppField("workspaceRoots");
 	const currentCwd = cwd;
 	const [projectPickerOpen, setProjectPickerOpen] = useState(false);
-	const [confirmDel, setConfirmDel] = useState<string | null>(null);
+	const [pendingConfirm, setPendingConfirm] = useState<{
+		title: string;
+		body: string;
+		confirmLabel: string;
+		danger?: boolean;
+		action: () => void;
+	} | null>(null);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 	const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => loadExpandedProjects(currentCwd));
@@ -198,14 +205,6 @@ export const LeftPanel = memo(function LeftPanel({
 	);
 
 	/** issue #145 行类型：运行的对话 = 本客户端 + 其他标签页/设备（elsewhere 只读行，标“另一处”）。 */
-	/** 上次打开会话菜单的坐标 + 目标：强行关闭的两段确认要在**原地**把菜单换成确认文案
-	 *  （老实现直接改自己那套菜单的 label；菜单搬到 App 之后只能按同一坐标重开一次）。 */
-	const sessionMenuRef = useRef<{ x: number; y: number; target: SessionMenuTarget } | null>(null);
-	/** 已 arm 的 scopeId（强行关闭的第一段确认）：点第二次才真关。每次重新打开菜单都复位
-	 *  （老实现在关闭菜单时复位）——两段确认不能跨菜单生效。 */
-	const forceArmedRef = useRef<string | null>(null);
-	/** 历史会话删除的两段确认：第一次仅改菜单文案，第二次才发送删除。 */
-	const deleteArmedRef = useRef<string | null>(null);
 	/** 菜单要用的 host 分派器（在下面定义）：showSessionMenu 在渲染期就要把它交给菜单，
 	 *  而分派器又要反过来用 showSessionMenu 重开菜单 —— 用一个 ref 打破这个循环。 */
 	const hostActionRef = useRef<(entry: UiSlotEntry, target: ContextMenuRequest["target"]) => void | boolean>(() => {});
@@ -229,7 +228,6 @@ export const LeftPanel = memo(function LeftPanel({
 	 *  （作用范围就是那条对话），历史行 / 区域空白处 hidden —— 与老菜单一致。 */
 	const showSessionMenu = useCallback(
 		(x: number, y: number, target: SessionMenuTarget) => {
-			sessionMenuRef.current = { x, y, target };
 			// scope：只有「运行中对话行」才限定到具体对话；历史行与区域空白处都是全局口径。
 			// 「另一处」行：id 即对方会话内的 convId（复制 id / 引用可用它），
 			// 但关闭类条目不适用（那是本会话的 dismissal 口径）。
@@ -243,8 +241,6 @@ export const LeftPanel = memo(function LeftPanel({
 					: scopeId
 						? t("dismissFinishedSubagentsScoped", { n: nFinished })
 						: t("dismissFinishedSubagents", { n: nFinished });
-			const armed = Boolean(scopeId) && forceArmedRef.current === scopeId;
-			const deleteArmed = target.kind === "history" && deleteArmedRef.current === target.id;
 			const entries = (uiContextSession ?? []).map((entry) => {
 				// 插件贡献的条目原样透传（点击由 App 分发给插件）。
 				if (entry.source !== "host") return entry;
@@ -252,10 +248,8 @@ export const LeftPanel = memo(function LeftPanel({
 				// （与悬停 ✎ 铅笔同一套内嵌输入框，见 dispatchHostSessionEntry）。
 				if (entry.id === "host:conv-rename")
 					return target.kind === "running" || target.kind === "history" ? entry : { ...entry, hidden: true };
-				if (entry.id === "host:conv-delete")
-					return target.kind === "history"
-						? { ...entry, ...(deleteArmed ? { label: t("deleteSessionConfirm") } : {}) }
-						: { ...entry, hidden: true };
+				if (entry.id === "host:conv-delete" || entry.id === "host:conv-archive")
+					return target.kind === "history" ? entry : { ...entry, hidden: true };
 				// 过户：只在「另一处」行出现（无 owner/convId 的旧条目同样隐藏）。
 				if (entry.id === "host:conv-takeover")
 					return isElsewhere && takeId && target.owner ? entry : { ...entry, hidden: true };
@@ -264,10 +258,7 @@ export const LeftPanel = memo(function LeftPanel({
 					return { ...entry, hidden: true };
 				if (entry.id === "host:conv-dismiss-subagents")
 					return { ...entry, label, ...(nFinished === 0 ? { when: [...(entry.when ?? []), "disabled"] } : {}) };
-				if (entry.id === "host:conv-force-dismiss")
-					return scopeId
-						? { ...entry, ...(armed ? { label: t("forceDismissConfirm") } : {}) }
-						: { ...entry, hidden: true };
+				if (entry.id === "host:conv-force-dismiss") return scopeId ? entry : { ...entry, hidden: true };
 				// 固化子代理/临时对话为普通对话：只在内存会话（未落盘、isSubagent 或临时）行显示
 				if (entry.id === "host:conv-persist") {
 					if (!scopeId) return { ...entry, hidden: true };
@@ -305,10 +296,7 @@ export const LeftPanel = memo(function LeftPanel({
 		[uiContextSession, conversations, finishedSubagentCount, t],
 	);
 
-	/** host 内置条目的分派：作用范围（scopeId）来自打开菜单时记下的 target。
-	 *  强行关闭保留老实现的两段确认：第一次点 = 武装 + 把菜单原地换成「确认强行关闭？」
-	 *  （返回 true 让 ContextMenu 先别关，见 ContextMenuRequest.onHostAction），
-	 *  第二次点才真发 `dismiss_conversation(force)`。 */
+	/** host 内置条目的分派：危险操作统一打开确认弹窗。 */
 	const dispatchHostSessionEntry = useCallback(
 		(entry: UiSlotEntry, target: ContextMenuRequest["target"]): void | boolean => {
 			const scopeId = target.kind === "running" ? target.id : undefined;
@@ -327,27 +315,33 @@ export const LeftPanel = memo(function LeftPanel({
 				return;
 			}
 			if (entry.id === "host:conv-force-dismiss") {
-				const last = sessionMenuRef.current;
-				if (!scopeId || !last) return;
-				if (forceArmedRef.current !== scopeId) {
-					forceArmedRef.current = scopeId;
-					showSessionMenu(last.x, last.y, last.target);
-					return true; // 菜单保持打开：它已经被换成「确认强行关闭？」那一版
-				}
-				forceArmedRef.current = null;
-				panelSend({ type: "dismiss_conversation", id: scopeId, force: true });
+				if (!scopeId) return;
+				setPendingConfirm({
+					title: t("forceDismissConfirm"),
+					body: target.label || scopeId,
+					confirmLabel: t("ok"),
+					danger: true,
+					action: () => panelSend({ type: "dismiss_conversation", id: scopeId, force: true }),
+				});
 				return;
 			}
-			if (entry.id === "host:conv-delete") {
-				const last = sessionMenuRef.current;
-				if (target.kind !== "history" || !target.id || !last) return;
-				if (deleteArmedRef.current !== target.id) {
-					deleteArmedRef.current = target.id;
-					showSessionMenu(last.x, last.y, last.target);
-					return true;
-				}
-				deleteArmedRef.current = null;
-				panelSend({ type: "delete_session", path: target.id });
+			if (entry.id === "host:conv-delete" || entry.id === "host:conv-archive") {
+				if (target.kind !== "history" || !target.id) return;
+				const archiving = entry.id === "host:conv-archive";
+				setPendingConfirm({
+					title: archiving ? t("archiveSession") : t("deleteSessionTitle"),
+					body: archiving
+						? t("archiveSessionConfirm", { name: target.label || target.id })
+						: t("deleteSessionConfirmBody", { name: target.label || target.id }),
+					confirmLabel: archiving ? t("archiveSession") : t("delete"),
+					danger: !archiving,
+					action: () =>
+						panelSend(
+							archiving
+								? { type: "archive_session", path: target.id, archived: true }
+								: { type: "delete_session", path: target.id },
+						),
+				});
 				return;
 			}
 			if (entry.id === "host:conv-persist") {
@@ -398,7 +392,7 @@ export const LeftPanel = memo(function LeftPanel({
 			// 重命名：切出该行内嵌的重命名输入框（与悬停 ✎ 同一套 renaming state）。
 			// 菜单直接关闭（返回 undefined），输入框的 autoFocus 负责聚焦。
 			if (entry.id === "host:conv-rename") {
-				setConfirmDel(null);
+				setPendingConfirm(null);
 				if (scopeId) {
 					const conv = conversations.find((c) => c.id === scopeId);
 					setRenameDraft(conv?.title ?? target.label ?? "");
@@ -495,8 +489,6 @@ export const LeftPanel = memo(function LeftPanel({
 			e.preventDefault();
 			// 行上的处理器要拦冒泡：整个运行对话区（含空白处）也有一个右键处理器。
 			e.stopPropagation();
-			forceArmedRef.current = null;
-			deleteArmedRef.current = null;
 			showSessionMenu(e.clientX, e.clientY, target);
 		},
 		[sessionMenuAvailable, showSessionMenu],
@@ -574,27 +566,31 @@ export const LeftPanel = memo(function LeftPanel({
 
 	const projectName = (path: string): string => path.split(/[\\/]/).pop() || path;
 
-	const delButton = (key: string, hint: string, confirmHint: string, onConfirm: () => void, icon?: React.ReactNode) => {
-		const armed = confirmDel === key;
-		return (
-			<button
-				type="button"
-				className={`lp-del ${armed ? "confirm" : ""}`}
-				title={armed ? confirmHint : hint}
-				onClick={(e) => {
-					e.stopPropagation();
-					if (armed) {
-						setConfirmDel(null);
-						onConfirm();
-					} else {
-						setConfirmDel(key);
-					}
-				}}
-			>
-				{armed ? <FiCheck /> : (icon ?? <FiTrash2 />)}
-			</button>
-		);
-	};
+	const delButton = (
+		_key: string,
+		hint: string,
+		confirmHint: string,
+		onConfirm: () => void,
+		icon?: React.ReactNode,
+	) => (
+		<button
+			type="button"
+			className="lp-del"
+			title={hint}
+			onClick={(e) => {
+				e.stopPropagation();
+				setPendingConfirm({
+					title: hint,
+					body: confirmHint,
+					confirmLabel: hint,
+					danger: true,
+					action: onConfirm,
+				});
+			}}
+		>
+			{icon ?? <FiTrash2 />}
+		</button>
+	);
 
 	const renderSessionRow = (s: SessionSummary) => {
 		const active = currentFile === s.path;
@@ -647,7 +643,7 @@ export const LeftPanel = memo(function LeftPanel({
 					title={t("renameSession")}
 					onClick={(e) => {
 						e.stopPropagation();
-						setConfirmDel(null);
+						setPendingConfirm(null);
 						setRenameDraft(s.name ?? "");
 						setRenaming(s.path);
 					}}
@@ -751,10 +747,7 @@ export const LeftPanel = memo(function LeftPanel({
 						const showAllSessions = showAllProjectSessions.has(p.path);
 						return (
 							<div className="lp-tree-project" key={p.path}>
-								<div
-									className="lp-row lp-tree-project-row"
-									onMouseLeave={() => setConfirmDel((k) => (k === `proj:${p.path}` ? null : k))}
-								>
+								<div className="lp-row lp-tree-project-row">
 									<button
 										type="button"
 										className={`project-item ${activeProject ? "active" : ""}`}
@@ -840,6 +833,17 @@ export const LeftPanel = memo(function LeftPanel({
 				onSelectDirectory={(path) => panelSend({ type: "set_cwd", path })}
 				onCreateProject={(path) => panelSend({ type: "make_dir", path, setAsCwd: true })}
 			/>
+			{pendingConfirm && (
+				<ConfirmDialog
+					title={pendingConfirm.title}
+					confirmLabel={pendingConfirm.confirmLabel}
+					danger={pendingConfirm.danger}
+					onClose={() => setPendingConfirm(null)}
+					onConfirm={pendingConfirm.action}
+				>
+					{pendingConfirm.body}
+				</ConfirmDialog>
+			)}
 		</aside>
 	);
 });

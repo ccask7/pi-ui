@@ -314,6 +314,16 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		group: "tools",
 		align: "end",
 	},
+	{
+		id: "host:history",
+		slot: "topbar.primary",
+		labelKey: "archivedHistory",
+		icon: "archive",
+		kind: "action",
+		order: 50,
+		group: "tools",
+		align: "end",
+	},
 	// 设置入口位于顶栏右侧，必须保留为用户找回其他布局入口的通道。
 	{
 		id: "host:settings",
@@ -732,7 +742,16 @@ export const BUILTIN_UI_ITEMS: BuiltinUiItem[] = [
 		context: "session",
 		order: 25,
 	},
-	// 永久删除历史会话：只在历史行显示；第一次点击切换为确认文案，第二次才删除。
+	{
+		id: "host:conv-archive",
+		slot: "contextmenu.session",
+		labelKey: "archiveSession",
+		icon: "archive",
+		kind: "action",
+		context: "session",
+		order: 50,
+	},
+	// 永久删除历史会话：只在历史行显示，点击后通过确认弹窗执行。
 	{
 		id: "host:conv-delete",
 		slot: "contextmenu.session",

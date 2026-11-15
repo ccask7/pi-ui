@@ -171,6 +171,7 @@ import {
 } from "./conversation-read-tool.js";
 import { extractTouches, formatTouchesCompact, intersectTouches } from "./conversation-touches.js";
 import { ClaimStore, matchClaims, mergeTouchSidecar, readTouchSidecar, removeTouchSidecar } from "./claim-store.js";
+import { SessionArchiveStore } from "./session-archive-store.js";
 import { makeClaimFilesTool, type ClaimFilesHost } from "./claim-files-tool.js";
 import { makeSkillTool, type SkillToolHost } from "./skill-tool.js";
 import { makeScheduleTools, type ScheduleToolHost } from "./schedule-agent-tool.js";
@@ -3220,6 +3221,8 @@ export class ClientSession {
 	private readonly approvalRules: ApprovalRulesStore;
 	/** 未发送输入框草稿（全局共享，<dataDir>/composer-drafts.json，按 sessionId 键入，见 server/composer-drafts.ts）。 */
 	private readonly drafts: ComposerDraftsStore;
+	/** 会话归档只保存 UI 元数据，不移动或改写 pi 转录文件。 */
+	private readonly sessionArchives: SessionArchiveStore;
 	/** 内置标记服务（todo/notify/svc/rename 等，可全局/分组开关）。 */
 	private readonly markerSvc: MarkerService;
 
@@ -3277,6 +3280,7 @@ export class ClientSession {
 		this.subagentTemplates = new SubagentTemplatesStore(join(stateStore.dataDir, "subagent-templates.json"));
 		this.approvalRules = new ApprovalRulesStore(join(stateStore.dataDir, "approval-rules.json"));
 		this.drafts = new ComposerDraftsStore(join(stateStore.dataDir, "composer-drafts.json"));
+		this.sessionArchives = new SessionArchiveStore(piSessionsRoot() ?? join(agentDir, "sessions"));
 		this.markerSvc = new MarkerService({
 			clientId,
 			stateStore,
@@ -8806,8 +8810,10 @@ export class ClientSession {
 					})()
 				: infos;
 
+		const archivedPaths = this.sessionArchives.paths();
 		const sessions = new Map<string, SessionSummary>();
 		for (const s of visibleInfos) {
+			if (archivedPaths.has(resolve(s.path))) continue;
 			sessions.set(s.path, {
 				path: s.path,
 				name: s.name,
@@ -8917,6 +8923,7 @@ export class ClientSession {
 				}
 			}
 			rmSync(abs, { force: true });
+			this.sessionArchives.set(abs, false);
 			// 转录删了，sidecar 再留着就是孤儿，一起清掉（不存在不报错）。
 			removeTouchSidecar(abs);
 			// 转录删了，未发送草稿再留着就是孤儿，一起清掉。
@@ -8929,7 +8936,7 @@ export class ClientSession {
 			// lands inside its 3s TTL and would otherwise re-serve a listing that
 			// still contains the deleted transcript.
 			this.invalidateSessionInfos();
-			await this.refreshSessions();
+			await Promise.all([this.refreshSessions(), this.refreshArchivedSessions()]);
 		} catch (err) {
 			this.emit({
 				type: "notice",
@@ -8938,6 +8945,50 @@ export class ClientSession {
 				textEn: `Failed to delete session: ${(err as Error).message}`,
 			});
 		}
+	}
+
+	async archiveSession(path: string, archived: boolean): Promise<void> {
+		try {
+			const abs = resolve(path);
+			if (!isInsideSessionsDir(this.agentDir, abs)) {
+				this.emit({
+					type: "notice",
+					level: "error",
+					text: "只能归档会话目录中的对话记录",
+					textEn: "Only transcripts inside the session directory can be archived",
+				});
+				return;
+			}
+			this.sessionArchives.set(abs, archived);
+			this.invalidateSessionInfos();
+			await Promise.all([this.refreshSessions(), this.refreshArchivedSessions()]);
+		} catch (err) {
+			this.emit({
+				type: "notice",
+				level: "error",
+				text: `更新会话归档失败：${(err as Error).message}`,
+				textEn: `Failed to update session archive: ${(err as Error).message}`,
+			});
+		}
+	}
+
+	async refreshArchivedSessions(): Promise<void> {
+		const archivedPaths = this.sessionArchives.paths();
+		const infos = await SessionManager.listAll(piSessionsRoot());
+		const sessions = infos
+			.filter((info) => archivedPaths.has(resolve(info.path)))
+			.map((info) => ({
+				path: info.path,
+				name: info.name,
+				firstMessage: info.firstMessage,
+				messageCount: info.messageCount,
+				modified: info.modified.getTime(),
+				source: "web" as const,
+				cwd: info.cwd,
+				...(info.parentSessionPath ? { isBranch: true } : {}),
+			}))
+			.sort((a, b) => b.modified - a.modified);
+		this.emit({ type: "archived_sessions", sessions });
 	}
 
 	/** Rename a persisted session by appending a session_info entry — the same

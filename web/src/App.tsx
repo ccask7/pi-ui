@@ -57,6 +57,7 @@ import { ModelConfigModal } from "./components/ModelConfigModal";
 
 import { SettingsModal } from "./components/SettingsModal";
 import { BgTasksModal } from "./components/BgTasksModal";
+import { ArchivedHistoryModal } from "./components/ArchivedHistoryModal";
 import { RollbackDialog } from "./components/RollbackDialog";
 import { openRollbackDialog } from "./rollback-state";
 import { ToolApprovalDialog } from "./components/ToolApprovalDialog";
@@ -709,6 +710,7 @@ export function App() {
 	const wide = useWideChat();
 	// Background-task panel (AI-started servers — stop individually or all).
 	const [bgTasksOpen, setBgTasksOpen] = useState(false);
+	const [historyOpen, setHistoryOpen] = useState(false);
 	// Global search panel (sessions / projects / workspace files).
 	const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 	/** 全局搜索「会话」结果点击后的跳转目标：切到该会话并定位到命中消息。
@@ -1357,6 +1359,10 @@ export function App() {
 					setSettingsOpen(true);
 				}}
 				onOpenBgTasks={() => setBgTasksOpen(true)}
+				onOpenHistory={() => {
+					setHistoryOpen(true);
+					send({ type: "list_archived_sessions" });
+				}}
 			/>
 			{chat.protocolMismatch && <div className="protocol-banner">⚠ {t("protocolMismatch")}</div>}
 			<div className="notices">
@@ -2119,6 +2125,18 @@ export function App() {
 				/>
 			)}
 			{bgTasksOpen && <BgTasksModal servers={chat.bgServers} onClose={() => setBgTasksOpen(false)} />}
+			{historyOpen && (
+				<ArchivedHistoryModal
+					sessions={chat.archivedSessions}
+					onClose={() => setHistoryOpen(false)}
+					onOpen={(path) => {
+						send({ type: "switch_session", path });
+						setHistoryOpen(false);
+					}}
+					onRestore={(path) => send({ type: "archive_session", path, archived: false })}
+					onDelete={(path) => send({ type: "delete_session", path })}
+				/>
+			)}
 			{/* 工具定义说明弹窗（工具卡右键菜单 host:tool-info）：自己订阅 store，无 props。 */}
 			<ToolInfoDialog />
 			{/* 会话回滚确认弹窗（Dual-State Rollback） */}

@@ -113,6 +113,8 @@ export interface ChatState {
 	sessions: SessionSummary[];
 	/** 项目树按需加载的历史会话，key 为项目绝对路径。 */
 	projectSessions: Record<string, SessionSummary[]>;
+	/** 顶栏历史弹窗中的全部已归档会话。 */
+	archivedSessions: SessionSummary[];
 	/** Open conversations (each runs its own session in parallel). */
 	conversations: ConversationSummary[];
 	/** issue #145：在其他客户端（标签页/设备）上正在跑的对话（只读感知，不可点）。 */
@@ -320,6 +322,7 @@ type Action =
 	  }
 	| { type: "sessions"; sessions: SessionSummary[] }
 	| { type: "project_sessions"; path: string; sessions: SessionSummary[] }
+	| { type: "archived_sessions"; sessions: SessionSummary[] }
 	| {
 			type: "conversations";
 			conversations: ConversationSummary[];
@@ -711,6 +714,8 @@ function reducer(state: ChatState, action: Action): ChatState {
 				...state,
 				projectSessions: { ...state.projectSessions, [action.path]: action.sessions },
 			};
+		case "archived_sessions":
+			return { ...state, archivedSessions: action.sessions };
 		case "conversations":
 			return {
 				...state,
@@ -942,6 +947,7 @@ export function useChat() {
 		notices: [],
 		sessions: [],
 		projectSessions: {},
+		archivedSessions: [],
 		conversations: [],
 		elsewhere: [],
 		activeConversationId: "",
@@ -1251,6 +1257,9 @@ export function useChat() {
 					break;
 				case "project_sessions":
 					dispatch({ type: "project_sessions", path: msg.path, sessions: msg.sessions });
+					break;
+				case "archived_sessions":
+					dispatch({ type: "archived_sessions", sessions: msg.sessions });
 					break;
 				case "conversations":
 					dispatch({

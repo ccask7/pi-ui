@@ -801,6 +801,11 @@ export type ClientMessage =
 	 *  ones, bump the epoch and re-push the catalog. Same spirit as
 	 *  extensions_reload but for ccui's own UI plugins. */
 	| { type: "plugins_reload" }
+	/** 卸载插件：反激活 + 删除 `<dataDir>/plugins/<id>/`（插件数据在它自己目录里，一起删）。
+	 *  之后不会再有"自动装回来"——播种标记会记住它被卸载过。
+	 *
+	 *  入口：设置 →「界面插件」每行的垃圾桶（确认框会写明会连数据一起删）。 */
+	| { type: "plugins_uninstall"; id: string }
 	/** 特权 DOM 访问授权（wantsDom 插件）：granted=true 即写入 <dataDir>/plugin-dom.json
 	 *  并 epoch+1 重推清单（浏览器按新 epoch 重拉 bundle）；false = 撤销。 */
 	| { type: "plugin_dom_consent"; pluginId: string; granted: boolean }
@@ -918,6 +923,10 @@ export type ClientMessage =
 	| { type: "remove_project"; path: string }
 	/** Permanently delete a persisted session transcript file (history list). */
 	| { type: "delete_session"; path: string }
+	/** Hide/show a session in the normal history tree without changing its transcript. */
+	| { type: "archive_session"; path: string; archived: boolean }
+	/** List archived sessions across all projects. */
+	| { type: "list_archived_sessions" }
 	/** Append a session_info name entry to a persisted session transcript (history rename). */
 	| { type: "rename_session"; path: string; name: string }
 	/** Rename a live conversation: retitle + persist a session_info entry so History matches. */
@@ -974,6 +983,8 @@ export interface SessionSummary {
 	source?: "web" | "tui";
 	/** 从另一会话派生而来；历史列表仅显示小标识，不改变分支链收纳规则。 */
 	isBranch?: boolean;
+	/** 归档历史弹窗用于显示所属项目。 */
+	cwd?: string;
 }
 
 /** 会话转录中一条命中消息的定位锚点：会话载入后按 role + timestamp 在
@@ -2305,6 +2316,7 @@ export type ServerMessage =
 	| { type: "heartbeat"; hostMetrics?: UiHostMetrics }
 	| { type: "sessions"; sessions: SessionSummary[] }
 	| { type: "project_sessions"; path: string; sessions: SessionSummary[] }
+	| { type: "archived_sessions"; sessions: SessionSummary[] }
 	/** Filename matches for the global search panel (reqId echo). Always sent
 	 *  in reply to a search_files request — ok:false means the walk failed. */
 	| {

@@ -39,7 +39,7 @@ import { startControlServer } from "./control-socket.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { windowsBashDir } from "./ensure-bash.js";
 import { listThemes, resolveThemeFile } from "./themes.js";
-import { seedBundledPlugins } from "./plugin-seed.js";
+import { markSeeded, seedBundledPlugins } from "./plugin-seed.js";
 import { parseTabs, tabsRefusal } from "./tabs.js";
 import { recordUnknownWsType } from "./ws-unknown-types.js";
 import { isKnownPack, listPacks, loadServerStrings, readPackFile, removePack, unloadServerStrings } from "./locales.js";
@@ -946,6 +946,8 @@ export interface DispatchSession {
 	pushProjects(): Promise<void>;
 	removeProject(path: string): Promise<void>;
 	deleteSession(path: string): Promise<void>;
+	archiveSession?(path: string, archived: boolean): Promise<void>;
+	refreshArchivedSessions?(): Promise<void>;
 	renameSession(path: string, name: string): Promise<void>;
 	renameConversation(id: string, name: string): Promise<void>;
 	dismissConversation(id: string, withFinishedSubagents?: boolean, force?: boolean): Promise<void>;
@@ -1973,6 +1975,12 @@ wss.on("connection", (ws) => {
 			case "delete_session":
 				void cs.deleteSession(msg.path);
 				break;
+			case "archive_session":
+				if (cs.archiveSession) void cs.archiveSession(msg.path, msg.archived);
+				break;
+			case "list_archived_sessions":
+				if (cs.refreshArchivedSessions) void cs.refreshArchivedSessions();
+				break;
 			case "rename_session":
 				void cs.renameSession(msg.path, msg.name);
 				break;
@@ -2332,6 +2340,20 @@ wss.on("connection", (ws) => {
 			case "plugins_reload":
 				void pluginMgr.reload(() => cs?.getLang() ?? "en").then(() => pluginMgr.pushToAll());
 				break;
+			case "plugins_uninstall": {
+				const id = String(msg.id ?? "");
+				void pluginMgr.uninstall(id).then(async (r) => {
+					if (r.ok) {
+						// 记住"卸载过"：下次启动的播种不再把它装回来。
+						markSeeded(DATA_DIR, id);
+						cs?.emitNotice("info", "插件已卸载（含其数据目录）", "Plugin uninstalled (including its data)");
+					} else {
+						cs?.emitNotice("error", `卸载失败：${r.error ?? "未知原因"}`, `Uninstall failed: ${r.error ?? "unknown"}`);
+					}
+					await pluginMgr.pushToAll();
+				});
+				break;
+			}
 			// 注册面目录（DSH P2-7）：只读装配（slot/工具/宿主方法表+当前占用者），按需拉取。
 			case "plugin_api_catalog": {
 				const requestId = String(msg.requestId ?? "");

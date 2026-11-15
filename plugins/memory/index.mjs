@@ -6,10 +6,10 @@
  *
  * 分工：
  *   - 纯逻辑（分词/检索/打分/衰减/脱敏/指纹）全在 client/core.mjs，与浏览器视图共用。
- *   - 落盘在 `<dataDir>/memory/`（**与插件目录平级**，同 notes 插件的口径）：主库 memories.jsonl
- *     （一行一条，临时文件 + rename 原子重写）、blacklist.json（删过的别再记回来）、
- *     audit.jsonl（谁在什么情况下写了什么）。不写插件目录 —— 插件覆盖/重装/卸载都碰不到它；
- *     老位置 `<dataDir>/plugins/memory/data/` 只在启动时复制一次（不移动不删）。
+ *   - 落盘在 `<dataDir>/plugins/memory/data/`（**与插件代码同目录**，卸载 = 删一个目录）：
+ *     主库 memories.jsonl（一行一条，临时文件 + rename 原子重写）、blacklist.json（删过的
+ *     别再记回来）、audit.jsonl（谁在什么情况下写了什么）、backups/（滚动快照，留 5 份）。
+ *     老位置 `<dataDir>/memory/` 只在启动时复制一次（不移动不删）。
  *   - 所有写走一条串行队列：工具写入优先，后台任务可被丢弃（P0 还没有后台任务）。
  *   - 迭代靠三件事：强度衰减（半衰期只跟重要度挂钩）+ 冲突换代（写入时判定谁赢）
  *     + 三合一反馈（被检索返回 +0.2；同轮工具命中绑定路径/命令 +1；用户点有用/没用 ±1）。
@@ -40,15 +40,18 @@ export default {
 	activate(host) {
 		// ---------------------------------------------------------------- 落盘
 		/**
-		 * 数据放在 `<dataDir>/memory/`，**与插件目录平级**（同 notes 插件的口径）：
-		 * 插件怎么覆盖/重装/卸载都碰不到它 —— 放在插件目录里时，一次"删目录再拷"
-		 * 就把整库带走了（真发生过）。
+		 * 数据放在 `<dataDir>/plugins/memory/data/`：**插件代码与数据在同一个目录里**，
+		 * 「卸载」删掉这个目录就是干净卸载，界面上也只有一处需要解释。
 		 *
-		 * 老位置 `<dataDir>/plugins/memory/data/` 只在启动时**复制**过来（不移动、不删），
-		 * 新库已有数据时以新库为准，不自动清理旧目录。
+		 * 代价（明确接受）：手动 `rm -rf` 插件目录会连记忆一起没。
+		 * 所以卸载入口带二次确认，且每次物理删除前仍会留快照（`data/backups/`）。
+		 *
+		 * 老位置 `<dataDir>/memory/`（曾与插件目录平级）只在启动时**复制**过来
+		 * （不移动、不删），新库已有数据时以新库为准。
 		 */
-		const dir = join(host.dataDir, "memory");
-		const legacyDir = join(host.dataDir, "plugins", "memory", "data");
+		const dir = join(host.dataDir, "plugins", "memory", "data");
+		/** 老位置：曾经与插件目录平级的 `<dataDir>/memory/`。 */
+		const legacyDirs = [join(host.dataDir, "memory")];
 		const file = join(dir, "memories.jsonl");
 		const blacklistFile = join(dir, "blacklist.json");
 		const auditFile = join(dir, "audit.jsonl");
@@ -80,8 +83,17 @@ export default {
 		}
 		ensureDirs();
 
-		/** 老位置 → 新位置的一次性复制。返回 {migrated, keptLegacy}。 */
+		/** 老位置 → 新位置的一次性复制（多个候选位置，取第一个有数据的）。 */
 		function migrateLegacy() {
+			for (const legacyDir of legacyDirs) {
+				const r = migrateFrom(legacyDir);
+				if (r.migrated > 0) return r;
+			}
+			return { migrated: 0, keptLegacy: false };
+		}
+
+		/** 从某个老目录复制过来；返回 {migrated, keptLegacy}。 */
+		function migrateFrom(legacyDir) {
 			const legacyFile = join(legacyDir, "memories.jsonl");
 			if (!existsSync(legacyFile)) return { migrated: 0, keptLegacy: false };
 			let legacySize = 0;
@@ -92,27 +104,46 @@ export default {
 			}
 			if (legacySize === 0) return { migrated: 0, keptLegacy: true };
 			const mine = existsSync(file) ? safeSize(file) : 0;
+			// 两边都有数据时按修改时间判新旧：老位置更新（数据搬走后又搬回来，插件目录里
+			// 可能残留一份更早的）→ 先给现有库留快照再覆盖；否则以现有库为准。
 			if (mine > 0) {
-				// 新库已有数据：以新的为准，旧的不动也不合并（避免把过期数据灌回来）
-				host.log("warn", `发现遗留的旧记忆库（${legacyFile}），已忽略；确认无误后可自行删除`);
-				return { migrated: 0, keptLegacy: true };
+				let legacyNewer = false;
+				try {
+					legacyNewer = statSync(legacyFile).mtimeMs > statSync(file).mtimeMs;
+				} catch {
+					legacyNewer = false;
+				}
+				if (!legacyNewer) {
+					host.log("warn", `发现遗留的旧记忆库（${legacyFile}），已忽略；确认无误后可自行删除`);
+					return { migrated: 0, keptLegacy: true };
+				}
 			}
 			let count = 0;
 			try {
 				if (readonly) return { migrated: 0, keptLegacy: true };
+				if (mine > 0) {
+					// 覆盖前先留一份：迁移判错也不能把用户的库弄丢
+					try {
+						const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+						copyFileSync(file, join(backupDir, `memories-${stamp}-premigrate.jsonl`));
+						pruneBackups();
+					} catch (err) {
+						host.log("warn", `迁移前快照失败（继续迁移）：${err instanceof Error ? err.message : String(err)}`);
+					}
+				}
 				copyFileSync(legacyFile, file);
-				for (const name of ["blacklist.json", "audit.jsonl"]) {
+				for (const name of ["blacklist.json", "audit.jsonl", "trash.jsonl", "state.json"]) {
 					const src = join(legacyDir, name);
 					if (existsSync(src) && !existsSync(join(dir, name))) copyFileSync(src, join(dir, name));
 				}
 				count = readFileSync(file, "utf8")
 					.split(/\r?\n/)
 					.filter((l) => l.trim()).length;
-				host.log("info", `已从插件目录迁移 ${count} 条记忆到 ${dir}（旧目录保留，可自行删除）`);
+				host.log("info", `已从 ${legacyDir} 迁移 ${count} 条记忆到 ${dir}（旧目录保留，可自行删除）`);
 				audit({ op: "migrate", from: legacyFile, count });
 			} catch (err) {
 				host.log("error", `旧记忆库迁移失败：${err instanceof Error ? err.message : String(err)}`);
-				host.notify("warning", "旧记忆库迁移失败，请手动把 data/ 里的 memories.jsonl 复制到 " + dir);
+				host.notify("warning", `旧记忆库迁移失败，请手动把 ${legacyFile} 复制到 ${dir}`);
 			}
 			return { migrated: count, keptLegacy: true };
 		}
@@ -358,6 +389,7 @@ export default {
 				if (rec.content.length > old.content.length) old.content = rec.content.slice(0, 400);
 				if (rec.excerpt && rec.excerpt.length > (old.excerpt ?? "").length) old.excerpt = rec.excerpt.slice(0, 2000);
 				old.tags = [...new Set([...(old.tags ?? []), ...rec.tags])].slice(0, 8);
+				old.topics = [...new Set([...(old.topics ?? []), ...(rec.topics ?? [])])].slice(0, 3);
 				old.importance = Math.max(old.importance, rec.importance);
 				old.updatedAt = now;
 				old.lastUsedAt = now;
@@ -395,9 +427,12 @@ export default {
 				if (secret.hit) return { ok: false, text: `拒绝：疑似包含凭据（${secret.hit}）` };
 				rec.content = next;
 			}
+			// 主题：可清空（传 []），也接受逗号分隔字符串
+			if (patch.topics !== undefined) rec.topics = C.normalizeTopics(patch.topics);
 			if (Array.isArray(patch.tags))
 				rec.tags = patch.tags
-					.map((t) => String(t).trim().slice(0, 24))
+					// 与 normalizeRecord 同口径：路径类标签要留够长度（旧版截 24 会写坏文件名）。
+					.map((t) => String(t).trim().slice(0, 120))
 					.filter(Boolean)
 					.slice(0, 8);
 			if (patch.type && C.TYPES.includes(patch.type)) rec.type = patch.type;
@@ -638,6 +673,7 @@ export default {
 					"不要写：一次性的中间结果、代码里能直接读到的、通用编程知识、任何密钥/令牌/密码。",
 					"content 写成一两句陈述句（什么情况下会需要它），excerpt 放关键原话（报错原文、命令原文），比摘要更有用。",
 					"用户说的如果是「回答问题就好、不要动手」这类行为约束，type 用 preference（或 convention），并在 content 里写清触发条件。",
+					"topics 是给人看的粗分组（0-3 个短名词，如 部署 / 数据库 / 个人偏好），能沿用已有主题就沿用，不要造近义词（部署 vs 发布）；它不参与检索打分。",
 				],
 				description:
 					"Remember one durable fact about this project or the user: a pitfall and its cause/fix, a decision with rationale, a convention, an environment fact, a term, or a stable preference. Call this whenever the user asks you to remember something — saying you will remember it without calling this tool records nothing. Store content as a one-sentence statement plus an optional verbatim excerpt.",
@@ -657,6 +693,12 @@ export default {
 							items: { type: "string" },
 							description: "Optional tags (files, modules, services).",
 						},
+						topics: {
+							type: "array",
+							items: { type: "string" },
+							description:
+								"Optional topics for the human graph (0-3 short nouns, e.g. 部署 / 数据库 / 个人偏好). Reuse existing topics when they fit; grouping only, not used for ranking.",
+						},
 						file: { type: "string", description: "File or directory this memory is bound to, if any." },
 						pinned: { type: "boolean", description: "Never fade this one out." },
 					},
@@ -671,6 +713,7 @@ export default {
 							scope: params.scope,
 							importance: params.importance,
 							tags: params.tags,
+							topics: params.topics,
 							pinned: params.pinned,
 							scopeKey: scopeKeyOf(params.scope ?? "project"),
 							source: { file: params.file, kind: "agent" },
@@ -695,6 +738,11 @@ export default {
 						type: { type: "string", enum: C.TYPES },
 						importance: { type: "number" },
 						tags: { type: "array", items: { type: "string" } },
+						topics: {
+							type: "array",
+							items: { type: "string" },
+							description: "Replace topics (0-3). Pass [] to clear.",
+						},
 						pinned: { type: "boolean" },
 					},
 					required: ["id"],

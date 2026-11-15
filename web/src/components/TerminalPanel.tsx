@@ -5,6 +5,7 @@ import type { ChatState, TerminalMeta } from "../use-chat";
 import type { CommandDef } from "../types";
 import { TermXterm } from "./TermXterm";
 import { useT } from "../i18n";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { appSend } from "../app-globals";
 import type { UiSlotEntry } from "../ui-slots";
 // 工具条通用渲染已抽到 ../slot-toolbar（本模块静态 import 会把 xterm 拉进主包）；
@@ -57,7 +58,6 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 	const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 	// Two-step delete confirmation.
 	const [confirmDel, setConfirmDel] = useState<number | null>(null);
-	const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	// 终端接管 bash 的「AI bash」折叠分组开关（默认展开）。
 	const [aiBashOpen, setAiBashOpen] = useState(true);
 	const [renamingTab, setRenamingTab] = useState<string | null>(null);
@@ -79,12 +79,6 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 			setActiveId(chat.terminalActiveId);
 		}
 	}, [chat.terminalActiveId]);
-
-	useEffect(() => {
-		return () => {
-			if (confirmTimer.current) clearTimeout(confirmTimer.current);
-		};
-	}, []);
 
 	// -- tab management --------------------------------------------------------
 
@@ -250,18 +244,7 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 		cancelEdit();
 	};
 
-	const requestDelete = (idx: number) => {
-		if (confirmDel === idx) {
-			const next = chat.commands.filter((_, i) => i !== idx);
-			appSend({ type: "save_commands", commands: next });
-			setConfirmDel(null);
-			if (confirmTimer.current) clearTimeout(confirmTimer.current);
-		} else {
-			setConfirmDel(idx);
-			if (confirmTimer.current) clearTimeout(confirmTimer.current);
-			confirmTimer.current = setTimeout(() => setConfirmDel(null), 2500);
-		}
-	};
+	const requestDelete = (idx: number) => setConfirmDel(idx);
 
 	const editing = isNew || editingIdx !== null;
 
@@ -383,13 +366,8 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 									<button type="button" className="cmd-act" title={t("edit")} onClick={() => startEdit(i)}>
 										<FiEdit2 />
 									</button>
-									<button
-										type="button"
-										className={`cmd-act del ${confirmDel === i ? "confirm" : ""}`}
-										title={t("delete")}
-										onClick={() => requestDelete(i)}
-									>
-										{confirmDel === i ? t("confirmQ") : <FiTrash2 />}
+									<button type="button" className="cmd-act del" title={t("delete")} onClick={() => requestDelete(i)}>
+										<FiTrash2 />
 									</button>
 								</div>
 							))}
@@ -451,6 +429,19 @@ export function TerminalPanel({ chat, terminal, uiTerminalToolbar, onUiAction }:
 					))
 				)}
 			</div>
+			{confirmDel !== null && chat.commands[confirmDel] && (
+				<ConfirmDialog
+					title={t("delete")}
+					confirmLabel={t("delete")}
+					danger
+					onClose={() => setConfirmDel(null)}
+					onConfirm={() =>
+						appSend({ type: "save_commands", commands: chat.commands.filter((_, i) => i !== confirmDel) })
+					}
+				>
+					{chat.commands[confirmDel].name}
+				</ConfirmDialog>
+			)}
 		</div>
 	);
 }

@@ -1,5 +1,13 @@
 import { Fragment, useState, type ReactNode } from "react";
-import { FiFolderPlus, FiGitBranch, FiMessageSquare, FiSettings, FiLayers, FiTerminal } from "react-icons/fi";
+import {
+	FiArchive,
+	FiFolderPlus,
+	FiGitBranch,
+	FiMessageSquare,
+	FiSettings,
+	FiLayers,
+	FiTerminal,
+} from "react-icons/fi";
 import type { ChatState } from "../use-chat";
 import { appUrl } from "../base-url";
 import { PluginIcon } from "../plugin-icon";
@@ -50,6 +58,7 @@ interface TopBarProps {
 	onOpenSettings: () => void;
 	/** Open the background-task panel (AI-started servers — stop individually or all). */
 	onOpenBgTasks: () => void;
+	onOpenHistory: () => void;
 }
 
 export function TopBar({
@@ -62,6 +71,7 @@ export function TopBar({
 	onViewChange,
 	onOpenSettings,
 	onOpenBgTasks,
+	onOpenHistory,
 }: TopBarProps) {
 	const { t } = useI18n();
 	/* 「打开项目」按钮（host:open-project）的项目选择器：与左栏 📁+ 同一个组件、同一套行为
@@ -93,6 +103,7 @@ export function TopBar({
 		"host:terminal",
 		"host:git",
 		"host:tasks",
+		"host:history",
 		"host:settings",
 		"host:new-ephemeral-chat",
 	];
@@ -227,6 +238,12 @@ export function TopBar({
 				<FiLayers />
 				<span className="chip-sub">{t("bgTasks")}</span>
 				{chat.bgServers.length > 0 && <span className="bg-task-badge">{chat.bgServers.length}</span>}
+			</button>
+		),
+		"host:history": (
+			<button type="button" className="chip" data-tip={t("archivedHistory")} onClick={onOpenHistory}>
+				<FiArchive />
+				<span className="chip-sub">{t("archivedHistory")}</span>
 			</button>
 		),
 		"host:settings": (

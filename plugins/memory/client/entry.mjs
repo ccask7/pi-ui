@@ -38,19 +38,48 @@ const TYPE_COLOR = {
 
 const STYLE = `
 .mem-root{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg,#12141a);color:var(--fg,#e6e6ea);font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
-.mem-bar{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap}
-.mem-bar input[type=search]{flex:1 1 200px;min-width:140px;padding:6px 9px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;font:inherit}
-.mem-bar input[type=search]:focus{outline:1px solid rgba(120,170,255,.6)}
-.mem-btn{padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;font:inherit;cursor:pointer}
+.mem-bar{display:flex;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.mem-search{position:relative;flex:1;display:flex;align-items:center;gap:7px;min-width:0;box-shadow:inset 0 -1px 0 transparent;transition:box-shadow .18s ease}
+.mem-search:focus-within{box-shadow:inset 0 -1px 0 rgba(120,170,255,.6)}
+.mem-search svg{width:14px;height:14px;flex:none;opacity:.45}
+.mem-search input{flex:1;min-width:0;padding:5px 0;border:none;background:transparent;color:inherit;font:inherit;outline:none}
+.mem-search input::placeholder{color:rgba(230,230,234,.34)}
+.mem-hits{flex:none;font-size:11.5px;color:rgba(230,230,234,.42);font-variant-numeric:tabular-nums}
+.mem-actions{display:flex;gap:2px;flex:none}
+.mem-icon{position:relative;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:none;border-radius:7px;background:transparent;color:inherit;opacity:.68;cursor:pointer;transition:opacity .15s ease,background .15s ease}
+.mem-icon:hover{opacity:1;background:rgba(255,255,255,.08)}
+.mem-icon.on{opacity:1;background:rgba(120,170,255,.16)}
+.mem-icon svg{width:15px;height:15px}
+.mem-flag{position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:#7aa2ff}
+.mem-filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.015);animation:mem-slide .16s ease}
+.mem-filters[hidden]{display:none}
+@keyframes mem-slide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.mem-btn{padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;font:inherit;font-size:12px;cursor:pointer;transition:background .15s ease}
 .mem-btn:hover{background:rgba(255,255,255,.09)}
 .mem-btn.on{background:rgba(120,170,255,.22);border-color:rgba(120,170,255,.5)}
+.mem-btn:disabled{opacity:.4;cursor:default}
 .mem-chips{display:flex;gap:4px;flex-wrap:wrap}
-.mem-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:transparent;color:inherit;font:inherit;font-size:12px;cursor:pointer;opacity:.55}
-.mem-chip.on{opacity:1;background:rgba(255,255,255,.07)}
+.mem-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:transparent;color:inherit;font:inherit;font-size:12px;cursor:pointer;opacity:.5;transition:opacity .15s ease,background .15s ease}
+.mem-chip:hover{opacity:.85}
+.mem-chip.on{opacity:1;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
 .mem-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.mem-topic{padding:1px 7px;border-radius:999px;background:rgba(120,170,255,.14);color:#9dc0ff;font-size:11.5px}
+.mem-menu{position:absolute;top:42px;right:10px;z-index:30;min-width:172px;padding:5px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(23,26,33,.98);box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:mem-pop .14s ease}
+.mem-menu[hidden]{display:none}
+@keyframes mem-pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+.mem-menu button{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 9px;border:none;border-radius:7px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.mem-menu button:hover{background:rgba(255,255,255,.08)}
+.mem-badge{min-width:17px;padding:0 5px;border-radius:999px;background:rgba(255,255,255,.12);font-size:11px;line-height:16px;text-align:center;color:rgba(230,230,234,.8)}
+.mem-badge[hidden]{display:none}
+.mem-banner{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid rgba(120,170,255,.26);background:rgba(120,170,255,.08);font-size:12px;color:rgba(230,238,255,.86)}
+.mem-banner[hidden]{display:none}
+.mem-banner button{margin-left:auto;padding:2px 8px;border:none;border-radius:6px;background:transparent;color:#9dc0ff;font:inherit;cursor:pointer}
+.mem-banner button:hover{background:rgba(120,170,255,.14)}
+.mem-toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:40;max-width:min(560px,90%);padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(24,27,34,.96);box-shadow:0 12px 28px rgba(0,0,0,.45);font-size:12px;pointer-events:none;animation:mem-pop .16s ease}
+.mem-toast[hidden]{display:none}
 .mem-main{position:relative;flex:1;display:flex;min-height:0}
 .mem-canvas-wrap{position:relative;flex:1;min-width:0}
-.mem-canvas{display:block;width:100%;height:100%;cursor:grab}
+.mem-canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 .mem-canvas.dragging{cursor:grabbing}
 .mem-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:rgba(230,230,234,.5);pointer-events:none;text-align:center;padding:24px}
 .mem-side{width:310px;flex:none;border-left:1px solid rgba(255,255,255,.08);padding:12px;overflow:auto;display:none}
@@ -161,18 +190,38 @@ export default {
 		root.className = "mem-root";
 		root.innerHTML = `
 			<div class="mem-bar">
-				<button class="mem-btn" data-act="back" title="回到对话（再点左栏「记忆」也能收起）">← 对话</button>
-				<input type="search" placeholder="搜记忆（高亮命中，其余压暗）" />
+				<div class="mem-search">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+					<input type="search" placeholder="搜索记忆" />
+					<span class="mem-hits"></span>
+				</div>
+				<div class="mem-actions">
+					<button class="mem-icon" data-act="filters" title="筛选（类型 / 范围 / 含淡出）" aria-label="筛选">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+					</button>
+					<button class="mem-icon" data-act="new" title="新建记忆" aria-label="新建记忆">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+					</button>
+					<button class="mem-icon" data-act="more" title="更多" aria-label="更多">
+						<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+					</button>
+				</div>
+			</div>
+			<div class="mem-filters" hidden>
 				<div class="mem-chips"></div>
-				<button class="mem-btn" data-act="scope" title="只看当前项目，还是看全部项目">当前项目</button>
-				<button class="mem-btn" data-act="faded" title="是否显示已经淡出/作废的点">含淡出</button>
-				<button class="mem-btn" data-act="new" title="手动新建一条记忆">＋ 新建</button>
-				<button class="mem-btn" data-act="batch" title="批量：点节点多选，然后一起作废/删除">批量</button>
-				<button class="mem-btn" data-act="housekeep" title="整理：合并近重复 + 把指向已删文件的记忆作废">整理</button>
-				<button class="mem-btn" data-act="quarantine" title="隔离区：自动记下但还没被用上的记忆">隔离区</button>
-				<button class="mem-btn" data-act="trash" title="回收站：删掉的先进这里 30 天，可恢复">回收站</button>
-				<button class="mem-btn" data-act="export" title="导出整库 JSON">导出</button>
-				<span class="mem-bar-note"></span>
+				<button class="mem-chip" data-act="scope" title="只看当前项目，还是看全部项目">当前项目</button>
+				<button class="mem-chip" data-act="faded" title="是否显示已经淡出/作废的点">含淡出</button>
+				<button class="mem-chip" data-act="batch" title="批量：点节点多选，然后一起作废/删除">批量选择</button>
+			</div>
+			<div class="mem-menu" hidden>
+				<button data-act="housekeep">整理<span class="mem-badge" hidden></span></button>
+				<button data-act="quarantine">隔离区<span class="mem-badge">0</span></button>
+				<button data-act="trash">回收站<span class="mem-badge">0</span></button>
+				<button data-act="export">导出 JSON</button>
+			</div>
+			<div class="mem-banner" hidden>
+				<span class="mem-banner-text"></span>
+				<button data-act="leave-list">返回全图</button>
 			</div>
 			<div class="mem-batchbar" hidden>
 				<span class="mem-batch-count"></span>
@@ -182,6 +231,7 @@ export default {
 				<button class="mem-btn" data-batch="delete">删除所选</button>
 				<button class="mem-btn" data-batch="pin">钉住所选</button>
 			</div>
+			<div class="mem-toast" hidden></div>
 			<div class="mem-main">
 				<div class="mem-canvas-wrap">
 					<canvas class="mem-canvas"></canvas>
@@ -197,8 +247,32 @@ export default {
 		const wrap = $(".mem-canvas-wrap");
 		const side = $(".mem-side");
 		const empty = $(".mem-empty");
-		const note = $(".mem-bar-note");
+		const hitsLabel = $(".mem-hits");
+		const filtersPanel = $(".mem-filters");
+		const menuEl = $(".mem-menu");
+		const banner = $(".mem-banner");
+		const bannerText = $(".mem-banner-text");
 		const searchInput = $('input[type="search"]');
+		const toastEl = $(".mem-toast");
+		let toastTimer = 0;
+		function toast(text) {
+			if (!text) return;
+			toastEl.textContent = text;
+			toastEl.hidden = false;
+			clearTimeout(toastTimer);
+			toastTimer = setTimeout(() => {
+				toastEl.hidden = true;
+			}, 2800);
+		}
+		/** 旧代码到处是 note.textContent = …，这里保留同名接口，换成短暂的 toast。 */
+		const note = {
+			set textContent(v) {
+				toast(v);
+			},
+			get textContent() {
+				return toastEl.textContent;
+			},
+		};
 		const g = canvas.getContext("2d");
 
 		const state = {
@@ -215,12 +289,22 @@ export default {
 			creating: false,
 			selected: null,
 			hover: null,
+			filtersOpen: false,
 		};
 		let nodes = [];
 		let edges = [];
 		let sim = { alpha: 0 };
-		let view = { x: 0, y: 0, k: 1 };
+		let view = { x: 0, y: 0, k: 1 }; // 当前渲染用的相机（每帧向 cam 阻尼靠拢）
+		const cam = { x: 0, y: 0, k: 1 }; // 目标相机
 		let raf = 0;
+		/** 动画保持到什么时候（毫秒时间戳）：hover 过渡、节点入场、聚焦动画都靠它续帧。 */
+		let animUntil = 0;
+		let hoverT = 0; // 0 = 没有悬停，1 = 完全高亮邻居
+		let spin = { x: 0, y: 0 }; // 平移松手后的惯性
+		let pulseStart = 0; // 选中脉冲的起始时间
+		let vw = 0; // 视口缓存：draw 里不再每帧读 clientWidth/Height（读一次就是一次强制布局）
+		let vh = 0;
+		const reducedMotion = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 		let disposed = false;
 
 		// ---------------------------------------------------------------- 数据
@@ -297,33 +381,43 @@ export default {
 			});
 		}
 
+		/** 位置记忆：连"这一刻不可见"的节点也记住坐标，筛掉再筛回来才不会跳到别处。 */
+		const posCache = new Map();
+
 		function rebuild() {
 			const keep = new Map(nodes.map((n) => [n.id, n]));
 			const recs = visibleRecords();
+			let fresh = 0;
 			nodes = recs.map((r, i) => {
-				const old = keep.get(r.id);
+				const old = keep.get(r.id) ?? posCache.get(r.id);
+				if (!old) fresh += 1;
 				const strength = clamp(Number(r.effStrength ?? 1), 0, 5);
 				const rt = C.TYPE_LABEL[r.type] ?? r.type;
 				return {
 					id: r.id,
 					rec: r,
+					born: old ? 0 : performance.now(),
 					label: rt,
 					r: (r.invalidated ? 4 : 5) + 9 * Math.sqrt(Math.min(strength, 4) / 4),
 					x: old?.x ?? Math.cos((i / Math.max(1, recs.length)) * Math.PI * 2) * 180,
 					y: old?.y ?? Math.sin((i / Math.max(1, recs.length)) * Math.PI * 2) * 180,
-					vx: 0,
-					vy: 0,
+					// 保留旧速度：从 0 起步会让整张图重新推一次
+					vx: old?.vx ?? 0,
+					vy: old?.vy ?? 0,
 				};
 			});
 			edges = buildEdges(recs);
-			sim.alpha = 1;
+			// 只有"真的来了新节点"才把模拟重新加热；否则给一点点余量让弹簧微调
+			sim.alpha = fresh ? clamp(0.4 + 0.12 * fresh, 0.4, 1) : 0.12;
 			renderChips();
 			updateEmpty();
-			if (nodes.length && !view.settled) {
-				view = { x: 0, y: 0, k: 1 };
-				view.settled = true;
-			}
+			if (fresh) keepAlive(400);
 			tick();
+		}
+
+		/** 物理停下时把当前坐标写进位置记忆（拖动中的点也算）。 */
+		function rememberPositions() {
+			for (const p of nodes) posCache.set(p.id, { x: p.x, y: p.y, vx: p.vx, vy: p.vy });
 		}
 
 		function updateEmpty() {
@@ -336,13 +430,54 @@ export default {
 			}
 		}
 
-		/** 两个列表按钮上的条数（没有就不显示数字）。 */
+		/** 菜单里的角标 + 正在看列表时顶部那条 banner。 */
 		function updateListButtons() {
-			const t = root.querySelector('[data-act="trash"]');
-			if (t) t.textContent = state.trash.length ? `回收站 ${state.trash.length}` : "回收站";
-			const q = root.querySelector('[data-act="quarantine"]');
-			const n = state.records.filter((r) => r.quarantined && !r.invalidated).length;
-			if (q) q.textContent = n ? `隔离区 ${n}` : "隔离区";
+			const qn = state.records.filter((r) => r.quarantined && !r.invalidated).length;
+			const set = (act, n) => {
+				const badge = root.querySelector(`[data-act="${act}"] .mem-badge`);
+				if (!badge) return;
+				badge.textContent = String(n);
+				badge.hidden = n === 0;
+			};
+			set("trash", state.trash.length);
+			set("quarantine", qn);
+			if (state.listMode) {
+				const n = state.listMode === "trash" ? state.trash.length : qn;
+				bannerText.textContent =
+					state.listMode === "trash"
+						? `正在查看回收站 · ${n} 条（删除后保留 30 天）`
+						: `正在查看隔离区 · ${n} 条（自动记下、还没被用上）`;
+				banner.hidden = false;
+			} else {
+				banner.hidden = true;
+			}
+		}
+
+		/** 搜索框右侧的命中计数；没有搜索时显示总数。 */
+		function updateHits() {
+			const q = state.query.trim();
+			if (!q) {
+				hitsLabel.textContent = nodes.length ? `${nodes.length} 条` : "";
+				return;
+			}
+			const hit = highlightSet();
+			hitsLabel.textContent = `${hit ? hit.size : 0}/${nodes.length}`;
+		}
+
+		/** 筛选图标上的小圆点：有任一筛选生效时亮着。 */
+		function updateFilterFlag() {
+			const btn = root.querySelector('[data-act="filters"]');
+			if (!btn) return;
+			const active = state.types.size > 0 || state.allProjects || state.showFaded || state.batch;
+			btn.classList.toggle("on", state.filtersOpen);
+			let flag = btn.querySelector(".mem-flag");
+			if (active && !flag) {
+				flag = document.createElement("span");
+				flag.className = "mem-flag";
+				btn.appendChild(flag);
+			} else if (!active && flag) {
+				flag.remove();
+			}
 		}
 
 		/**
@@ -443,21 +578,71 @@ export default {
 				};
 				chips.appendChild(b);
 			}
+			updateFilterFlag();
+			updateHits();
+		}
+
+		// ---------------------------------------------------------------- 动画
+		/** 让主循环多跑一会儿（hover 过渡 / 入场 / 相机缓动 / 惯性）。 */
+		function keepAlive(ms = 260) {
+			animUntil = Math.max(animUntil, performance.now() + ms);
+			if (!raf) tick();
+		}
+
+		function easeOutCubic(t) {
+			return 1 - (1 - t) ** 3;
+		}
+
+		/** 相机向目标阻尼靠拢；返回本帧是否还在动。 */
+		function smoothCamera() {
+			const ease = reducedMotion ? 1 : 0.2;
+			let moving = false;
+			if (spin.x || spin.y) {
+				// 惯性：把剩余速度继续推进目标，并按帧衰减
+				cam.x += spin.x * 0.12;
+				cam.y += spin.y * 0.12;
+				spin.x *= 0.86;
+				spin.y *= 0.86;
+				if (Math.hypot(spin.x, spin.y) < 0.4) spin = { x: 0, y: 0 };
+				else moving = true;
+			}
+			for (const key of ["x", "y", "k"]) {
+				const diff = cam[key] - view[key];
+				if (Math.abs(diff) > 0.01) {
+					view[key] += diff * ease;
+					moving = true;
+				} else {
+					view[key] = cam[key];
+				}
+			}
+			return moving;
 		}
 
 		// ---------------------------------------------------------------- 物理
+		let ticking = false;
 		function tick() {
-			if (disposed) return;
+			if (disposed || ticking) return;
+			ticking = true;
 			const steps = sim.alpha > 0.05 ? 2 : 1;
-			for (let s = 0; s < steps; s++) step();
+			// 拖动视角时别算物理：平移是纯相机操作，算力留给重绘
+			if (!panFrom) for (let s = 0; s < steps; s++) step();
+			const camMoving = smoothCamera();
+			// hover 过渡：0 → 1 淡入（非邻居压暗、悬停节点放大都靠它插值）
+			const hoverTarget = state.hover ? 1 : 0;
+			if (Math.abs(hoverT - hoverTarget) > 0.01) hoverT += (hoverTarget - hoverT) * 0.25;
+			else hoverT = hoverTarget;
+			rememberPositions();
 			draw();
-			if (sim.alpha > 0.005) {
-				sim.alpha *= 0.985;
+			const busy = camMoving || sim.alpha > 0.005 || performance.now() < animUntil;
+			if (busy) {
+				if (sim.alpha > 0.005) sim.alpha *= 0.985;
+				else sim.alpha = 0;
 				raf = requestAnimationFrame(tick);
 			} else {
 				sim.alpha = 0;
 				raf = 0;
 			}
+			ticking = false;
 		}
 
 		function step() {
@@ -532,10 +717,28 @@ export default {
 			return out;
 		}
 
+		/** 只在尺寸真的变了（窗口缩放 / 侧栏开合）时重新量一次。 */
+		function measure() {
+			vw = wrap.clientWidth;
+			vh = wrap.clientHeight;
+		}
+
+		/** 把重绘合并到下一帧：pointermove 每秒可能几十上百次，逐个 draw 会拖垮手感。 */
+		let drawQueued = false;
+		function requestDraw() {
+			if (drawQueued) return;
+			drawQueued = true;
+			requestAnimationFrame(() => {
+				drawQueued = false;
+				if (!disposed) draw();
+			});
+		}
+
 		function draw() {
 			const dpr = window.devicePixelRatio || 1;
-			const w = wrap.clientWidth;
-			const h = wrap.clientHeight;
+			if (!vw || !vh) measure();
+			const w = vw;
+			const h = vh;
 			if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
 				canvas.width = Math.floor(w * dpr);
 				canvas.height = Math.floor(h * dpr);
@@ -549,17 +752,36 @@ export default {
 			const hit = highlightSet();
 			const dimmed = (id) => hit && !hit.has(id);
 
+			// 悬停：自身 + 一度邻居高亮，其余压暗（hoverT 负责过渡）
+			const hoverId = state.hover?.id ?? null;
+			let neighbors = null;
+			if (hoverId) {
+				neighbors = new Set([hoverId]);
+				for (const e of edges) {
+					if (e.a === hoverId) neighbors.add(e.b);
+					else if (e.b === hoverId) neighbors.add(e.a);
+				}
+			}
+			const focusId = hoverId ?? state.selected?.id ?? null;
+			const near = (id) => !focusId || (neighbors ? neighbors.has(id) : true) || id === state.selected?.id;
+			const now = performance.now();
+
 			// 边
 			const byId = new Map(nodes.map((x) => [x.id, x]));
 			for (const e of edges) {
 				const a = byId.get(e.a);
 				const b = byId.get(e.b);
 				if (!a || !b) continue;
-				const dim = dimmed(a.id) && dimmed(b.id);
-				g.strokeStyle = e.kind === "supersede" ? "rgba(255,255,255,.34)" : "rgba(255,255,255,.13)";
+				const inFocus = Boolean(focusId) && (e.a === focusId || e.b === focusId);
+				const dim = (dimmed(a.id) && dimmed(b.id)) || (Boolean(focusId) && !inFocus && hoverT > 0.05);
+				g.strokeStyle = inFocus
+					? "rgba(150,188,255,.62)"
+					: e.kind === "supersede"
+						? "rgba(255,255,255,.34)"
+						: "rgba(255,255,255,.13)";
 				if (e.kind === "supersede") g.setLineDash([4, 3]);
-				g.lineWidth = (e.kind === "supersede" ? 1.4 : 1) / view.k;
-				g.globalAlpha = dim ? 0.25 : 0.9;
+				g.lineWidth = ((e.kind === "supersede" ? 1.5 : 1) + (inFocus ? 0.5 : 0)) / view.k;
+				g.globalAlpha = dim ? 0.12 : 0.9;
 				g.beginPath();
 				g.moveTo(a.x, a.y);
 				g.lineTo(b.x, b.y);
@@ -573,19 +795,35 @@ export default {
 				const rec = p.rec;
 				const invalid = rec.invalidated === true || (rec.validUntil > 0 && rec.validUntil <= state.now);
 				const strength = clamp(Number(rec.effStrength ?? 1), 0, 5);
-				const alpha = invalid ? 0.42 : clamp(0.35 + 0.65 * Math.min(1, strength), 0.25, 1);
+				const baseAlpha = invalid ? 0.42 : clamp(0.35 + 0.65 * Math.min(1, strength), 0.25, 1);
+				// 入场：新节点从小长出来 + 淡入（首次渲染的老节点 born=0，直接是完成态）
+				const birth = p.born ? clamp((now - p.born) / 240, 0, 1) : 1;
+				const grow = reducedMotion ? 1 : 0.55 + 0.45 * easeOutCubic(birth);
+				const isHover = p === state.hover;
+				const dimFactor = 1 - 0.82 * hoverT * (near(p.id) ? 0 : 1);
+				const searchDim = dimmed(p.id) && !isHover && p !== state.selected ? 0.22 : 1;
+				g.globalAlpha = baseAlpha * searchDim * dimFactor * birth;
+				const rr = p.r * grow * (isHover && !reducedMotion ? 1 + 0.18 * hoverT : 1);
 				const baseColor = invalid ? "#6b6f78" : (TYPE_COLOR[rec.type] ?? "#8a8f98");
-				g.globalAlpha = dimmed(p.id) && p !== state.hover && p !== state.selected ? alpha * 0.22 : alpha;
 				g.beginPath();
-				g.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+				g.arc(p.x, p.y, rr, 0, Math.PI * 2);
 				g.fillStyle = baseColor;
 				g.fill();
+				// 悬停时给节点一圈柔光，和"选中/虚线"区分开
+				if (isHover && hoverT > 0.02) {
+					g.globalAlpha = 0.16 * hoverT;
+					g.beginPath();
+					g.arc(p.x, p.y, rr + 6 / view.k, 0, Math.PI * 2);
+					g.fillStyle = baseColor;
+					g.fill();
+					g.globalAlpha = baseAlpha * dimFactor;
+				}
 				if (rec.quarantined) {
 					g.setLineDash([3, 3]);
 					g.strokeStyle = "rgba(255,255,255,.55)";
 					g.lineWidth = 1.2 / view.k;
 					g.beginPath();
-					g.arc(p.x, p.y, p.r + 3, 0, Math.PI * 2);
+					g.arc(p.x, p.y, rr + 3, 0, Math.PI * 2);
 					g.stroke();
 					g.setLineDash([]);
 				}
@@ -593,7 +831,7 @@ export default {
 					g.strokeStyle = "#f5c451";
 					g.lineWidth = 1.8 / view.k;
 					g.beginPath();
-					g.arc(p.x, p.y, p.r + 2.5, 0, Math.PI * 2);
+					g.arc(p.x, p.y, rr + 2.5, 0, Math.PI * 2);
 					g.stroke();
 				}
 				if (state.batch && state.picked.has(p.id)) {
@@ -601,26 +839,46 @@ export default {
 					g.lineWidth = 2 / view.k;
 					g.setLineDash([4 / view.k, 3 / view.k]);
 					g.beginPath();
-					g.arc(p.x, p.y, p.r + 5, 0, Math.PI * 2);
+					g.arc(p.x, p.y, rr + 5, 0, Math.PI * 2);
 					g.stroke();
 					g.setLineDash([]);
 				}
-				if (p === state.selected || p === state.hover) {
-					g.strokeStyle = "rgba(255,255,255,.85)";
+				// 选中脉冲：点下去时荡开一圈
+				if (p === state.selected && pulseStart) {
+					const t = clamp((now - pulseStart) / 520, 0, 1);
+					if (t < 1) {
+						g.globalAlpha = 0.5 * (1 - t);
+						g.strokeStyle = "#9dc0ff";
+						g.lineWidth = 1.6 / view.k;
+						g.beginPath();
+						g.arc(p.x, p.y, rr + 4 + 22 * easeOutCubic(t), 0, Math.PI * 2);
+						g.stroke();
+						g.globalAlpha = baseAlpha * dimFactor;
+						keepAlive(80);
+					}
+				}
+				if (p === state.selected || isHover) {
+					g.strokeStyle = isHover ? "rgba(180,205,255,.95)" : "rgba(255,255,255,.85)";
 					g.lineWidth = 1.6 / view.k;
 					g.beginPath();
-					g.arc(p.x, p.y, p.r + 4.5, 0, Math.PI * 2);
+					g.arc(p.x, p.y, rr + 4.5, 0, Math.PI * 2);
 					g.stroke();
 				}
-				// 标签：够大、或选中/悬停时才画（避免噪声）
-				if (p.r > 11 || p === state.selected || p === state.hover || (hit && hit.has(p.id))) {
-					g.globalAlpha = invalid ? 0.5 : 0.9;
+				// 标签：够大、或选中/悬停/命中的才画（避免噪声）；悬停邻居也显示，方便顺着读
+				if (
+					p.r > 11 ||
+					p === state.selected ||
+					isHover ||
+					(hit && hit.has(p.id)) ||
+					(hoverT > 0.5 && near(p.id) && p.r > 8)
+				) {
+					g.globalAlpha = (invalid ? 0.5 : 0.9) * dimFactor * birth;
 					g.fillStyle = "rgba(235,238,245,.92)";
 					g.font = `${11 / view.k}px system-ui,-apple-system,"Segoe UI",sans-serif`;
 					g.textAlign = "center";
 					g.textBaseline = "top";
 					const text = rec.content.length > 22 ? `${rec.content.slice(0, 22)}…` : rec.content;
-					g.fillText(text, p.x, p.y + p.r + 4 / view.k);
+					g.fillText(text, p.x, p.y + rr + 4 / view.k);
 				}
 			}
 			g.globalAlpha = 1;
@@ -646,14 +904,19 @@ export default {
 
 		let dragNode = null;
 		let panFrom = null;
+		let panTrack = null; // 最近一次平移的速度（松手后做惯性）
+		let downAt = 0;
 
 		canvas.addEventListener("pointerdown", (ev) => {
+			downAt = performance.now();
+			spin = { x: 0, y: 0 };
 			const p = nodeAt(ev.clientX, ev.clientY);
 			if (p) {
 				dragNode = p;
 				p.fixed = true;
 			} else {
 				panFrom = { x: ev.clientX - view.x, y: ev.clientY - view.y };
+				panTrack = { x: ev.clientX, y: ev.clientY, t: downAt, vx: 0, vy: 0 };
 				canvas.classList.add("dragging");
 			}
 			canvas.setPointerCapture(ev.pointerId);
@@ -670,38 +933,110 @@ export default {
 				return;
 			}
 			if (panFrom) {
-				view.x = ev.clientX - panFrom.x;
-				view.y = ev.clientY - panFrom.y;
-				draw();
+				// 平移 1:1（同时写 cam，别被阻尼拖慢），顺手记速度做松手惯性
+				view.x = cam.x = ev.clientX - panFrom.x;
+				view.y = cam.y = ev.clientY - panFrom.y;
+				if (panTrack) {
+					const dt = Math.max(1, performance.now() - panTrack.t);
+					panTrack.vx = (ev.clientX - panTrack.x) / dt;
+					panTrack.vy = (ev.clientY - panTrack.y) / dt;
+					panTrack.x = ev.clientX;
+					panTrack.y = ev.clientY;
+					panTrack.t = performance.now();
+				}
+				requestDraw();
 				return;
 			}
 			const p = nodeAt(ev.clientX, ev.clientY);
 			if (p !== state.hover) {
 				state.hover = p;
-				draw();
+				canvas.style.cursor = p ? "pointer" : "";
+				keepAlive(300);
+				if (!raf) tick();
 			}
 		});
 		canvas.addEventListener("pointerup", (ev) => {
 			const wasPan = !!panFrom;
 			const target = dragNode;
+			const track = panTrack;
 			dragNode = null;
 			panFrom = null;
+			panTrack = null;
 			canvas.classList.remove("dragging");
 			canvas.releasePointerCapture?.(ev.pointerId);
+			// 甩一下继续滑（惯性），速度太小就不做
+			if (wasPan && track && !reducedMotion) {
+				const speed = Math.hypot(track.vx, track.vy);
+				if (speed > 0.25) {
+					spin = { x: track.vx * 160, y: track.vy * 160 };
+					cam.x += spin.x;
+					cam.y += spin.y;
+					keepAlive(520);
+				}
+			}
 			if (!wasPan) select(target ? target.id : null);
 		});
-		canvas.addEventListener("wheel", (ev) => {
-			ev.preventDefault();
-			const rect = canvas.getBoundingClientRect();
-			const mx = ev.clientX - rect.left - rect.width / 2;
-			const my = ev.clientY - rect.top - rect.height / 2;
-			const before = view.k;
-			const next = clamp(view.k * (ev.deltaY < 0 ? 1.1 : 0.9), 0.25, 3);
-			view.x = mx - ((mx - view.x) * next) / before;
-			view.y = my - ((my - view.y) * next) / before;
-			view.k = next;
-			draw();
+		canvas.addEventListener(
+			"wheel",
+			(ev) => {
+				ev.preventDefault();
+				const rect = canvas.getBoundingClientRect();
+				const mx = ev.clientX - rect.left - rect.width / 2;
+				const my = ev.clientY - rect.top - rect.height / 2;
+				const before = cam.k;
+				const next = clamp(cam.k * (ev.deltaY < 0 ? 1.12 : 0.9), 0.25, 3);
+				// 以鼠标为锚点缩放：目标位置一起换算，阻尼动画自己会插过去
+				cam.x = mx - ((mx - cam.x) * next) / before;
+				cam.y = my - ((my - cam.y) * next) / before;
+				cam.k = next;
+				keepAlive(320);
+				if (!raf) tick();
+			},
+			{ passive: false },
+		);
+
+		canvas.addEventListener("pointerleave", () => {
+			if (!state.hover) return;
+			state.hover = null;
+			canvas.style.cursor = "";
+			keepAlive(300);
+			if (!raf) tick();
 		});
+
+		canvas.addEventListener("dblclick", (ev) => {
+			if (nodeAt(ev.clientX, ev.clientY)) return;
+			fitAll();
+		});
+
+		/** 双击空白 / 「返回全图」：把整张图放回视野中央。 */
+		function fitAll() {
+			if (!nodes.length) {
+				cam.x = cam.y = 0;
+				cam.k = 1;
+				keepAlive(320);
+				return;
+			}
+			let minX = Infinity;
+			let minY = Infinity;
+			let maxX = -Infinity;
+			let maxY = -Infinity;
+			for (const p of nodes) {
+				minX = Math.min(minX, p.x);
+				minY = Math.min(minY, p.y);
+				maxX = Math.max(maxX, p.x);
+				maxY = Math.max(maxY, p.y);
+			}
+			const cx = (minX + maxX) / 2;
+			const cy = (minY + maxY) / 2;
+			const w = Math.max(1, wrap.clientWidth - 80);
+			const h = Math.max(1, wrap.clientHeight - 120);
+			const spanX = Math.max(1, maxX - minX + 120);
+			const spanY = Math.max(1, maxY - minY + 120);
+			cam.k = clamp(Math.min(w / spanX, h / spanY, 1.6), 0.25, 3);
+			cam.x = -cx * cam.k;
+			cam.y = -cy * cam.k;
+			keepAlive(360);
+		}
 
 		function select(id) {
 			if (state.batch) {
@@ -709,7 +1044,10 @@ export default {
 				return;
 			}
 			state.selected = id ? (nodes.find((n) => n.id === id) ?? null) : null;
+			// 只荡一圈脉冲，不移动视角（视角跟随关掉：用户自己拖/缩，别抢方向盘）
+			if (state.selected) pulseStart = performance.now();
 			renderSide();
+			keepAlive(280);
 			draw();
 		}
 
@@ -752,6 +1090,7 @@ export default {
 					<label>原话片段（可选，报错原文/命令原文）</label>
 					<textarea data-new="excerpt" style="min-height:52px"></textarea>
 					<input data-new="tags" placeholder="标签（逗号分隔，可写文件路径）" />
+					<input data-new="topics" placeholder="主题（0-3 个，逗号分隔；例如 部署, 数据库）" />
 				</div>
 				<div class="mem-actions">
 					<button class="mem-btn" data-new-act="save">保存</button>
@@ -779,6 +1118,10 @@ export default {
 						.split(",")
 						.map((t) => t.trim())
 						.filter(Boolean),
+					topics: String(q("[data-new=topics]")?.value ?? "")
+						.split(/[,，]/)
+						.map((t) => t.trim())
+						.filter(Boolean),
 				}).then(() => {
 					state.creating = false;
 					renderSide();
@@ -802,6 +1145,7 @@ export default {
 			side.innerHTML = `
 				<h3>${escapeHtml(C.TYPE_LABEL[r.type] ?? r.type)}${invalid ? " · 已作废" : ""}${r.quarantined ? " · 隔离区" : ""}</h3>
 				<div class="mem-meta">
+					${(r.topics ?? []).map((t) => `<span class="mem-topic">#${escapeHtml(t)}</span>`).join("")}
 					<span>${escapeHtml(r.scope === "global" ? "全局" : r.scope === "task" ? "任务" : "项目")}</span>
 					<span>重要 ${r.importance}/5</span>
 					<span>${escapeHtml(C.relTime(r.updatedAt ?? r.createdAt, Date.now()))}</span>
@@ -816,6 +1160,7 @@ export default {
 						<select data-edit="importance">${[1, 2, 3, 4, 5].map((i) => `<option value="${i}"${i === Number(r.importance) ? " selected" : ""}>重要 ${i}</option>`).join("")}</select>
 					</div>
 					<input data-edit="tags" placeholder="标签（逗号分隔）" value="${escapeHtml((r.tags ?? []).join(", "))}" />
+					<input data-edit="topics" placeholder="主题（0-3 个，逗号分隔；只影响图谱分组）" value="${escapeHtml((r.topics ?? []).join(", "))}" />
 					<button class="mem-btn" data-op="save">保存修改</button>
 				</div>
 				${r.excerpt ? `<div class="mem-quote">${escapeHtml(r.excerpt)}</div>` : ""}
@@ -851,6 +1196,10 @@ export default {
 								.split(",")
 								.map((t) => t.trim())
 								.filter(Boolean),
+							topics: String(q("[data-edit=topics]")?.value ?? "")
+								.split(/[,，]/)
+								.map((t) => t.trim())
+								.filter(Boolean),
 						}).then(() => renderSide());
 					}
 				};
@@ -868,8 +1217,11 @@ export default {
 		let searchTimer = 0;
 		searchInput.addEventListener("input", () => {
 			clearTimeout(searchTimer);
+			clearTimeout(toastTimer);
 			searchTimer = setTimeout(() => {
 				state.query = searchInput.value;
+				updateHits();
+				keepAlive(260);
 				draw();
 			}, 120);
 		});
@@ -877,35 +1229,65 @@ export default {
 			state.allProjects = !state.allProjects;
 			ev.currentTarget.classList.toggle("on", state.allProjects);
 			ev.currentTarget.textContent = state.allProjects ? "全部项目" : "当前项目";
+			updateFilterFlag();
 			rebuild();
 		};
 		root.querySelector('[data-act="faded"]').onclick = (ev) => {
 			state.showFaded = !state.showFaded;
 			ev.currentTarget.classList.toggle("on", state.showFaded);
+			updateFilterFlag();
 			rebuild();
-		};
-		root.querySelector('[data-act="back"]').onclick = () => {
-			// 走宿主桥切回对话；宿主在 setView("chat") 时顺手收起主面板（见 App.tsx）。
-			const bridge = window.__piWebUiHost;
-			if (bridge?.setView) bridge.setView("chat");
 		};
 		const toggleList = (mode) => () => {
 			state.listMode = state.listMode === mode ? null : mode;
-			root.querySelectorAll('[data-act="trash"],[data-act="quarantine"]').forEach((b) => {
-				b.classList.toggle("on", state.listMode && b.dataset.act === state.listMode);
-			});
+			closeMenu();
 			if (state.listMode) select(null);
 			renderList();
+			updateListButtons();
 		};
 		root.querySelector('[data-act="trash"]').onclick = toggleList("trash");
 		root.querySelector('[data-act="quarantine"]').onclick = toggleList("quarantine");
+		function closeMenu() {
+			menuEl.hidden = true;
+			root.querySelector('[data-act="more"]').classList.remove("on");
+		}
+		function toggleMenu() {
+			const open = menuEl.hidden;
+			menuEl.hidden = !open;
+			root.querySelector('[data-act="more"]').classList.toggle("on", open);
+			if (open) updateListButtons();
+		}
+		root.querySelector('[data-act="more"]').onclick = (ev) => {
+			ev.stopPropagation();
+			toggleMenu();
+		};
+		menuEl.addEventListener("click", (ev) => {
+			if (ev.target.closest("[data-act]")) closeMenu();
+		});
+		root.addEventListener("pointerdown", (ev) => {
+			if (menuEl.hidden) return;
+			if (ev.target.closest(".mem-menu") || ev.target.closest('[data-act="more"]')) return;
+			closeMenu();
+		});
+		root.querySelector('[data-act="filters"]').onclick = () => {
+			state.filtersOpen = !state.filtersOpen;
+			filtersPanel.hidden = !state.filtersOpen;
+			updateFilterFlag();
+		};
+		root.querySelector('[data-act="leave-list"]').onclick = () => {
+			state.listMode = null;
+			renderList();
+			updateListButtons();
+			keepAlive(260);
+		};
 		root.querySelector('[data-act="new"]').onclick = () => {
 			state.creating = true;
 			state.selected = null;
+			closeMenu();
 			if (state.listMode) {
 				state.listMode = null;
-				root.querySelectorAll('[data-act="trash"],[data-act="quarantine"]').forEach((b) => b.classList.remove("on"));
 				renderList();
+				updateListButtons();
 			}
 			renderSide();
 		};
@@ -915,6 +1297,8 @@ export default {
 			ev.currentTarget.classList.toggle("on", state.batch);
 			if (state.batch) select(null);
 			updateBatchBar();
+			updateFilterFlag();
+			keepAlive(260);
 			draw();
 		};
 		root.querySelectorAll("[data-batch]").forEach((btn) => {
@@ -945,14 +1329,17 @@ export default {
 			};
 		});
 		root.querySelector('[data-act="housekeep"]').onclick = () => {
-			note.textContent = "整理中…";
+			toast("整理中…");
 			void op({ op: "housekeep" });
 		};
 		root.querySelector('[data-act="export"]').onclick = () => {
 			window.open(`${API}/export`, "_blank");
 		};
 
-		const onResize = () => draw();
+		const onResize = () => {
+			measure();
+			requestDraw();
+		};
 		window.addEventListener("resize", onResize);
 		const ro = typeof ResizeObserver === "function" ? new ResizeObserver(onResize) : null;
 		ro?.observe(wrap);
