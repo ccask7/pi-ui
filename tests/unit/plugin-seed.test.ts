@@ -61,7 +61,7 @@ describe("seedBundledPlugins", () => {
 		seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
 		const again = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
 		expect(again.installed).toEqual([]);
-		expect(again.skipped[0]).toMatch(/已存在/);
+		expect(again.skipped[0]).toMatch(/已是最新/);
 		expect(again.disabled).toEqual([]);
 	});
 
@@ -85,6 +85,60 @@ describe("seedBundledPlugins", () => {
 		expect(r.installed).toEqual([]);
 		expect(r.skipped[0]).toMatch(/用户删过/);
 		expect(existsSync(dest())).toBe(false);
+	});
+
+	it("内置副本版本更高 → 换代码、保留 data/（用户升级后看到新界面）", () => {
+		seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		// 插件写出来的数据：升级时必须留着
+		mkdirSync(join(dest(), "data"), { recursive: true });
+		writeFileSync(join(dest(), "data", "memories.jsonl"), '{"id":"kept"}\n');
+		// 出厂副本升到 0.2.0，客户端也换了
+		writeFileSync(
+			join(src, "memory", "manifest.json"),
+			JSON.stringify({ id: "memory", name: "记忆", version: "0.2.0" }),
+		);
+		writeFileSync(join(src, "memory", "client", "entry.mjs"), "new-client\n");
+
+		const r = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		expect(r.updated).toEqual(["memory 0.1.0 → 0.2.0"]);
+		expect(readFileSync(join(dest(), "client", "entry.mjs"), "utf8")).toBe("new-client\n");
+		expect(JSON.parse(readFileSync(join(dest(), "manifest.json"), "utf8")).version).toBe("0.2.0");
+		expect(readFileSync(join(dest(), "data", "memories.jsonl"), "utf8")).toBe('{"id":"kept"}\n');
+		// 再跑一次：已经是最新，不重复覆盖
+		const again = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		expect(again.updated).toEqual([]);
+		expect(again.skipped[0]).toMatch(/已是最新 0.2.0/);
+	});
+
+	it("本地改过代码就不覆盖（哪怕出厂版本更高）", () => {
+		seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		writeFileSync(join(dest(), "index.mjs"), "// 用户自己改的\n");
+		writeFileSync(
+			join(src, "memory", "manifest.json"),
+			JSON.stringify({ id: "memory", name: "记忆", version: "0.3.0" }),
+		);
+		writeFileSync(join(src, "memory", "client", "entry.mjs"), "new-client\n");
+
+		const r = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		expect(r.updated).toEqual([]);
+		expect(r.skipped[0]).toMatch(/本地改过/);
+		expect(readFileSync(join(dest(), "index.mjs"), "utf8")).toBe("// 用户自己改的\n");
+		expect(readFileSync(join(dest(), "client", "entry.mjs"), "utf8")).toBe("export default { mount() {} };\n");
+	});
+
+	it("老标记（只有 ids，0.0.9/0.0.10 播种的）在版本更高时也会换代码", () => {
+		seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		writeFileSync(join(dataDir(), "plugin-seeded.json"), JSON.stringify({ ids: ["memory"] }));
+		writeFileSync(join(dest(), "client", "entry.mjs"), "old-client\n");
+		writeFileSync(
+			join(src, "memory", "manifest.json"),
+			JSON.stringify({ id: "memory", name: "记忆", version: "0.2.0" }),
+		);
+		writeFileSync(join(src, "memory", "client", "entry.mjs"), "new-client\n");
+
+		const r = seedBundledPlugins(dataDir(), { sourceDir: src, log: silent });
+		expect(r.updated).toEqual(["memory 0.1.0 → 0.2.0"]);
+		expect(readFileSync(join(dest(), "client", "entry.mjs"), "utf8")).toBe("new-client\n");
 	});
 
 	it("用户自己改过（目录已存在）就不覆盖", () => {
