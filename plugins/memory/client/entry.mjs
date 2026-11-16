@@ -37,76 +37,76 @@ const TYPE_COLOR = {
 };
 
 const STYLE = `
-.mem-root{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg,#12141a);color:var(--fg,#e6e6ea);font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
-.mem-bar{display:flex;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.mem-root{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--msgs-bg,transparent);color:var(--text,#e6e6ea);font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+.mem-bar{display:flex;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
 .mem-search{position:relative;flex:1;display:flex;align-items:center;gap:7px;min-width:0;box-shadow:inset 0 -1px 0 transparent;transition:box-shadow .18s ease}
-.mem-search:focus-within{box-shadow:inset 0 -1px 0 rgba(120,170,255,.6)}
+.mem-search:focus-within{box-shadow:inset 0 -1px 0 var(--accent, rgba(120,170,255,.6))}
 .mem-search svg{width:14px;height:14px;flex:none;opacity:.45}
 .mem-search input{flex:1;min-width:0;padding:5px 0;border:none;background:transparent;color:inherit;font:inherit;outline:none}
-.mem-search input::placeholder{color:rgba(230,230,234,.34)}
-.mem-hits{flex:none;font-size:11.5px;color:rgba(230,230,234,.42);font-variant-numeric:tabular-nums}
+.mem-search input::placeholder{color:var(--text-faint,#7b7f8a)}
+.mem-hits{flex:none;font-size:11.5px;color:var(--text-faint,#7b7f8a);font-variant-numeric:tabular-nums}
 .mem-actions{display:flex;gap:2px;flex:none}
 .mem-icon{position:relative;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:none;border-radius:7px;background:transparent;color:inherit;opacity:.68;cursor:pointer;transition:opacity .15s ease,background .15s ease}
-.mem-icon:hover{opacity:1;background:rgba(255,255,255,.08)}
-.mem-icon.on{opacity:1;background:rgba(120,170,255,.16)}
+.mem-icon:hover{opacity:1;background:color-mix(in srgb, var(--text,#e6e6ea) 8%, transparent)}
+.mem-icon.on{opacity:1;background:var(--accent-soft,rgba(120,170,255,.16))}
 .mem-icon svg{width:15px;height:15px}
-.mem-flag{position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:#7aa2ff}
-.mem-filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.015);animation:mem-slide .16s ease}
+.mem-flag{position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:var(--accent,#7aa2ff)}
+.mem-filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 12px;border-bottom:1px solid var(--border,rgba(255,255,255,.07));background:transparent;animation:mem-slide .16s ease}
 .mem-filters[hidden]{display:none}
 @keyframes mem-slide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-.mem-btn{padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;font:inherit;font-size:12px;cursor:pointer;transition:background .15s ease}
-.mem-btn:hover{background:rgba(255,255,255,.09)}
-.mem-btn.on{background:rgba(120,170,255,.22);border-color:rgba(120,170,255,.5)}
+.mem-btn{padding:5px 10px;border-radius:7px;border:1px solid var(--border,rgba(255,255,255,.14));background:var(--chip-bg,rgba(255,255,255,.04));color:inherit;font:inherit;font-size:12px;cursor:pointer;transition:background .15s ease}
+.mem-btn:hover{background:color-mix(in srgb, var(--text,#e6e6ea) 8%, transparent)}
+.mem-btn.on{background:var(--accent-soft,rgba(120,170,255,.22));border-color:var(--accent,rgba(120,170,255,.5))}
 .mem-btn:disabled{opacity:.4;cursor:default}
 .mem-chips{display:flex;gap:4px;flex-wrap:wrap}
-.mem-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:transparent;color:inherit;font:inherit;font-size:12px;cursor:pointer;opacity:.5;transition:opacity .15s ease,background .15s ease}
+.mem-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;border:1px solid var(--border,rgba(255,255,255,.1));background:transparent;color:inherit;font:inherit;font-size:12px;cursor:pointer;opacity:.5;transition:opacity .15s ease,background .15s ease}
 .mem-chip:hover{opacity:.85}
-.mem-chip.on{opacity:1;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}
+.mem-chip.on{opacity:1;background:color-mix(in srgb, var(--text,#e6e6ea) 8%, transparent);border-color:var(--border,rgba(255,255,255,.2))}
 .mem-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.mem-topic{padding:1px 7px;border-radius:999px;background:rgba(120,170,255,.14);color:#9dc0ff;font-size:11.5px}
-.mem-menu{position:absolute;top:42px;right:10px;z-index:30;min-width:172px;padding:5px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(23,26,33,.98);box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:mem-pop .14s ease}
+.mem-topic{padding:1px 7px;border-radius:999px;background:var(--accent-soft,rgba(120,170,255,.14));color:var(--accent,#9dc0ff);font-size:11.5px}
+.mem-menu{position:absolute;top:42px;right:10px;z-index:30;min-width:172px;padding:5px;border-radius:10px;border:1px solid var(--border,rgba(255,255,255,.12));background:var(--menu-bg,#171a21);box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:mem-pop .14s ease}
 .mem-menu[hidden]{display:none}
 @keyframes mem-pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
 .mem-menu button{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 9px;border:none;border-radius:7px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
-.mem-menu button:hover{background:rgba(255,255,255,.08)}
-.mem-badge{min-width:17px;padding:0 5px;border-radius:999px;background:rgba(255,255,255,.12);font-size:11px;line-height:16px;text-align:center;color:rgba(230,230,234,.8)}
+.mem-menu button:hover{background:color-mix(in srgb, var(--text,#e6e6ea) 8%, transparent)}
+.mem-badge{min-width:17px;padding:0 5px;border-radius:999px;background:color-mix(in srgb, var(--text,#e6e6ea) 8%, transparent);font-size:11px;line-height:16px;text-align:center;color:var(--text-dim,rgba(230,230,234,.8))}
 .mem-badge[hidden]{display:none}
-.mem-banner{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid rgba(120,170,255,.26);background:rgba(120,170,255,.08);font-size:12px;color:rgba(230,238,255,.86)}
+.mem-banner{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--accent,rgba(120,170,255,.26));background:var(--accent-soft,rgba(120,170,255,.08));font-size:12px;color:var(--text,#e6e6ea)}
 .mem-banner[hidden]{display:none}
-.mem-banner button{margin-left:auto;padding:2px 8px;border:none;border-radius:6px;background:transparent;color:#9dc0ff;font:inherit;cursor:pointer}
-.mem-banner button:hover{background:rgba(120,170,255,.14)}
-.mem-toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:40;max-width:min(560px,90%);padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(24,27,34,.96);box-shadow:0 12px 28px rgba(0,0,0,.45);font-size:12px;pointer-events:none;animation:mem-pop .16s ease}
+.mem-banner button{margin-left:auto;padding:2px 8px;border:none;border-radius:6px;background:transparent;color:var(--accent,#9dc0ff);font:inherit;cursor:pointer}
+.mem-banner button:hover{background:var(--accent-soft,rgba(120,170,255,.14))}
+.mem-toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:40;max-width:min(560px,90%);padding:7px 12px;border-radius:9px;border:1px solid var(--border,rgba(255,255,255,.12));background:var(--menu-bg,#181b22);box-shadow:0 12px 28px rgba(0,0,0,.45);font-size:12px;pointer-events:none;animation:mem-pop .16s ease}
 .mem-toast[hidden]{display:none}
 .mem-main{position:relative;flex:1;display:flex;min-height:0}
 .mem-canvas-wrap{position:relative;flex:1;min-width:0}
 .mem-canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 .mem-canvas.dragging{cursor:grabbing}
-.mem-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:rgba(230,230,234,.5);pointer-events:none;text-align:center;padding:24px}
-.mem-side{width:310px;flex:none;border-left:1px solid rgba(255,255,255,.08);padding:12px;overflow:auto;display:none}
+.mem-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--text-dim,rgba(230,230,234,.5));pointer-events:none;text-align:center;padding:24px}
+.mem-side{width:310px;flex:none;border-left:1px solid var(--border,rgba(255,255,255,.08));background:var(--panel-bg,transparent);padding:12px;overflow:auto;display:none}
 .mem-side.open{display:block}
 .mem-side h3{margin:0 0 6px;font-size:14px;font-weight:600}
-.mem-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;color:rgba(230,230,234,.62);font-size:12px}
-.mem-body{white-space:pre-wrap;word-break:break-word;background:rgba(255,255,255,.04);border-radius:8px;padding:8px 10px;margin-bottom:10px}
-.mem-quote{border-left:2px solid rgba(255,255,255,.18);padding-left:8px;color:rgba(230,230,234,.7);white-space:pre-wrap;margin-bottom:10px;font-family:ui-monospace,Consolas,monospace;font-size:12px;max-height:160px;overflow:auto}
+.mem-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;color:var(--text-dim,rgba(230,230,234,.62));font-size:12px}
+.mem-body{white-space:pre-wrap;word-break:break-word;background:var(--card-bg,rgba(255,255,255,.04));border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.mem-quote{border-left:2px solid var(--border,rgba(255,255,255,.18));padding-left:8px;color:var(--text-dim,rgba(230,230,234,.7));white-space:pre-wrap;margin-bottom:10px;font-family:ui-monospace,Consolas,monospace;font-size:12px;max-height:160px;overflow:auto}
 .mem-actions{display:flex;gap:6px;flex-wrap:wrap}
-.mem-batchbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(120,170,255,.07)}
+.mem-batchbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--card-bg,rgba(120,170,255,.07))}
 .mem-batchbar[hidden]{display:none}
-.mem-batch-count{color:rgba(230,230,234,.7);font-size:12px;margin-right:4px}
+.mem-batch-count{color:var(--text-dim,rgba(230,230,234,.7));font-size:12px;margin-right:4px}
 .mem-trash{position:absolute;inset:0;overflow:auto;padding:14px 16px;display:none}
 .mem-trash.open{display:block}
-.mem-trash-head{display:flex;gap:10px;align-items:center;margin-bottom:10px;color:rgba(230,230,234,.8);font-size:13px;font-weight:600}
-.mem-trash-row{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:8px}
+.mem-trash-head{display:flex;gap:10px;align-items:center;margin-bottom:10px;color:var(--text,rgba(230,230,234,.8));font-size:13px;font-weight:600}
+.mem-trash-row{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:8px;margin-bottom:8px;background:var(--card-bg,transparent)}
 .mem-trash-main{flex:1;min-width:0}
 .mem-trash-text{word-break:break-word}
-.mem-trash-meta{color:rgba(230,230,234,.55);font-size:12px;margin-top:2px}
+.mem-trash-meta{color:var(--text-dim,rgba(230,230,234,.55));font-size:12px;margin-top:2px}
 .mem-edit{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-.mem-edit label{font-size:12px;color:rgba(230,230,234,.6)}
-.mem-edit textarea,.mem-edit select,.mem-edit input{padding:6px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;font:inherit;width:100%;box-sizing:border-box}
+.mem-edit label{font-size:12px;color:var(--text-dim,rgba(230,230,234,.6))}
+.mem-edit textarea,.mem-edit select,.mem-edit input{padding:6px 8px;border-radius:7px;border:1px solid var(--border,rgba(255,255,255,.14));background:var(--inputbox-bg,rgba(255,255,255,.04));color:inherit;font:inherit;width:100%;box-sizing:border-box}
 .mem-edit textarea{min-height:76px;resize:vertical}
 .mem-edit-row{display:flex;gap:6px}
-.mem-drop{color:rgba(230,230,234,.45);font-size:12px;text-align:center;padding:20px}
-.mem-bar-note{color:rgba(230,230,234,.55);font-size:12px}
-.mem-strength{height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden;margin-bottom:10px}
+.mem-drop{color:var(--text-faint,rgba(230,230,234,.45));font-size:12px;text-align:center;padding:20px}
+.mem-bar-note{color:var(--text-dim,rgba(230,230,234,.55));font-size:12px}
+.mem-strength{height:4px;border-radius:2px;background:var(--border,rgba(255,255,255,.12));overflow:hidden;margin-bottom:10px}
 .mem-strength > i{display:block;height:100%;background:linear-gradient(90deg,#4ea1ff,#3ecf8e)}
 `;
 
@@ -274,6 +274,29 @@ export default {
 			},
 		};
 		const g = canvas.getContext("2d");
+		/** 画布颜色取自主题变量：画布不能直接用 CSS 变量，浅色主题下写死的白色就看不见了。 */
+		const TC = { text: "#e6e6ea", line: "#2a2f3a", ring: "#8b5cf6", faint: "#6b7284", accent: "#8b5cf6" };
+		function readThemeColors() {
+			try {
+				const cs = getComputedStyle(document.documentElement);
+				const v = (name, fallback) => cs.getPropertyValue(name).trim() || fallback;
+				TC.text = v("--text", "#e6e6ea");
+				TC.line = v("--border", "#2a2f3a");
+				TC.ring = v("--text-dim", "#9aa1b4");
+				TC.faint = v("--text-faint", "#6b7284");
+				TC.accent = v("--accent", "#8b5cf6");
+			} catch {
+				/* 读不到就用默认值 */
+			}
+		}
+		readThemeColors();
+		// 主题切换后重读：宿主换主题只是替换 <head> 里的 <link>，documentElement 的
+		// 属性并不变（监听属性永远等不到），它在样式表加载完成后广播 ccui:theme-change。
+		const onThemeChange = () => {
+			readThemeColors();
+			requestDraw();
+		};
+		window.addEventListener("ccui:theme-change", onThemeChange);
 
 		const state = {
 			records: [],
@@ -774,11 +797,7 @@ export default {
 				if (!a || !b) continue;
 				const inFocus = Boolean(focusId) && (e.a === focusId || e.b === focusId);
 				const dim = (dimmed(a.id) && dimmed(b.id)) || (Boolean(focusId) && !inFocus && hoverT > 0.05);
-				g.strokeStyle = inFocus
-					? "rgba(150,188,255,.62)"
-					: e.kind === "supersede"
-						? "rgba(255,255,255,.34)"
-						: "rgba(255,255,255,.13)";
+				g.strokeStyle = inFocus ? TC.accent : e.kind === "supersede" ? TC.ring : TC.line;
 				if (e.kind === "supersede") g.setLineDash([4, 3]);
 				g.lineWidth = ((e.kind === "supersede" ? 1.5 : 1) + (inFocus ? 0.5 : 0)) / view.k;
 				g.globalAlpha = dim ? 0.12 : 0.9;
@@ -804,7 +823,7 @@ export default {
 				const searchDim = dimmed(p.id) && !isHover && p !== state.selected ? 0.22 : 1;
 				g.globalAlpha = baseAlpha * searchDim * dimFactor * birth;
 				const rr = p.r * grow * (isHover && !reducedMotion ? 1 + 0.18 * hoverT : 1);
-				const baseColor = invalid ? "#6b6f78" : (TYPE_COLOR[rec.type] ?? "#8a8f98");
+				const baseColor = invalid ? TC.faint : (TYPE_COLOR[rec.type] ?? TC.ring);
 				g.beginPath();
 				g.arc(p.x, p.y, rr, 0, Math.PI * 2);
 				g.fillStyle = baseColor;
@@ -820,7 +839,7 @@ export default {
 				}
 				if (rec.quarantined) {
 					g.setLineDash([3, 3]);
-					g.strokeStyle = "rgba(255,255,255,.55)";
+					g.strokeStyle = TC.faint;
 					g.lineWidth = 1.2 / view.k;
 					g.beginPath();
 					g.arc(p.x, p.y, rr + 3, 0, Math.PI * 2);
@@ -858,7 +877,7 @@ export default {
 					}
 				}
 				if (p === state.selected || isHover) {
-					g.strokeStyle = isHover ? "rgba(180,205,255,.95)" : "rgba(255,255,255,.85)";
+					g.strokeStyle = isHover ? TC.accent : TC.ring;
 					g.lineWidth = 1.6 / view.k;
 					g.beginPath();
 					g.arc(p.x, p.y, rr + 4.5, 0, Math.PI * 2);
@@ -873,7 +892,7 @@ export default {
 					(hoverT > 0.5 && near(p.id) && p.r > 8)
 				) {
 					g.globalAlpha = (invalid ? 0.5 : 0.9) * dimFactor * birth;
-					g.fillStyle = "rgba(235,238,245,.92)";
+					g.fillStyle = TC.text;
 					g.font = `${11 / view.k}px system-ui,-apple-system,"Segoe UI",sans-serif`;
 					g.textAlign = "center";
 					g.textBaseline = "top";
@@ -1352,6 +1371,7 @@ export default {
 			if (raf) cancelAnimationFrame(raf);
 			clearTimeout(searchTimer);
 			window.removeEventListener("resize", onResize);
+			window.removeEventListener("ccui:theme-change", onThemeChange);
 			ro?.disconnect();
 			root.remove();
 		};

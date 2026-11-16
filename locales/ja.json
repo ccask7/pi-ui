@@ -1152,6 +1152,12 @@
 		"pluginLogEmpty": "まだログがありません",
 		"pluginLogClear": "クリア",
 		"pluginDomNeed": "⚠ 完全な DOM アクセスを要求",
+		"pluginDetailOpen": "{name} の詳細を開く",
+		"pluginGrantsOrphan": "残った権限",
+		"pluginGrantsOrphanHint":
+			"プラグイン用フォルダにもう存在しないプラグイン（手動で削除、または古いバージョンのアンインストールで残ったもの）の権限です。同じ id で再インストールすると黙って引き継がれるので、ここで取り消してください。",
+		"pluginEnable": "有効",
+		"pluginDomTitle": "特権 DOM アクセス",
 		"pluginDomDesc": "このプラグインはページの DOM を自由に読み書きできます（レイアウト制限を回避）。信頼できる提供元のプラグインのみ許可してください。許可後はトップバー・入力欄・任意の要素に触れられます。",
 		"pluginDomGrant": "DOM アクセスを許可",
 		"pluginDomRevoke": "DOM アクセスを取り消し",

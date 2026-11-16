@@ -1152,6 +1152,12 @@
 		"pluginLogEmpty": "Aún no hay registros",
 		"pluginLogClear": "Borrar",
 		"pluginDomNeed": "⚠ Solicita acceso total al DOM",
+		"pluginDetailOpen": "Ver detalles de {name}",
+		"pluginGrantsOrphan": "Permisos sobrantes",
+		"pluginGrantsOrphanHint":
+			"Estos permisos pertenecen a plugins que ya no están en la carpeta de plugins (borrados a mano, o desinstalados por una versión anterior que no limpiaba). Un plugin reinstalado con el mismo id los heredaría en silencio; revócalos aquí.",
+		"pluginEnable": "Activado",
+		"pluginDomTitle": "Acceso DOM privilegiado",
 		"pluginDomDesc": "Este plugin puede leer y escribir libremente el DOM de la página (omite las restricciones de diseño). Autorízalo solo si confías en su origen; una vez autorizado, su código puede tocar la barra superior, el editor y cualquier elemento.",
 		"pluginDomGrant": "Conceder acceso al DOM",
 		"pluginDomRevoke": "Revocar acceso al DOM",

@@ -1152,6 +1152,12 @@
 		"pluginLogEmpty": "Aucun journal pour le moment",
 		"pluginLogClear": "Effacer",
 		"pluginDomNeed": "⚠ Demande un accès DOM complet",
+		"pluginDetailOpen": "Ouvrir les détails de {name}",
+		"pluginGrantsOrphan": "Autorisations résiduelles",
+		"pluginGrantsOrphanHint":
+			"Ces autorisations appartiennent à des plugins qui ne sont plus dans le dossier des plugins (supprimés à la main, ou désinstallés par une ancienne version qui ne nettoyait pas). Un plugin réinstallé avec le même id en hériterait silencieusement — révoquez-les ici.",
+		"pluginEnable": "Activé",
+		"pluginDomTitle": "Accès DOM privilégié",
 		"pluginDomDesc": "Ce plugin peut lire et écrire librement le DOM de la page (contourne les restrictions de mise en page). Autorisez uniquement les plugins de sources fiables ; une fois autorisé, son code peut toucher la barre supérieure, la zone de saisie et tout élément.",
 		"pluginDomGrant": "Autoriser l'accès DOM",
 		"pluginDomRevoke": "Révoquer l'accès DOM",

@@ -56,10 +56,14 @@ function mount() {
 							agentTools: [],
 						},
 					] as never,
-					pluginGrants: [{ pluginId: "demo-ui", paths: ["/tmp/shared"] }],
+					pluginGrants: [
+						{ pluginId: "demo-ui", paths: ["/tmp/shared"] },
+						{ pluginId: "gone-ui", paths: ["/tmp/orphan"] },
+					],
 					pluginPermissions: [
 						{ pluginId: "demo-ui", family: "net", hosts: ["api.example.com"] },
 						{ pluginId: "demo-ui", family: "llm", models: ["gpt-demo"] },
+						{ pluginId: "gone-ui", family: "net", hosts: ["old.example.com"] },
 					],
 					onOpenPluginView: vi.fn(),
 					onOpenTools: vi.fn(),
@@ -82,7 +86,7 @@ describe("插件 / 技能 / MCP 面板", () => {
 		expect(send).toHaveBeenCalledWith({ type: "set_settings", disabledSkills: ["review"] });
 	});
 
-	it("插件页签合并扩展包和界面插件，并保留各自启停入口", () => {
+	it("插件页签合并扩展包和界面插件；列表行只有简介与开关，详情收进弹窗", () => {
 		const { container, send } = mount();
 		const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
 		expect(tabs).toHaveLength(3);
@@ -91,40 +95,73 @@ describe("插件 / 技能 / MCP 面板", () => {
 		expect(container.textContent).toContain("界面插件");
 		expect(container.textContent).toContain("Demo Extension");
 		expect(container.textContent).toContain("Demo UI Plugin");
+		expect(container.textContent).toContain("A short plugin summary");
 		const extensionToggle = container.querySelector<HTMLButtonElement>('.capabilities-extension-group [role="switch"]');
 		act(() => extensionToggle!.click());
 		expect(send).toHaveBeenCalledWith({ type: "set_settings", disabledExtensions: ["npm:demo"] });
-		const uiToggle = container.querySelector<HTMLButtonElement>('.capabilities-ui-group [role="switch"]');
-		act(() => uiToggle!.click());
+
+		// 行内开关：点了不打开弹窗
+		const row = container.querySelector<HTMLElement>(".plugin-row")!;
+		const uiToggle = row.querySelector<HTMLButtonElement>('[role="switch"]')!;
+		act(() => uiToggle.click());
 		expect(send).toHaveBeenCalledWith({ type: "set_settings", disabledPlugins: ["demo-ui"] });
-		// 授权撤销是插件页里唯一入口（设置页旧插件页签已收）：目录 / 网络 / 模型三类都在。
-		const auth = container.querySelectorAll(".plugin-auth-section");
-		expect(auth).toHaveLength(3);
-		expect(container.textContent).toContain("/tmp/shared");
-		expect(container.textContent).toContain("api.example.com");
-		const revoke = [...container.querySelectorAll<HTMLButtonElement>(".plugin-auth-row .set-uninstall")];
-		act(() => revoke[0].click());
+		expect(document.body.querySelector(".plugin-detail")).toBeNull();
+
+		// 列表里不再常驻授权区块（遗留授权区是另一回事，见下一条用例）
+		expect(container.querySelector(".set-list .plugin-auth-section")).toBeNull();
+		expect(container.textContent).not.toContain("/tmp/shared");
+		expect(container.textContent).not.toContain("api.example.com");
+
+		// 点整行 → 详情弹窗，授权在弹窗里
+		act(() => row.click());
+		const dialog = document.body.querySelector(".plugin-detail")!;
+		expect(dialog).toBeTruthy();
+		expect(dialog.textContent).toContain("/tmp/shared");
+		expect(dialog.textContent).toContain("api.example.com");
+		expect(dialog.textContent).toContain("gpt-demo");
+		const revoke = [...dialog.querySelectorAll<HTMLButtonElement>(".btn.danger")];
+		const pathRevoke = revoke.find((b) => b.textContent?.includes("撤销")) ?? revoke[0];
+		act(() => pathRevoke.click());
 		expect(send).toHaveBeenCalledWith({ type: "plugin_path_revoke", pluginId: "demo-ui", path: "/tmp/shared" });
-		act(() => revoke[1].click());
-		expect(send).toHaveBeenCalledWith({
-			type: "plugin_permission_revoke",
-			pluginId: "demo-ui",
-			family: "net",
-			host: "api.example.com",
-		});
-		expect(container.textContent).toContain("A short plugin summary");
-		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-		expect(container.querySelector(".plugin-secondary-section")).toBeNull();
-		expect(container.querySelector<HTMLButtonElement>(".plugin-rescan")).not.toBeNull();
+		act(() => container.querySelector<HTMLButtonElement>(".plugin-rescan")!.click());
+		expect(send).toHaveBeenCalledWith({ type: "plugins_reload" });
 	});
 
-	it("插件行有卸载入口，确认框写明会连数据一起删", () => {
+	it("插件目录已不在的遗留授权仍可撤销（否则重装会静默继承）", () => {
+		const { container, send } = mount();
+		act(() => container.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1].click());
+		const section = container.querySelector<HTMLDetailsElement>(".plugin-auth-section")!;
+		expect(section.textContent).toContain("遗留授权");
+		expect(section.textContent).toContain("/tmp/orphan");
+		expect(section.textContent).toContain("old.example.com");
+		// 存在的插件的授权只出现在详情弹窗里，不在遗留区
+		expect(section.textContent).not.toContain("/tmp/shared");
+		const rows = [...section.querySelectorAll<HTMLElement>(".plugin-auth-row")];
+		const pathRow = rows.find((r) => r.textContent?.includes("/tmp/orphan"))!;
+		act(() => pathRow.querySelector<HTMLButtonElement>("button")!.click());
+		expect(send).toHaveBeenCalledWith({ type: "plugin_path_revoke", pluginId: "gone-ui", path: "/tmp/orphan" });
+		const hostRow = rows.find((r) => r.textContent?.includes("old.example.com"))!;
+		act(() => hostRow.querySelector<HTMLButtonElement>("button")!.click());
+		expect(send).toHaveBeenCalledWith({
+			type: "plugin_permission_revoke",
+			pluginId: "gone-ui",
+			family: "net",
+			host: "old.example.com",
+		});
+	});
+
+	it("卸载入口在详情弹窗里，确认框写明会连数据一起删", () => {
 		const { container, send } = mount();
 		const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
 		act(() => tabs[1].click());
-		const trash = container.querySelector<HTMLButtonElement>(".plugin-simple-item .set-icon-btn.danger")!;
-		expect(trash).toBeTruthy();
-		act(() => trash.click());
+		const row = container.querySelector<HTMLElement>(".plugin-row")!;
+		expect(row.querySelector(".set-icon-btn.danger")).toBeNull();
+		act(() => row.click());
+		const uninstall = [...document.body.querySelectorAll<HTMLButtonElement>(".plugin-detail .btn.danger")].find((b) =>
+			b.textContent?.includes("卸载"),
+		)!;
+		expect(uninstall).toBeTruthy();
+		act(() => uninstall.click());
 		const dialog = document.body.querySelector(".confirm-dialog");
 		expect(dialog?.textContent).toContain("会删除整个插件目录");
 		expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "plugins_uninstall" }));

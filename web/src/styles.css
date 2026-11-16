@@ -444,6 +444,191 @@ body {
 	background: var(--glow-03);
 	color: var(--text);
 }
+/* 「界面插件」列表行：只有图标 + 名称 + 一句介绍 + 开关；点行开详情弹窗。 */
+.plugin-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 9px 10px;
+	border-radius: 9px;
+	border: 1px solid transparent;
+	cursor: pointer;
+	transition:
+		background 0.14s ease,
+		border-color 0.14s ease;
+}
+
+.plugin-row:hover {
+	background: var(--chip-bg);
+	border-color: var(--border);
+}
+
+.plugin-row:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -2px;
+}
+
+.plugin-row.off .plugin-row-text {
+	opacity: 0.55;
+}
+
+.plugin-row-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.plugin-row-name {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	font-weight: 500;
+	color: var(--text);
+}
+
+.plugin-row-version {
+	font-size: 11px;
+	color: var(--text-faint);
+	font-variant-numeric: tabular-nums;
+}
+
+.plugin-row-desc {
+	margin-top: 2px;
+	font-size: 12px;
+	color: var(--text-dim);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.plugin-row-arrow {
+	flex: none;
+	color: var(--text-faint);
+	opacity: 0;
+	transition: opacity 0.14s ease;
+}
+
+.plugin-row:hover .plugin-row-arrow,
+.plugin-row:focus-visible .plugin-row-arrow {
+	opacity: 1;
+}
+
+/* 插件详情弹窗 */
+/* 详情弹窗：比默认 460px 宽（.modal 的 max-width 在后面，这里用 .modal. 前缀压过去）。 */
+.modal.plugin-detail {
+	width: min(760px, 92vw);
+	max-width: min(760px, 92vw);
+	max-height: min(82vh, 780px);
+}
+
+.plugin-detail-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.plugin-detail-version {
+	font-size: 11px;
+	font-weight: 400;
+	color: var(--text-faint);
+}
+
+.plugin-detail-body {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	overflow: auto;
+	padding: 2px 2px 8px;
+}
+
+.plugin-detail-desc {
+	margin: 0;
+	color: var(--text-dim);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.plugin-detail-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	justify-content: space-between;
+	min-height: 28px;
+}
+
+.plugin-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.plugin-detail-section {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding-top: 12px;
+	border-top: 1px solid var(--border);
+}
+
+.plugin-detail-section h3 {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--text-dim);
+	letter-spacing: 0.02em;
+}
+
+.plugin-detail-hint {
+	color: var(--text-dim);
+	font-size: 12px;
+	margin: 0;
+}
+
+.plugin-detail-path {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12px;
+	color: var(--text);
+	background: var(--card-bg);
+	border-radius: 6px;
+	padding: 3px 7px;
+}
+
+.plugin-detail-tools {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.plugin-detail-tools code {
+	font-size: 11.5px;
+	padding: 2px 7px;
+	border-radius: 6px;
+	background: var(--card-bg);
+	color: var(--text-dim);
+}
+
+.plugin-detail-grant {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.plugin-detail-foot {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	padding-top: 10px;
+	border-top: 1px solid var(--border);
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
 .plugin-simple-item > .mcp-error {
 	margin: -4px 0 10px;
 }

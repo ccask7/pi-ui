@@ -804,7 +804,8 @@ export type ClientMessage =
 	/** 卸载插件：反激活 + 删除 `<dataDir>/plugins/<id>/`（插件数据在它自己目录里，一起删）。
 	 *  只对用户自己装的插件有效；内置插件（`UiPluginInfo.bundled`）直接拒绝——它们由应用安装/更新。
 	 *
-	 *  入口：设置 →「界面插件」每行的垃圾桶（内置插件不显示；确认框会写明会连数据一起删）。 */
+	 *  卸载同时撤销它拿过的目录 / 网络 / 模型 / DOM 授权与设置覆盖文件（`plugin-overrides/<id>.json`）。
+	 *  入口：设置 →「界面插件」→ 插件详情弹窗里的卸载按钮（内置插件不显示；确认框会写明会连数据一起删）。 */
 	| { type: "plugins_uninstall"; id: string }
 	/** 特权 DOM 访问授权（wantsDom 插件）：granted=true 即写入 <dataDir>/plugin-dom.json
 	 *  并 epoch+1 重推清单（浏览器按新 epoch 重拉 bundle）；false = 撤销。 */

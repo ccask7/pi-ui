@@ -1958,8 +1958,10 @@ export class PluginManager {
 	 *
 	 *  界面上没有入口（只有开关），保留它是迭代期"删掉某个内置功能"的正规出口。
 	 *
-	 *  只删 `<dataDir>/plugins/<id>/` 这一个目录 —— 插件的数据放在它自己目录里
-	 *  （memory 插件就是 `plugins/memory/data/`），所以这一刀就是"卸载干净"。
+	 *  删 `<dataDir>/plugins/<id>/` 这一个目录 —— 插件的数据放在它自己目录里
+	 *  （memory 插件就是 `plugins/memory/data/`），所以这一刀就是"卸载干净"；
+	 *  目录外属于它的状态（目录/网络/模型/DOM 授权、`plugin-overrides/<id>.json`、
+	 *  停用表条目）也一并清掉。
 	 *  内置插件（bundledIds）直接拒绝：它们由应用同步，删了下次启动也会回来。
 	 */
 	async uninstall(id: string): Promise<{ ok: boolean; error?: string }> {
@@ -1981,6 +1983,12 @@ export class PluginManager {
 		if (this.disabled.has(pluginId)) {
 			this.disabled = new Set(this.disabledStore.write([...this.disabled].filter((x) => x !== pluginId)));
 		}
+		// 它拿过的东西一起清：目录授权 / 网络·模型授权 / 特权 DOM / 设置覆盖文件。
+		// 否则重装同 id 会静默继承旧授权，而插件已经不在列表里，界面上无处撤销。
+		this.grants.revoke(pluginId);
+		this.permGrants.revoke(pluginId);
+		this.domConsentStore.set(pluginId, false);
+		rmSync(join(this.dataDir, "plugin-overrides", `${pluginId}.json`), { force: true });
 		this.epochCounter += 1;
 		console.log(`[plugin:${pluginId}] uninstalled (${dir})`);
 		return { ok: true };

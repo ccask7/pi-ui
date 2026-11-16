@@ -1152,6 +1152,12 @@
 		"pluginLogEmpty": "아직 로그가 없습니다",
 		"pluginLogClear": "지우기",
 		"pluginDomNeed": "⚠ 전체 DOM 접근 요청",
+		"pluginDetailOpen": "{name} 상세 정보 열기",
+		"pluginGrantsOrphan": "남은 권한",
+		"pluginGrantsOrphanHint":
+			"플러그인 폴더에 더 이상 없는 플러그인(직접 삭제했거나 정리하지 않던 이전 버전에서 제거)의 권한입니다. 같은 id로 다시 설치하면 조용히 이어받으므로 여기서 취소하세요.",
+		"pluginEnable": "사용",
+		"pluginDomTitle": "권한 있는 DOM 접근",
 		"pluginDomDesc": "이 플러그인은 페이지 DOM을 자유롭게 읽고 쓸 수 있습니다(레이아웃 제한 우회). 신뢰할 수 있는 출처의 플러그인에만 허용하세요. 허용 후에는 상단 바, 입력창, 모든 요소에 접근할 수 있습니다.",
 		"pluginDomGrant": "DOM 접근 허용",
 		"pluginDomRevoke": "DOM 접근 취소",

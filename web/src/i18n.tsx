@@ -1292,6 +1292,12 @@ export const zh = {
 	pluginLogEmpty: "暂无日志",
 	pluginLogClear: "清空",
 	pluginDomNeed: "⚠ 请求完全 DOM 访问",
+	pluginDetailOpen: "查看 {name} 的详情",
+	pluginGrantsOrphan: "遗留授权",
+	pluginGrantsOrphanHint:
+		"这些授权属于已不在插件目录里的插件（被手动删除或旧版卸载时没清掉）。留着重装同 id 的插件会静默继承，可以在这里撤销。",
+	pluginEnable: "启用",
+	pluginDomTitle: "特权 DOM 访问",
 	pluginDomDesc:
 		"该插件可直接读写页面 DOM（绕过界面布局限制）。只给可信来源的插件授权；授权后其界面代码可碰顶栏/输入框/任意页面元素。",
 	pluginDomGrant: "授权 DOM 访问",
@@ -2832,6 +2838,12 @@ const en: Record<keyof typeof zh, string> = {
 	pluginLogEmpty: "No logs yet",
 	pluginLogClear: "Clear",
 	pluginDomNeed: "⚠ Requests full DOM access",
+	pluginDetailOpen: "Open {name} details",
+	pluginGrantsOrphan: "Leftover grants",
+	pluginGrantsOrphanHint:
+		"These grants belong to plugins that are no longer in the plugins folder (deleted by hand, or uninstalled by an older version that did not clean up). A plugin reinstalled with the same id would silently inherit them — revoke them here.",
+	pluginEnable: "Enabled",
+	pluginDomTitle: "Privileged DOM access",
 	pluginDomDesc:
 		"This plugin can freely read and write the page DOM (bypassing UI layout restrictions). Grant only to plugins from sources you trust; once granted its UI code can touch the topbar, composer and any page element.",
 	pluginDomGrant: "Grant DOM access",

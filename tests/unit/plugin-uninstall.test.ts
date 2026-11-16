@@ -2,7 +2,7 @@
  * 插件卸载：删除 `<dataDir>/plugins/<id>/` 整目录（含插件自己的数据）+ 反激活 + 从停用表移除。
  */
 import { describe, expect, it } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PluginManager } from "../../server/plugins.js";
@@ -51,6 +51,38 @@ describe("PluginManager.uninstall", () => {
 		await mgr.ensureLoaded(() => "zh");
 		await mgr.uninstall("memory");
 		expect(mgr.disabledIds()).toEqual(["other"]);
+		mgr.dispose();
+		rmSync(dataDir, { recursive: true, force: true });
+	});
+
+	it("连同它拿过的目录 / 网络 / 模型 / DOM 授权与设置覆盖一起清掉", async () => {
+		const dataDir = tmp();
+		makePlugin(dataDir, "memory");
+		writeFileSync(
+			join(dataDir, "plugin-grants.json"),
+			JSON.stringify({ grants: { memory: ["/tmp/shared"], other: ["/tmp/k"] } }),
+		);
+		writeFileSync(
+			join(dataDir, "plugin-permissions.json"),
+			JSON.stringify({ grants: [{ pluginId: "memory", family: "net", hosts: ["api.example.com"] }] }),
+		);
+		writeFileSync(join(dataDir, "plugin-dom.json"), JSON.stringify({ granted: ["memory", "other"] }));
+		mkdirSync(join(dataDir, "plugin-overrides"), { recursive: true });
+		writeFileSync(join(dataDir, "plugin-overrides", "memory.json"), JSON.stringify({ autoRemember: false }));
+
+		const mgr = new PluginManager(dataDir, dataDir);
+		await mgr.ensureLoaded(() => "zh");
+		const r = await mgr.uninstall("memory");
+		expect(r.ok).toBe(true);
+
+		const grants = JSON.parse(readFileSync(join(dataDir, "plugin-grants.json"), "utf8")) as {
+			grants: Record<string, string[]>;
+		};
+		expect(grants.grants.memory).toBeUndefined();
+		expect(grants.grants.other).toHaveLength(1);
+		expect(grants.grants.other[0]?.endsWith("k")).toBe(true);
+		expect(readFileSync(join(dataDir, "plugin-permissions.json"), "utf8")).not.toContain("memory");
+		expect(existsSync(join(dataDir, "plugin-overrides", "memory.json"))).toBe(false);
 		mgr.dispose();
 		rmSync(dataDir, { recursive: true, force: true });
 	});

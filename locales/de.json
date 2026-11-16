@@ -1152,6 +1152,12 @@
 		"pluginLogEmpty": "Noch keine Protokolle",
 		"pluginLogClear": "Leeren",
 		"pluginDomNeed": "⚠ Fordert vollen DOM-Zugriff an",
+		"pluginDetailOpen": "Details zu {name} öffnen",
+		"pluginGrantsOrphan": "Übrig gebliebene Berechtigungen",
+		"pluginGrantsOrphanHint":
+			"Diese Berechtigungen gehören zu Plugins, die nicht mehr im Plugin-Ordner liegen (manuell gelöscht, oder von einer älteren Version ohne Aufräumen deinstalliert). Ein neu installiertes Plugin mit derselben id würde sie stillschweigend erben – hier widerrufen.",
+		"pluginEnable": "Aktiviert",
+		"pluginDomTitle": "Privilegierter DOM-Zugriff",
 		"pluginDomDesc": "Dieses Plugin kann das Seiten-DOM frei lesen und schreiben (umgeht Layout-Einschränkungen). Nur Plugins aus vertrauenswürdigen Quellen berechtigen; danach kann sein UI-Code Topbar, Eingabefeld und beliebige Elemente anfassen.",
 		"pluginDomGrant": "DOM-Zugriff gewähren",
 		"pluginDomRevoke": "DOM-Zugriff entziehen",
