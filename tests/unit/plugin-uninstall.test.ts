@@ -55,6 +55,22 @@ describe("PluginManager.uninstall", () => {
 		rmSync(dataDir, { recursive: true, force: true });
 	});
 
+	it("内置插件拒绝卸载（随应用安装/更新，删了也会回来）", async () => {
+		const dataDir = tmp();
+		makePlugin(dataDir, "memory");
+		const mgr = new PluginManager(dataDir, dataDir, ["memory"]);
+		await mgr.ensureLoaded(() => "zh");
+		const r = await mgr.uninstall("memory");
+		expect(r.ok).toBe(false);
+		expect(r.error).toMatch(/内置插件/);
+		expect(existsSync(join(dataDir, "plugins", "memory", "index.mjs"))).toBe(true);
+		// 清单里带 bundled 标记（前端据此隐藏卸载按钮）
+		const [info] = await mgr.ensureLoaded(() => "zh");
+		expect(info.bundled).toBe(true);
+		mgr.dispose();
+		rmSync(dataDir, { recursive: true, force: true });
+	});
+
 	it("目录不存在 / 非法 id 直接拒绝，不抛", async () => {
 		const dataDir = tmp();
 		const mgr = new PluginManager(dataDir, dataDir);

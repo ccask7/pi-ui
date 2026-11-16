@@ -39,7 +39,7 @@ import { startControlServer } from "./control-socket.js";
 import { scheduleUploadCleanup } from "./uploads.js";
 import { windowsBashDir } from "./ensure-bash.js";
 import { listThemes, resolveThemeFile } from "./themes.js";
-import { markSeeded, seedBundledPlugins } from "./plugin-seed.js";
+import { BUNDLED_PLUGIN_IDS, syncBundledPlugins } from "./plugin-seed.js";
 import { parseTabs, tabsRefusal } from "./tabs.js";
 import { recordUnknownWsType } from "./ws-unknown-types.js";
 import { isKnownPack, listPacks, loadServerStrings, readPackFile, removePack, unloadServerStrings } from "./locales.js";
@@ -1207,12 +1207,12 @@ const service: EngineService = new AgentService(
 );
 initAttachmentStore(DATA_DIR);
 loadServerStrings(DATA_DIR);
-// 内置插件播种：首次启动把随包发行的那几个拷进 <dataDir>/plugins/（默认停用）。
-// 必须在 new PluginManager 之前 —— 它构造时就要读停用表。
-seedBundledPlugins(DATA_DIR);
+// 内置插件：每次启动把随包发行的副本同步到 <dataDir>/plugins/（插件代码永远跟应用版本一致；
+// 插件自己的 data/ 不动）。必须在 new PluginManager 之前 —— 它构造时就要读停用表。
+syncBundledPlugins(DATA_DIR);
 // Optional UI plugins (<dataDir>/plugins/<id>/): scanned on every client
 // attach so freshly dropped plugins appear without a server restart.
-const pluginMgr = new PluginManager(DATA_DIR, CWD);
+const pluginMgr = new PluginManager(DATA_DIR, CWD, BUNDLED_PLUGIN_IDS);
 // ---------------------------------------------------------------------------
 // 插件目录授权（issue #146）：插件要访问**工作区之外**的目录时，向所有在线客户端推一条
 // plugin_path_request，等第一个答复；同意则写进全局授权表（设置面板可撤销），超时=拒绝。
@@ -2344,8 +2344,6 @@ wss.on("connection", (ws) => {
 				const id = String(msg.id ?? "");
 				void pluginMgr.uninstall(id).then(async (r) => {
 					if (r.ok) {
-						// 记住"卸载过"：下次启动的播种不再把它装回来。
-						markSeeded(DATA_DIR, id);
 						cs?.emitNotice("info", "插件已卸载（含其数据目录）", "Plugin uninstalled (including its data)");
 					} else {
 						cs?.emitNotice("error", `卸载失败：${r.error ?? "未知原因"}`, `Uninstall failed: ${r.error ?? "unknown"}`);

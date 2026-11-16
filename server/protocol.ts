@@ -802,9 +802,9 @@ export type ClientMessage =
 	 *  extensions_reload but for ccui's own UI plugins. */
 	| { type: "plugins_reload" }
 	/** 卸载插件：反激活 + 删除 `<dataDir>/plugins/<id>/`（插件数据在它自己目录里，一起删）。
-	 *  之后不会再有"自动装回来"——播种标记会记住它被卸载过。
+	 *  只对用户自己装的插件有效；内置插件（`UiPluginInfo.bundled`）直接拒绝——它们由应用安装/更新。
 	 *
-	 *  入口：设置 →「界面插件」每行的垃圾桶（确认框会写明会连数据一起删）。 */
+	 *  入口：设置 →「界面插件」每行的垃圾桶（内置插件不显示；确认框会写明会连数据一起删）。 */
 	| { type: "plugins_uninstall"; id: string }
 	/** 特权 DOM 访问授权（wantsDom 插件）：granted=true 即写入 <dataDir>/plugin-dom.json
 	 *  并 epoch+1 重推清单（浏览器按新 epoch 重拉 bundle）；false = 撤销。 */
@@ -1484,6 +1484,8 @@ export interface UiPluginInfo {
 	/** The plugin failed to activate (bad entry / thrown error) — UI shows it
 	 *  greyed out instead of a dead tab. */
 	error?: string;
+	/** 随包发行（应用负责安装/更新，不给卸载入口）。缺省 = 用户自己装的。 */
+	bundled?: boolean;
 	/** 宿主当前持有该插件实例（loaded 表里有它；激活失败的占位行也有）。
 	 *  设置面板据此合成运行相位：error→失败 / 用户禁用→已禁用 /
 	 *  active→运行中 / 其他→纯前端（无 index.mjs，从未激活）。

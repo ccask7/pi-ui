@@ -94,15 +94,17 @@ export function PluginsPanel({
 													{t("pluginViewOpen")}
 												</button>
 											)}
-											<button
-												type="button"
-												className="set-icon-btn danger"
-												title={t("uninstallExt")}
-												aria-label={`${t("uninstallExt")} ${plugin.name}`}
-												onClick={() => setUninstalling(plugin)}
-											>
-												<FiTrash2 />
-											</button>
+											{!plugin.bundled && (
+												<button
+													type="button"
+													className="set-icon-btn danger"
+													title={t("uninstallExt")}
+													aria-label={`${t("uninstallExt")} ${plugin.name}`}
+													onClick={() => setUninstalling(plugin)}
+												>
+													<FiTrash2 />
+												</button>
+											)}
 										</>
 									}
 								/>

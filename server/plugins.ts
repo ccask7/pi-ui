@@ -1616,11 +1616,16 @@ export class PluginManager {
 	 *  （与 diagnostics 的“只读诊断随清单下发”正交，互不冲突）。 */
 	private pluginLogs = new Map<string, PluginLogEntry[]>();
 
+	/** 随包发行（由应用负责安装/更新，界面上不提供卸载）的插件 id。 */
+	private readonly bundledIds: Set<string>;
+
 	constructor(
 		private readonly dataDir: string,
 		cwd: string,
+		bundledIds: readonly string[] = [],
 	) {
 		this.cwdValue = resolve(cwd);
+		this.bundledIds = new Set(bundledIds);
 		this.grants = new PluginGrantsStore(dataDir);
 		this.permGrants = new PluginPermissionStore(dataDir);
 		this.domConsentStore = new PluginDomConsent(dataDir);
@@ -1955,11 +1960,15 @@ export class PluginManager {
 	 *
 	 *  只删 `<dataDir>/plugins/<id>/` 这一个目录 —— 插件的数据放在它自己目录里
 	 *  （memory 插件就是 `plugins/memory/data/`），所以这一刀就是"卸载干净"。
-	 *  出厂副本的播种标记由调用方写（见 plugin-seed 的 markSeeded），否则下次启动会装回来。
+	 *  内置插件（bundledIds）直接拒绝：它们由应用同步，删了下次启动也会回来。
 	 */
 	async uninstall(id: string): Promise<{ ok: boolean; error?: string }> {
 		const pluginId = String(id ?? "").trim();
 		if (!ID_RE.test(pluginId)) return { ok: false, error: "非法插件 id" };
+		// 内置插件由应用安装/更新：删了下次启动也会回来，所以直接拒绝（界面上也不显示卸载按钮）。
+		if (this.bundledIds.has(pluginId)) {
+			return { ok: false, error: "内置插件随应用安装/更新，不能卸载（想关掉请用开关停用）" };
+		}
 		const dir = join(this.pluginsDir, pluginId);
 		if (!existsSync(dir)) return { ok: false, error: "插件目录不存在" };
 		const loaded = this.loaded.get(pluginId);
@@ -2763,6 +2772,7 @@ export class PluginManager {
 						hasClient: existsSync(join(dir, "client", "entry.mjs")),
 						error: msg,
 						view: false,
+						...(this.bundledIds.has(name) ? { bundled: true } : {}),
 						...(refused.length ? { diagnostics: refused } : {}),
 					});
 					const lpRefused = this.loaded.get(name);
@@ -2787,6 +2797,7 @@ export class PluginManager {
 				out.push({
 					id: name,
 					name: typeof m.name === "string" && m.name ? m.name : name,
+					...(this.bundledIds.has(name) ? { bundled: true } : {}),
 					version: typeof m.version === "string" ? m.version : undefined,
 					description: typeof m.description === "string" ? m.description : undefined,
 					icon: typeof m.icon === "string" && m.icon.trim() ? m.icon.trim() : undefined,
@@ -2952,6 +2963,7 @@ export class PluginManager {
 					hasClient: existsSync(join(dir, "client", "entry.mjs")),
 					error: msg,
 					view: false,
+					...(this.bundledIds.has(name) ? { bundled: true } : {}),
 					...(brokenDiags ? { diagnostics: brokenDiags } : {}),
 				});
 			}
