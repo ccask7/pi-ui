@@ -8821,7 +8821,6 @@ export class ClientSession {
 				messageCount: s.messageCount,
 				modified: s.modified.getTime(),
 				source: "web",
-				...(s.parentSessionPath ? { isBranch: true } : {}),
 			});
 		}
 		return [...sessions.values()].sort((a, b) => b.modified - a.modified).slice(0, 200);
@@ -8985,7 +8984,6 @@ export class ClientSession {
 				modified: info.modified.getTime(),
 				source: "web" as const,
 				cwd: info.cwd,
-				...(info.parentSessionPath ? { isBranch: true } : {}),
 			}))
 			.sort((a, b) => b.modified - a.modified);
 		this.emit({ type: "archived_sessions", sessions });
@@ -9870,6 +9868,14 @@ export class ClientSession {
 			);
 
 			const newConv = this.makeConversation(runtime, conversationId, terminals);
+			// 分支后缀就是正式会话名称的一部分，而不是前端额外添加的标识。
+			const branchTitle = targetConv.title.endsWith("(分支)") ? targetConv.title : `${targetConv.title}(分支)`;
+			newConv.title = branchTitle;
+			try {
+				forkedManager.appendSessionInfo(branchTitle);
+			} catch {
+				// 名字只是展示信息：内存模式 / 只读盘写不进会话文件，不该让分叉失败。
+			}
 			if (targetConv.agentPreset) newConv.agentPreset = targetConv.agentPreset;
 			if (targetConv.permissionPreset) newConv.permissionPreset = targetConv.permissionPreset;
 			newConv.forkFrom = {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { FiEdit2, FiMessageSquare, FiX } from "react-icons/fi";
+import { FiEdit2, FiMessageSquare, FiSettings, FiX } from "react-icons/fi";
+import { PluginIcon } from "../plugin-icon";
 import type { ConversationSummary, ElsewhereRunning } from "../types";
 import { useT } from "../i18n";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -23,6 +24,15 @@ interface ChatTabBarProps {
 	conversations: ConversationSummary[];
 	elsewhere: ElsewhereRunning[];
 	activeConversationId: string;
+	page?: {
+		id: string;
+		title: string;
+		kind: "settings" | "plugin";
+		icon?: string;
+		iconSvg?: string;
+	} | null;
+	onActivatePage?: () => void;
+	onClosePage?: () => void;
 	panelSend: (msg: ChatPanelMessage) => boolean;
 }
 
@@ -88,22 +98,24 @@ function subagentCount(conversations: ConversationSummary[], id: string): number
 	return n;
 }
 
-export function ChatTabBar({ conversations, elsewhere, activeConversationId, panelSend }: ChatTabBarProps) {
+export function ChatTabBar({
+	conversations,
+	elsewhere,
+	activeConversationId,
+	page,
+	onActivatePage,
+	onClosePage,
+	panelSend,
+}: ChatTabBarProps) {
 	const t = useT();
 	const rows = useMemo(() => flattenTabs(conversations, elsewhere), [conversations, elsewhere]);
-	// 已产生新分支的会话是当前操作的来源，不再与刚派生的会话同时显示「分支」。
-	// 标识只落在分支链最新会话上；较早的分支源即使自身也有 forkFrom 也不标记。
-	const forkedParentIds = useMemo(
-		() => new Set(conversations.map((c) => c.forkFrom?.conversationId).filter((id): id is string => Boolean(id))),
-		[conversations],
-	);
 	/** 已「点过一次」的别处会话标签（过户确认）。 */
 	const [armed, setArmed] = useState<string | null>(null);
 	const [pendingClose, setPendingClose] = useState<ConversationSummary | null>(null);
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
 
-	if (rows.length === 0) return null;
+	if (rows.length === 0 && !page) return null;
 
 	const closeTab = (c: ConversationSummary) => {
 		const risky = c.isStreaming || subagentCount(conversations, c.id) > 0;
@@ -171,7 +183,7 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 
 				// ---- 本客户端的会话 ----
 				const c = row.conv as ConversationSummary;
-				const active = c.id === activeConversationId;
+				const active = !page && c.id === activeConversationId;
 				return (
 					<div
 						key={row.key}
@@ -194,6 +206,7 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 							onClick={() => {
 								setArmed(null);
 								// 当前标签也要经过 panelSend：插件页中点击它应退出插件并返回会话。
+								onClosePage?.();
 								panelSend({ type: "switch_conversation", id: c.id });
 							}}
 							onDoubleClick={() => {
@@ -203,7 +216,6 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 						>
 							{row.depth > 0 && <span className="chat-tab-indent">↳</span>}
 							{c.isSubagent && <span className="chat-tab-flag">{t("subagentBadge")}</span>}
-							{c.forkFrom && !forkedParentIds.has(c.id) && <span className="chat-tab-flag">{t("forkBadge")}</span>}
 							{renaming === row.key ? (
 								<input
 									autoFocus
@@ -264,11 +276,25 @@ export function ChatTabBar({ conversations, elsewhere, activeConversationId, pan
 					</div>
 				);
 			})}
+			{page && (
+				<div className="chat-tab workspace-page-tab active" data-page-id={page.id}>
+					<button type="button" className="chat-tab-main" role="tab" aria-selected onClick={onActivatePage}>
+						{page.kind === "settings" ? <FiSettings /> : <PluginIcon icon={page.icon} iconSvg={page.iconSvg} />}
+						<span className="chat-tab-title">{page.title}</span>
+					</button>
+					<button type="button" className="chat-tab-act close" title={t("close")} onClick={onClosePage}>
+						<FiX />
+					</button>
+				</div>
+			)}
 			<button
 				type="button"
 				className="chat-tab-new"
 				title={t("newChat")}
-				onClick={() => panelSend({ type: "new_chat" })}
+				onClick={() => {
+					onClosePage?.();
+					panelSend({ type: "new_chat" });
+				}}
 			>
 				<FiMessageSquare />
 			</button>

@@ -31,6 +31,7 @@ import {
 } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import * as C from "./client/core.mjs";
+import { createObserver } from "./lib/observe.mjs";
 
 const INVALIDATE = "invalidate";
 const HINT_MAX_CHARS = 420;
@@ -63,6 +64,12 @@ export default {
 		/** 整理（去重合并 + 复核指向已删除文件的记忆）的最近运行时间。 */
 		const stateFile = join(dir, "state.json");
 		const HOUSEKEEP_EVERY_MS = 24 * 60 * 60 * 1000;
+		/**
+		 * P0 可观测性（`lib/observe.mjs`）：events 是逐次诊断数据（按天滚动、30 天），
+		 * stats.json 是每条记忆的长期计数（hint/search/read/used/ignored）。
+		 * 两者都不含内容，只有 id 与事件类型。
+		 */
+		const obs = createObserver({ dataDir: dir, log: (lvl, ...args) => host.log(lvl, ...args) });
 
 		let records = [];
 		/** 回收站条目：原记录 + deletedAt（+ 可选 reason）。 */
@@ -607,9 +614,14 @@ export default {
 				limit: C.clampInt(opts.limit, 1, 30, 8),
 				nowMs: now,
 			});
+			const conv = opts.conversationId ?? activeConversationId();
 			noteReturned(
 				hits.map((h) => h.rec.id),
-				opts.conversationId ?? activeConversationId(),
+				conv,
+			);
+			obs.search(
+				hits.map((h) => h.rec.id),
+				conv,
 			);
 			return hits;
 		}
@@ -908,10 +920,12 @@ export default {
 		host.onRunEvent((ev) => {
 			if (ev?.type === "run_start") {
 				runMeta.set(ev.conversationId || "global", { task: ev.task ?? "", tools: new Set() });
+				obs.startTurn(ev.conversationId);
 				return;
 			}
 			if (ev?.type === "tool_start") {
 				runMeta.get(ev.conversationId || "global")?.tools.add(ev.toolName ?? "");
+				obs.call(ev.toolName, ev.conversationId);
 				return;
 			}
 			if (ev?.type !== "run_end") return;
@@ -939,6 +953,14 @@ export default {
 					{ droppable: true },
 				);
 			}
+			// 推过但本轮没被用上 → 记 ignore（只对带绑定路径/命令的记忆有意义，
+			// 概念类条目命中后靠推理采纳、不一定碰文件，统计上结构性偏低，已知并接受）
+			if (bucket?.returned.size) {
+				for (const id of bucket.returned) {
+					if (!bucket.hit.has(id)) obs.ignore(id, key);
+				}
+			}
+			obs.flush();
 			runs.delete(key);
 
 			// 兜底：用户明确要求记住，但这一轮既没调 memory_write 也没走 /remember → 自动补一条。
@@ -970,7 +992,10 @@ export default {
 					const rec = records.find((r) => r.id === id);
 					if (!rec) continue;
 					const keys = boundKeys(rec);
-					if (keys.some((k) => text.includes(k))) bucket.hit.add(id);
+					if (keys.some((k) => text.includes(k))) {
+						bucket.hit.add(id);
+						obs.use(id, req?.conversationId);
+					}
 				}
 			}
 			// 操作点提醒：命中的记忆顺手附在工具结果后面（数据段，不是指令）
@@ -988,6 +1013,10 @@ export default {
 					noteReturned(
 						hits.map((h) => h.rec.id),
 						req?.conversationId ?? "global",
+					);
+					obs.hint(
+						hits.map((h) => h.rec.id),
+						req?.conversationId,
 					);
 				}
 			}
@@ -1008,6 +1037,43 @@ export default {
 				})),
 				blacklistCount: blacklist.length,
 				trash: trash.map((t) => ({ ...t, expiresAt: (Number(t.deletedAt) || 0) + TRASH_TTL_MS })),
+			});
+		});
+
+		/**
+		 * P0 基线指标（`.review/plan-pages-v4.md` §1）。
+		 * 主动调用率 = memory_* 工具调用数 ÷ 轮数；hint 有效性 = 被证实「用上」的条目轮次 ÷
+		 * 注入的条目轮次；误记率 = 用户删除/作废条数 ÷ 新增条数（来自 audit.jsonl）。
+		 */
+		host.route("GET", "/metrics", (req, res) => {
+			const sinceMs = Number(req?.query?.since ?? 0) || 0;
+			let adds = 0;
+			let kills = 0;
+			try {
+				const body = readFileSync(auditFile, "utf8");
+				for (const line of body.split(String.fromCharCode(10))) {
+					const t = line.trim();
+					if (!t) continue;
+					let e;
+					try {
+						e = JSON.parse(t);
+					} catch {
+						continue;
+					}
+					if (sinceMs && Number(e.at) < sinceMs) continue;
+					if (e.op === "add" || e.op === "auto-recover") adds += 1;
+					else if (e.op === "delete" || e.op === "invalidate" || e.op === "bulk") kills += 1;
+				}
+			} catch {
+				/* 没有审计文件 = 全 0 */
+			}
+			res.json({
+				ok: true,
+				now: Date.now(),
+				since: sinceMs,
+				events: obs.summarize({ sinceMs }),
+				audit: { adds, kills, misrecordRate: adds > 0 ? Number((kills / adds).toFixed(3)) : null },
+				perRecord: obs.allStats(),
 			});
 		});
 

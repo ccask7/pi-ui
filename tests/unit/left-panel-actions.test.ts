@@ -96,22 +96,22 @@ afterEach(() => {
 });
 
 describe("LeftPanel 标题栏操作与项目管理", () => {
-	it("历史分支会话显示分支小标识，但不增加悬浮提示", () => {
+	it("历史会话直接显示并重命名真实名称，不渲染独立分支标识", () => {
 		setAppGlobals({ cwd: "/test", ready: true, status: "open", workspaceRoots: [] });
 		const sessions = [
 			{
 				path: "branch.jsonl",
-				name: "分支会话",
+				name: "分支会话(分支)",
 				firstMessage: "Hello",
 				modified: Date.now(),
 				messageCount: 1,
-				isBranch: true,
 			},
 		];
 		const { container } = mountLeftPanel({ sessions, projectSessions: { "/test": sessions } });
-		const badge = container.querySelector(".session-fork-badge");
-		expect(badge?.textContent).toBe("分支");
-		expect(badge?.getAttribute("title")).toBeNull();
+		expect(container.querySelector(".session-title")?.textContent).toBe("分支会话(分支)");
+		expect(container.querySelector(".session-fork-badge")).toBeNull();
+		act(() => container.querySelector<HTMLButtonElement>(".lp-tree-session-row .lp-rename")!.click());
+		expect(container.querySelector<HTMLInputElement>(".session-rename-input")?.value).toBe("分支会话(分支)");
 	});
 
 	it("projects=[] 时仍渲染“项目”标题栏和项目管理按钮，并保留统一树滚动区", () => {

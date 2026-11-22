@@ -982,8 +982,6 @@ export interface SessionSummary {
 	modified: number;
 	/** Where the session lives: this UI's per-client dir, or the pi CLI/TUI dir. */
 	source?: "web" | "tui";
-	/** 从另一会话派生而来；历史列表仅显示小标识，不改变分支链收纳规则。 */
-	isBranch?: boolean;
 	/** 归档历史弹窗用于显示所属项目。 */
 	cwd?: string;
 }

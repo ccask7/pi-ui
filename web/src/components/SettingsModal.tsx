@@ -177,6 +177,8 @@ interface SettingsModalProps {
 	onOpenPluginView: (id: string) => void;
 	/** Switch the top-level view to the terminal (uninstall runs there). */
 	onSwitchToTerminal: () => void;
+	/** Render as a workspace tab instead of a modal backdrop. */
+	inline?: boolean;
 	onClose: () => void;
 }
 
@@ -281,6 +283,7 @@ export function SettingsModal({
 	reloadThemes,
 	onOpenPluginView,
 	onSwitchToTerminal,
+	inline = false,
 	onClose,
 }: SettingsModalProps) {
 	const t = useT();
@@ -826,8 +829,8 @@ export function SettingsModal({
 		Object.values(promptOverridesDraft).some((v) => v.trim());
 
 	return (
-		<div className="modal-backdrop" onClick={onClose}>
-			<div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
+		<div className={inline ? "settings-inline-host" : "modal-backdrop"} onClick={inline ? undefined : onClose}>
+			<div className={`modal settings-modal${inline ? " settings-inline" : ""}`} onClick={(e) => e.stopPropagation()}>
 				<button type="button" className="modal-close" aria-label={t("close")} onClick={onClose}>
 					<FiX />
 				</button>

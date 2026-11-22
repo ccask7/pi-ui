@@ -47,6 +47,18 @@ describe("memory 插件真机激活", () => {
 			expect(String(text)).toContain("已记住");
 			const found = await search?.execute("c2", { query: "pnpm" });
 			expect(String(found)).toContain("pnpm");
+			// P0 可观测性：/metrics 真的挂上了，且检索计数落在 stats 里（不靠 events 重算）。
+			let body: any = null;
+			mgr.handleHttp(
+				"memory",
+				"GET",
+				"/metrics",
+				{ query: {} } as never,
+				{ json: (v: unknown) => (body = v) } as never,
+			);
+			expect(body?.ok).toBe(true);
+			expect(body?.events?.turns).toBe(0);
+			expect(Object.values(body?.perRecord ?? {}).some((r: any) => (r?.search ?? 0) >= 1)).toBe(true);
 		} finally {
 			mgr.dispose();
 			rmSync(dir, { recursive: true, force: true });

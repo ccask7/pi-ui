@@ -10,6 +10,7 @@ import {
 	type PointerEvent as ReactPointerEvent,
 } from "react";
 import { TopBar } from "./components/TopBar";
+import { mainPanelPluginId, type WorkspacePageId } from "./workspace-page";
 import { ChatTabBar } from "./components/ChatTabBar.js";
 import { LeftPanel } from "./components/LeftPanel";
 import { RightPanel } from "./components/RightPanel";
@@ -333,19 +334,18 @@ export function App() {
 		return () => window.removeEventListener("drop", clear, true);
 	}, []);
 	const [viewChosen, setView] = useState<ViewName>("chat");
-	// 左栏「插件」只替换对话内容，不注册顶栏视图或改动右栏。
-	const [pluginsOpen, setPluginsOpen] = useState(false);
-	/* 对话区内的插件主面板（slot main.panel，如「记忆」）：只换对话区，左右栏不动 ——
-	   与「插件」能力面板同一形态，不是 view（view 会整块替换布局）。点同一个按钮是开关。 */
-	const [mainPanelId, setMainPanelId] = useState<string | null>(null);
+	// 会话工作区中的单例页面：设置、插件清单或某个 main.panel 插件（如记忆）。
+	const [workspacePage, setWorkspacePage] = useState<WorkspacePageId | null>(null);
+	const settingsOpen = workspacePage === "settings";
+	const pluginsOpen = workspacePage === "plugins";
+	const mainPanelId = mainPanelPluginId(workspacePage);
 	/** 新建任务先停留在前端草稿；首条消息由服务端按选中项目原子创建。 */
 	const [newTaskOpen, setNewTaskOpen] = useState(false);
 	const [newTaskCwd, setNewTaskCwd] = useState(cwd);
 	const openNewTask = useCallback(() => {
 		setNewTaskCwd(cwd);
 		setNewTaskOpen(true);
-		setPluginsOpen(false);
-		setMainPanelId(null);
+		setWorkspacePage(null);
 		setView("chat");
 	}, [cwd]);
 	/* PI_WEB_TABS: a tab this instance does not offer cannot be shown, even if
@@ -392,6 +392,22 @@ export function App() {
 	);
 	/* 插件被停用/卸载时面板要自动收起：否则对话区会一直藏着、只剩一块空白。 */
 	const mainPanel = mainPanelId && enabledPlugins.some((p) => p.id === mainPanelId) ? mainPanelId : null;
+	const workspaceTab = settingsOpen
+		? { id: "settings", title: t("settingsTitle"), kind: "settings" as const }
+		: pluginsOpen
+			? { id: "plugins", title: t("pluginEntry"), kind: "plugin" as const }
+			: mainPanel
+				? (() => {
+						const info = enabledPlugins.find((p) => p.id === mainPanel);
+						return {
+							id: `main:${mainPanel}`,
+							title: info?.name ?? mainPanel,
+							kind: "plugin" as const,
+							icon: info?.icon,
+							iconSvg: info?.iconSvg,
+						};
+					})()
+				: null;
 	const uiTerminalToolbar = useMemo(() => uiSlots["terminal.toolbar"].filter((e) => !e.hidden), [uiSlots]);
 	const uiScmToolbar = useMemo(() => uiSlots["scm.toolbar"].filter((e) => !e.hidden), [uiSlots]);
 	const uiGoalbarActions = useMemo(() => uiSlots["goalbar.actions"].filter((e) => !e.hidden), [uiSlots]);
@@ -421,8 +437,7 @@ export function App() {
 			// slot main.panel：只换对话区（左右栏不动）。再点一次同一个按钮 = 收起。
 			if (item.slot === "main.panel" && item.source.startsWith("plugin:")) {
 				const pid = item.source.slice(7);
-				setPluginsOpen(false);
-				setMainPanelId((cur) => (cur === pid ? null : pid));
+				setWorkspacePage((cur) => (cur === `main:${pid}` ? null : `main:${pid}`));
 				// 面板画在对话区：停在终端/Git/插件视图时点它必须切回对话，否则看不见任何反馈。
 				setView("chat");
 				return;
@@ -431,7 +446,7 @@ export function App() {
 			if (item.kind === "view" || ((!action || action === "view") && item.source !== "host")) {
 				const next = (item.view ??
 					`plugin:${item.source.startsWith("plugin:") ? item.source.slice(7) : ""}`) as ViewName;
-				if (next === "chat") setMainPanelId(null);
+				if (next === "chat") setWorkspacePage(null);
 				setView(next);
 				return;
 			}
@@ -507,7 +522,7 @@ export function App() {
 				send,
 				isReady: () => Boolean(chatRefForPlugins.current.state),
 				setView: (v) => {
-					if (v === "chat") setMainPanelId(null);
+					if (v === "chat") setWorkspacePage(null);
 					setViewRefForPlugins.current(v as ViewName);
 				},
 				getCwd: () => chatRefForPlugins.current.state?.cwd ?? "",
@@ -661,8 +676,7 @@ export function App() {
 	const [setupDismissed, setSetupDismissed] = useState(false);
 	// Custom model config panel (model dropdown → 管理模型).
 	const [manageModelsOpen, setManageModelsOpen] = useState(false);
-	// Settings panel (system prompt / skills / extensions / presets).
-	const [settingsOpen, setSettingsOpen] = useState(false);
+	// Settings is hosted by workspacePage and rendered as a workspace tab.
 	const [settingsInitialSection, setSettingsInitialSection] = useState<"tools" | undefined>();
 	// 插件请求目录授权时的确认（host.openSession，issue #146）——非模态 inline 面板。
 	const [pluginPathConfirm, setPluginPathConfirm] = useState<{ path: string; resolve: (ok: boolean) => void } | null>(
@@ -762,7 +776,7 @@ export function App() {
 					command: def,
 				});
 			}
-			setPluginsOpen(false);
+			setWorkspacePage(null);
 			setView("terminal");
 		};
 		window.addEventListener("ccui:plugin-run-command", onPluginRunCommand);
@@ -770,7 +784,7 @@ export function App() {
 		const onSwitchConversation = (e: Event) => {
 			const id = (e as CustomEvent<string>).detail;
 			if (typeof id === "string" && id) {
-				setMainPanelId(null);
+				setWorkspacePage(null);
 				send({ type: "switch_conversation", id });
 			}
 		};
@@ -1037,9 +1051,8 @@ export function App() {
 				msg.type === "switch_conversation" ||
 				msg.type === "switch_session"
 			) {
-				setPluginsOpen(false);
+				setWorkspacePage(null);
 				setNewTaskOpen(false);
-				setMainPanelId(null);
 				setView((prev) => (prev !== "chat" ? "chat" : prev));
 			}
 			return send(msg);
@@ -1343,9 +1356,8 @@ export function App() {
 				uiContextTopbar={uiSlots["contextmenu.topbar"]}
 				onUiAction={onUiAction}
 				onViewChange={(v: ViewName) => {
-					// 回对话 = 收起能力面板；离开对话 = 收起对话区内的插件主面板（它在对话区里）。
-					if (v === "chat") setPluginsOpen(false);
-					else setMainPanelId(null);
+					// 顶栏切视图同时退出设置标签；原对话运行状态不受影响。
+					setWorkspacePage(null);
 					// The terminal panel stays mounted while hidden. Create the first
 					// shell on the user's terminal-view click, not on initial mount.
 					terminalOpenRequested.current = v === "terminal" && chat.terminals.length === 0;
@@ -1356,7 +1368,9 @@ export function App() {
 				}}
 				onOpenSettings={() => {
 					setSettingsInitialSection(undefined);
-					setSettingsOpen(true);
+					setWorkspacePage(null);
+					setView("chat");
+					setWorkspacePage("settings");
 				}}
 				onOpenBgTasks={() => setBgTasksOpen(true)}
 				onOpenHistory={() => {
@@ -1472,8 +1486,7 @@ export function App() {
 								activeConversationId={chat.activeConversationId}
 								pluginsActive={pluginsOpen}
 								onOpenPlugins={() => {
-									setMainPanelId(null);
-									setPluginsOpen(true);
+									setWorkspacePage("plugins");
 								}}
 								onNewTask={openNewTask}
 								onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
@@ -1493,9 +1506,11 @@ export function App() {
 								conversations={chat.conversations}
 								elsewhere={chat.elsewhere}
 								activeConversationId={chat.activeConversationId}
+								page={workspaceTab}
+								onClosePage={() => setWorkspacePage(null)}
 								panelSend={panelSend}
 							/>
-							<div className={`conversation-content${pluginsOpen || mainPanel ? " hidden" : ""}`}>
+							<div className={`conversation-content${pluginsOpen || mainPanel || settingsOpen ? " hidden" : ""}`}>
 								{/* 对话头部条（chat.header 槽位）：纯插件新增位，无条目时不渲染。 */}
 								{uiChatHeader.length > 0 && (
 									<div className="chat-header" role="toolbar">
@@ -1979,14 +1994,38 @@ export function App() {
 									pluginGrants={chat.pluginGrants}
 									pluginPermissions={chat.pluginPermissions}
 									onOpenPluginView={(id) => {
-										setPluginsOpen(false);
+										setWorkspacePage(null);
 										setView(`plugin:${id}`);
 									}}
 									onOpenTools={() => {
 										setSettingsInitialSection("tools");
-										setSettingsOpen(true);
+										setWorkspacePage(null);
+										setWorkspacePage("settings");
 									}}
 									send={send}
+								/>
+							)}
+							{settingsOpen && (
+								<SettingsModal
+									inline
+									chat={chat}
+									terminal={terminal}
+									initialSection={settingsInitialSection}
+									sound={sound}
+									onSoundChange={setSound}
+									themes={themes}
+									theme={theme}
+									onThemeChange={switchTheme}
+									reloadThemes={reloadThemes}
+									onOpenPluginView={(id) => {
+										setWorkspacePage(null);
+										setView(`plugin:${id}`);
+									}}
+									onSwitchToTerminal={() => {
+										setWorkspacePage(null);
+										setView("terminal");
+									}}
+									onClose={() => setWorkspacePage(null)}
 								/>
 							)}
 						</main>
@@ -2103,25 +2142,6 @@ export function App() {
 					cloneProviderResult={chat.cloneProviderResult}
 					defaultModel={chat.defaultModel}
 					onClose={() => setManageModelsOpen(false)}
-				/>
-			)}
-			{settingsOpen && (
-				<SettingsModal
-					chat={chat}
-					terminal={terminal}
-					initialSection={settingsInitialSection}
-					sound={sound}
-					onSoundChange={setSound}
-					themes={themes}
-					theme={theme}
-					onThemeChange={switchTheme}
-					reloadThemes={reloadThemes}
-					onOpenPluginView={(id) => {
-						setSettingsOpen(false);
-						setView(`plugin:${id}`);
-					}}
-					onSwitchToTerminal={() => setView("terminal")}
-					onClose={() => setSettingsOpen(false)}
 				/>
 			)}
 			{bgTasksOpen && <BgTasksModal servers={chat.bgServers} onClose={() => setBgTasksOpen(false)} />}

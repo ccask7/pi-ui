@@ -402,7 +402,7 @@ export const LeftPanel = memo(function LeftPanel({
 						Object.values(projectSessions)
 							.flat()
 							.find((s) => s.path === target.id) ?? sessions.find((s) => s.path === target.id);
-					setRenameDraft(sess?.name ?? target.label ?? "");
+					setRenameDraft(sess ? displayName(sess) : (target.label ?? ""));
 					setRenaming(target.id);
 				}
 				return;
@@ -609,7 +609,6 @@ export const LeftPanel = memo(function LeftPanel({
 						if (!active) panelSend({ type: "switch_session", path: s.path });
 					}}
 				>
-					{s.isBranch && <span className="session-fork-badge">{t("forkBadge")}</span>}
 					<span className="session-info">
 						{renaming === s.path ? (
 							<input
@@ -644,7 +643,7 @@ export const LeftPanel = memo(function LeftPanel({
 					onClick={(e) => {
 						e.stopPropagation();
 						setPendingConfirm(null);
-						setRenameDraft(s.name ?? "");
+						setRenameDraft(displayName(s));
 						setRenaming(s.path);
 					}}
 				>

@@ -8,6 +8,20 @@
 每个版本的内容按"实际合入该版本发布的提交"归档（以 `package.json` 的 version 变更提交为准），
 而不是按提交日期聚类——连续快速发布的 patch 版本以此为准最准确。
 
+## [0.0.14] — 2026-11-23
+
+### Changed
+
+- 设置、界面插件清单、插件主面板（如「记忆」）统一成**工作区标签页**：和对话标签同排、带 ✕，打开时不遮罩对话区（对话仍在后台跑）。设置以 `SettingsModal inline` 内嵌渲染，新增 `web/src/workspace-page.ts` 管理 `settings | plugins | main:<id>` 三种单例页面。
+- 分支会话的名称直接带 `(分支)` 后缀并写进会话文件（`appendSessionInfo`），不再靠 `SessionSummary.isBranch` 标记 + 前端小标；已有 `(分支)` 后缀不再叠加。协议移除 `SessionSummary.isBranch`。
+- 记忆插件 0.2.3：P0 可观测性 —— `data/events/YYYY-MM-DD.jsonl`（30 天保留、单文件 5MB 滚动）、`data/stats.json`（每条记忆 hint / search / read / used / ignored 长期计数）、`GET /plugins-api/memory/metrics`（主动调用率 / hint 有效性 / 误记率）。事件只含 id 与类型，不含正文。
+
+### Fixed
+
+- 分叉时写会话名失败（内存模式、只读盘）会让整个分叉失败：`forkedManager.appendSessionInfo` 改成尽力而为。
+- 新的 `plugins/memory/test/observe.test.mjs` 没接进 `npm run test:plugins`（等于静默不跑）。
+- `plugins/memory/manifest.json` 被改成 LF，恢复仓库既有 CRLF（避免整文件 diff）。
+
 ## [0.0.13] — 2026-11-17
 
 ### Changed
